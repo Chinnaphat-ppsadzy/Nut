@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "c:\\Users\\ppsadzy\\Desktop\\8272 chinnaphat supsombat\\Nut\\Chinnaphat_8272_L005\\Chinnaphat_8272_L005.csproj": {}
+    "C:\\Users\\ppsadzy\\Desktop\\8272 chinnaphat supsombat\\Nut\\Chinnaphat_8272_L005\\Chinnaphat_8272_L005.csproj": {}
   },
   "projects": {
-    "c:\\Users\\ppsadzy\\Desktop\\8272 chinnaphat supsombat\\Nut\\Chinnaphat_8272_L005\\Chinnaphat_8272_L005.csproj": {
+    "C:\\Users\\ppsadzy\\Desktop\\8272 chinnaphat supsombat\\Nut\\Chinnaphat_8272_L005\\Chinnaphat_8272_L005.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "c:\\Users\\ppsadzy\\Desktop\\8272 chinnaphat supsombat\\Nut\\Chinnaphat_8272_L005\\Chinnaphat_8272_L005.csproj",
+        "projectUniqueName": "C:\\Users\\ppsadzy\\Desktop\\8272 chinnaphat supsombat\\Nut\\Chinnaphat_8272_L005\\Chinnaphat_8272_L005.csproj",
         "projectName": "Chinnaphat_8272_L005",
-        "projectPath": "c:\\Users\\ppsadzy\\Desktop\\8272 chinnaphat supsombat\\Nut\\Chinnaphat_8272_L005\\Chinnaphat_8272_L005.csproj",
+        "projectPath": "C:\\Users\\ppsadzy\\Desktop\\8272 chinnaphat supsombat\\Nut\\Chinnaphat_8272_L005\\Chinnaphat_8272_L005.csproj",
         "packagesPath": "C:\\Users\\ppsadzy\\.nuget\\packages\\",
-        "outputPath": "c:\\Users\\ppsadzy\\Desktop\\8272 chinnaphat supsombat\\Nut\\Chinnaphat_8272_L005\\obj\\",
+        "outputPath": "C:\\Users\\ppsadzy\\Desktop\\8272 chinnaphat supsombat\\Nut\\Chinnaphat_8272_L005\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\ppsadzy\\AppData\\Roaming\\NuGet\\NuGet.Config"

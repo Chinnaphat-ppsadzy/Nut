@@ -17,6 +17,18 @@ public class HomeController : Controller
         return View();
     }
 
+    public IActionResult Customer()
+    {
+        ViewData["Title"] = "หน้าหลัก";
+        return View();
+    }
+
+    public IActionResult Admin()
+    {
+        ViewData["Title"] = "Dashboard";
+        return View();
+    }
+
  public IActionResult Lab2()
     {
     char A = 'a';

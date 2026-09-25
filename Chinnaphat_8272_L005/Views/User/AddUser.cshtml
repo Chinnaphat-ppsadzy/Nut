@@ -1,0 +1,335 @@
+@model Chinnaphat_8272_L005.Models.AddUserViewModel
+
+@{
+    ViewData["Title"] = "เพิ่มผู้ใช้งาน";
+    Layout = "_AdminLayout";
+}
+
+<style>
+    .form-card {
+        background: #fff;
+        border-radius: 16px;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+        padding: 2rem;
+    }
+
+    .section-title {
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: #2d6a4f;
+        border-bottom: 2px solid #e8f5e9;
+        padding-bottom: 0.5rem;
+        margin-bottom: 1.2rem;
+    }
+
+    .form-label { font-weight: 600; font-size: 0.88rem; color: #2d3748; }
+
+    .form-control, .form-select {
+        border: 1.5px solid #e2e8f0;
+        border-radius: 10px;
+        padding: 0.6rem 1rem 0.6rem 2.5rem;
+        font-size: 0.92rem;
+        transition: all 0.25s;
+    }
+
+    .form-select { padding-left: 2.5rem; }
+
+    .form-control:focus, .form-select:focus {
+        border-color: #52b788;
+        box-shadow: 0 0 0 3px rgba(82,183,136,0.2);
+        outline: none;
+    }
+
+    .input-wrapper {
+        position: relative;
+    }
+
+    .input-wrapper .bi-icon {
+        position: absolute;
+        left: 0.8rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #52b788;
+        font-size: 1rem;
+        pointer-events: none;
+        z-index: 1;
+    }
+
+    .input-wrapper .toggle-password {
+        position: absolute;
+        right: 0.9rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #999;
+        cursor: pointer;
+        z-index: 1;
+    }
+
+    .required-star { color: #e53e3e; }
+
+    .btn-save {
+        background: linear-gradient(135deg, #2d6a4f, #52b788);
+        border: none;
+        border-radius: 10px;
+        padding: 0.65rem 2rem;
+        font-weight: 600;
+        color: white;
+        font-size: 0.95rem;
+        transition: all 0.25s;
+    }
+
+    .btn-save:hover {
+        background: linear-gradient(135deg, #1a472a, #2d6a4f);
+        transform: translateY(-1px);
+        box-shadow: 0 5px 20px rgba(45,106,79,0.35);
+        color: white;
+    }
+
+    .btn-cancel {
+        border-radius: 10px;
+        padding: 0.65rem 2rem;
+        font-weight: 600;
+        font-size: 0.95rem;
+    }
+
+    .avatar-preview {
+        width: 90px;
+        height: 90px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #2d6a4f, #52b788);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2.5rem;
+        color: white;
+        margin: 0 auto 1rem;
+    }
+
+    .role-badge {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.78rem;
+        font-weight: 600;
+    }
+</style>
+
+@if (TempData["SuccessMessage"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show mb-4" style="border-radius:10px;">
+        <i class="bi bi-check-circle me-2"></i>@TempData["SuccessMessage"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+<form asp-action="AddUser" asp-controller="User" method="post" id="addUserForm">
+    @Html.AntiForgeryToken()
+
+    <div class="row g-4">
+
+        <!-- ============ LEFT: Avatar Card ============ -->
+        <div class="col-lg-4">
+            <div class="form-card text-center">
+                <div class="avatar-preview" id="avatarCircle">
+                    <i class="bi bi-person-fill"></i>
+                </div>
+                <p class="text-muted small mb-0">รูปโปรไฟล์</p>
+                <hr>
+
+                <!-- Status toggle -->
+                <div class="d-flex align-items-center justify-content-between">
+                    <span class="form-label mb-0">สถานะบัญชี</span>
+                    <div class="form-check form-switch mb-0">
+                        <input asp-for="IsActive" class="form-check-input" id="isActiveSwitch"
+                               role="switch" style="width:2.5rem; height:1.3rem; cursor:pointer;" />
+                    </div>
+                </div>
+                <p id="statusText" class="text-success small mt-1 mb-0">
+                    <i class="bi bi-circle-fill me-1" style="font-size:0.5rem;"></i>เปิดใช้งาน
+                </p>
+
+                <hr>
+                <div class="text-start">
+                    <p class="section-title">บทบาทในระบบ</p>
+                    <div class="mb-2">
+                        <span class="role-badge bg-danger bg-opacity-10 text-danger">Admin</span>
+                        <small class="text-muted ms-2">ผู้ดูแลระบบ</small>
+                    </div>
+                    <div class="mb-2">
+                        <span class="role-badge bg-warning bg-opacity-10 text-warning">Staff</span>
+                        <small class="text-muted ms-2">พนักงาน</small>
+                    </div>
+                    <div>
+                        <span class="role-badge bg-primary bg-opacity-10 text-primary">User</span>
+                        <small class="text-muted ms-2">ผู้ใช้ทั่วไป</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============ RIGHT: Form ============ -->
+        <div class="col-lg-8">
+            <div class="form-card">
+
+                @if (!ViewData.ModelState.IsValid && ViewData.ModelState.ErrorCount > 0)
+                {
+                    <div class="alert alert-danger py-2 mb-3" style="border-radius:10px;">
+                        <i class="bi bi-exclamation-triangle me-2"></i>กรุณาตรวจสอบข้อมูลให้ครบถ้วน
+                    </div>
+                }
+
+                <!-- ส่วน: ข้อมูลส่วนตัว -->
+                <p class="section-title"><i class="bi bi-person me-1"></i>ข้อมูลส่วนตัว</p>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-6">
+                        <label asp-for="FirstName" class="form-label">ชื่อ <span class="required-star">*</span></label>
+                        <div class="input-wrapper">
+                            <i class="bi bi-person bi-icon"></i>
+                            <input asp-for="FirstName" class="form-control" id="addFirstName" placeholder="ชื่อ" />
+                        </div>
+                        <span asp-validation-for="FirstName" class="text-danger small"></span>
+                    </div>
+                    <div class="col-6">
+                        <label asp-for="LastName" class="form-label">นามสกุล <span class="required-star">*</span></label>
+                        <div class="input-wrapper">
+                            <i class="bi bi-person bi-icon"></i>
+                            <input asp-for="LastName" class="form-control" id="addLastName" placeholder="นามสกุล" />
+                        </div>
+                        <span asp-validation-for="LastName" class="text-danger small"></span>
+                    </div>
+                </div>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-6">
+                        <label asp-for="Gender" class="form-label">เพศ <span class="required-star">*</span></label>
+                        <div class="input-wrapper">
+                            <i class="bi bi-gender-ambiguous bi-icon"></i>
+                            <select asp-for="Gender" class="form-select" id="addGender">
+                                <option value="">-- เลือกเพศ --</option>
+                                <option value="male">ชาย</option>
+                                <option value="female">หญิง</option>
+                                <option value="other">อื่น ๆ</option>
+                            </select>
+                        </div>
+                        <span asp-validation-for="Gender" class="text-danger small"></span>
+                    </div>
+                    <div class="col-6">
+                        <label asp-for="Phone" class="form-label">เบอร์โทรศัพท์ <span class="required-star">*</span></label>
+                        <div class="input-wrapper">
+                            <i class="bi bi-telephone bi-icon"></i>
+                            <input asp-for="Phone" class="form-control" id="addPhone" placeholder="0XX-XXX-XXXX" />
+                        </div>
+                        <span asp-validation-for="Phone" class="text-danger small"></span>
+                    </div>
+                </div>
+
+                <!-- ส่วน: ข้อมูลบัญชี -->
+                <p class="section-title mt-3"><i class="bi bi-shield-lock me-1"></i>ข้อมูลบัญชีผู้ใช้</p>
+
+                <div class="mb-3">
+                    <label asp-for="Email" class="form-label">อีเมล <span class="required-star">*</span></label>
+                    <div class="input-wrapper">
+                        <i class="bi bi-envelope bi-icon"></i>
+                        <input asp-for="Email" class="form-control" id="addEmail" placeholder="example@email.com" type="email" />
+                    </div>
+                    <span asp-validation-for="Email" class="text-danger small"></span>
+                </div>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-6">
+                        <label asp-for="Username" class="form-label">ชื่อผู้ใช้ <span class="required-star">*</span></label>
+                        <div class="input-wrapper">
+                            <i class="bi bi-at bi-icon"></i>
+                            <input asp-for="Username" class="form-control" id="addUsername" placeholder="ชื่อผู้ใช้" />
+                        </div>
+                        <span asp-validation-for="Username" class="text-danger small"></span>
+                    </div>
+                    <div class="col-6">
+                        <label asp-for="Role" class="form-label">บทบาท <span class="required-star">*</span></label>
+                        <div class="input-wrapper">
+                            <i class="bi bi-shield bi-icon"></i>
+                            <select asp-for="Role" class="form-select" id="addRole">
+                                <option value="">-- เลือกบทบาท --</option>
+                                <option value="Admin">Admin (ผู้ดูแลระบบ)</option>
+                                <option value="Staff">Staff (พนักงาน)</option>
+                                <option value="User">User (ผู้ใช้ทั่วไป)</option>
+                            </select>
+                        </div>
+                        <span asp-validation-for="Role" class="text-danger small"></span>
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label asp-for="Password" class="form-label">รหัสผ่าน <span class="required-star">*</span></label>
+                    <div class="input-wrapper">
+                        <i class="bi bi-lock bi-icon"></i>
+                        <input asp-for="Password" class="form-control" id="addPassword" placeholder="รหัสผ่าน (อย่างน้อย 6 ตัว)" />
+                        <i class="bi bi-eye toggle-password" id="toggleAddPwd" onclick="togglePwd('addPassword','toggleAddPwd')"></i>
+                    </div>
+                    <span asp-validation-for="Password" class="text-danger small"></span>
+                </div>
+
+                <!-- Buttons -->
+                <div class="d-flex gap-3 justify-content-end">
+                    <a asp-action="UserList" asp-controller="User" class="btn btn-outline-secondary btn-cancel" id="btnCancelAddUser">
+                        <i class="bi bi-x-circle me-1"></i>ยกเลิก
+                    </a>
+                    <button type="submit" class="btn-save" id="btnSaveUser">
+                        <i class="bi bi-person-plus me-1"></i>บันทึกผู้ใช้
+                    </button>
+                </div>
+
+            </div>
+        </div>
+
+    </div>
+</form>
+
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jquery-validation@1.19.5/dist/jquery.validate.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jquery-validation-unobtrusive@4.0.0/dist/jquery.validate.unobtrusive.min.js"></script>
+
+<script>
+    function togglePwd(inputId, iconId) {
+        const input = document.getElementById(inputId);
+        const icon  = document.getElementById(iconId);
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.classList.replace('bi-eye', 'bi-eye-slash');
+        } else {
+            input.type = 'password';
+            icon.classList.replace('bi-eye-slash', 'bi-eye');
+        }
+    }
+
+    // Status switch label
+    document.getElementById('isActiveSwitch').addEventListener('change', function () {
+        const st = document.getElementById('statusText');
+        if (this.checked) {
+            st.className = 'text-success small mt-1 mb-0';
+            st.innerHTML = '<i class="bi bi-circle-fill me-1" style="font-size:0.5rem;"></i>เปิดใช้งาน';
+        } else {
+            st.className = 'text-danger small mt-1 mb-0';
+            st.innerHTML = '<i class="bi bi-circle-fill me-1" style="font-size:0.5rem;"></i>ปิดใช้งาน';
+        }
+    });
+
+    // Auto-fill avatar initials from name
+    function updateAvatar() {
+        const fn = document.getElementById('addFirstName').value;
+        const ln = document.getElementById('addLastName').value;
+        const circle = document.getElementById('avatarCircle');
+        if (fn || ln) {
+            circle.innerHTML = `<span style="font-size:2rem;font-weight:700;">${(fn[0]||'').toUpperCase()}${(ln[0]||'').toUpperCase()}</span>`;
+        } else {
+            circle.innerHTML = '<i class="bi bi-person-fill"></i>';
+        }
+    }
+
+    document.getElementById('addFirstName').addEventListener('input', updateAvatar);
+    document.getElementById('addLastName').addEventListener('input', updateAvatar);
+</script>

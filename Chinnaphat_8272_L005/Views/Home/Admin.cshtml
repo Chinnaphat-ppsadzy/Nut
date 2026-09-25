@@ -1,0 +1,273 @@
+@{
+    ViewData["Title"] = "Dashboard";
+    Layout = "_AdminLayout";
+}
+
+<style>
+    .stat-card {
+        background: #fff;
+        border-radius: 16px;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+        padding: 1.5rem;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .stat-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 6px 24px rgba(0,0,0,0.1);
+    }
+    .stat-icon {
+        width: 52px; height: 52px;
+        border-radius: 14px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1.5rem;
+    }
+    .stat-value { font-size: 2rem; font-weight: 700; line-height: 1; }
+    .stat-label { font-size: 0.85rem; color: #6b7280; margin-top: 0.25rem; }
+    .stat-change { font-size: 0.8rem; margin-top: 0.5rem; }
+
+    .section-card {
+        background: #fff;
+        border-radius: 16px;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+    }
+    .section-card .card-header {
+        background: transparent;
+        border-bottom: 1px solid #f1f5f9;
+        padding: 1.2rem 1.5rem;
+        font-weight: 700;
+        font-size: 0.95rem;
+    }
+
+    .avatar-xs {
+        width: 34px; height: 34px; border-radius: 50%;
+        background: linear-gradient(135deg,#2d6a4f,#52b788);
+        display: inline-flex; align-items: center; justify-content: center;
+        color: white; font-weight: 700; font-size: 0.8rem;
+    }
+    .badge-role { font-size: 0.72rem; padding: 0.25rem 0.65rem; border-radius: 20px; font-weight: 600; }
+
+    .activity-dot {
+        width: 8px; height: 8px; border-radius: 50%;
+        flex-shrink: 0; margin-top: 5px;
+    }
+
+    .progress-bar-custom {
+        height: 8px; border-radius: 10px;
+        background: linear-gradient(90deg,#2d6a4f,#52b788);
+    }
+</style>
+
+<!-- ========== STAT CARDS ========== -->
+<div class="row g-3 mb-4">
+
+    <!-- Users -->
+    <div class="col-6 col-xl-3">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-start mb-3">
+                <div class="stat-icon" style="background:#e8f5e9;">
+                    <i class="bi bi-people-fill text-success"></i>
+                </div>
+                <span class="badge bg-success-subtle text-success" style="border-radius:10px; font-size:0.72rem;">+12%</span>
+            </div>
+            <div class="stat-value">248</div>
+            <div class="stat-label">ผู้ใช้งานทั้งหมด</div>
+        </div>
+    </div>
+
+    <!-- Courts -->
+    <div class="col-6 col-xl-3">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-start mb-3">
+                <div class="stat-icon" style="background:#e0f2fe;">
+                    <i class="bi bi-building text-primary"></i>
+                </div>
+                <span class="badge bg-primary-subtle text-primary" style="border-radius:10px; font-size:0.72rem;">+3</span>
+            </div>
+            <div class="stat-value">12</div>
+            <div class="stat-label">สนามกีฬาทั้งหมด</div>
+        </div>
+    </div>
+
+    <!-- Bookings -->
+    <div class="col-6 col-xl-3">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-start mb-3">
+                <div class="stat-icon" style="background:#fef3c7;">
+                    <i class="bi bi-calendar-check text-warning"></i>
+                </div>
+                <span class="badge bg-warning-subtle text-warning" style="border-radius:10px; font-size:0.72rem;">+8%</span>
+            </div>
+            <div class="stat-value">1,340</div>
+            <div class="stat-label">การจองเดือนนี้</div>
+        </div>
+    </div>
+
+    <!-- Revenue -->
+    <div class="col-6 col-xl-3">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-start mb-3">
+                <div class="stat-icon" style="background:#fce7f3;">
+                    <i class="bi bi-currency-exchange" style="color:#db2777;"></i>
+                </div>
+                <span class="badge" style="background:#fce7f3; color:#db2777; border-radius:10px; font-size:0.72rem;">+15%</span>
+            </div>
+            <div class="stat-value" style="font-size:1.6rem;">฿84,500</div>
+            <div class="stat-label">รายได้เดือนนี้</div>
+        </div>
+    </div>
+
+</div>
+
+
+<!-- ========== MIDDLE ROW ========== -->
+<div class="row g-3 mb-4">
+
+    <!-- Court Usage -->
+    <div class="col-lg-5">
+        <div class="section-card h-100">
+            <div class="card-header">
+                <i class="bi bi-bar-chart-fill text-success me-2"></i>อัตราการใช้สนาม
+            </div>
+            <div class="card-body p-4">
+                @{
+                    var courts = new[] {
+                        new { Name = "สนาม A (แบดมินตัน)", Pct = 92, Color = "#52b788" },
+                        new { Name = "สนาม B (บาสเกตบอล)", Pct = 75, Color = "#3b82f6" },
+                        new { Name = "สนาม C (วอลเลย์บอล)", Pct = 60, Color = "#f59e0b" },
+                        new { Name = "สนาม D (ฟุตบอล)",    Pct = 48, Color = "#ec4899" },
+                        new { Name = "สนาม E (เทนนิส)",    Pct = 35, Color = "#8b5cf6" },
+                    };
+                }
+                @foreach (var c in courts)
+                {
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between mb-1">
+                            <small class="fw-semibold">@c.Name</small>
+                            <small class="text-muted">@c.Pct%</small>
+                        </div>
+                        <div class="progress" style="height:8px; border-radius:10px; background:#f1f5f9;">
+                            <div class="progress-bar" role="progressbar"
+                                 style="width:@(c.Pct)%; background:@(c.Color); border-radius:10px;">
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Activity -->
+    <div class="col-lg-7">
+        <div class="section-card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-activity text-success me-2"></i>กิจกรรมล่าสุด</span>
+            </div>
+            <div class="card-body p-4">
+                @{
+                    var activities = new[] {
+                        new { Dot="#22c55e", Text="สมชาย ใจดี จองสนาม A เวลา 09:00–10:00",  Time="5 นาทีที่แล้ว" },
+                        new { Dot="#3b82f6", Text="สมหญิง รักเรียน สมัครสมาชิกใหม่",          Time="18 นาทีที่แล้ว" },
+                        new { Dot="#f59e0b", Text="วิชัย เก่งมาก ยกเลิกการจองสนาม B",         Time="45 นาทีที่แล้ว" },
+                        new { Dot="#22c55e", Text="นภา สวยงาม จองสนาม C เวลา 14:00–15:00",   Time="1 ชั่วโมงที่แล้ว" },
+                        new { Dot="#ec4899", Text="Admin เพิ่มโปรโมชั่นใหม่ ลด 20%",          Time="2 ชั่วโมงที่แล้ว" },
+                        new { Dot="#8b5cf6", Text="ระบบชำระเงินสำเร็จ ฿500",                  Time="3 ชั่วโมงที่แล้ว" },
+                    };
+                }
+                <div class="d-flex flex-column gap-3">
+                    @foreach (var a in activities)
+                    {
+                        <div class="d-flex gap-3">
+                            <div class="activity-dot" style="background:@(a.Dot);"></div>
+                            <div class="flex-grow-1">
+                                <div style="font-size:0.88rem;">@a.Text</div>
+                                <small class="text-muted">@a.Time</small>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+
+<!-- ========== USERS TABLE ========== -->
+<div class="section-card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-people text-success me-2"></i>ผู้ใช้งานล่าสุด</span>
+        <a asp-action="UserList" asp-controller="User"
+           class="btn btn-sm btn-outline-success" style="border-radius:8px; font-size:0.8rem;">
+            ดูทั้งหมด <i class="bi bi-arrow-right ms-1"></i>
+        </a>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0" style="font-size:0.88rem;">
+                <thead class="table-light">
+                    <tr>
+                        <th class="px-4 py-3" style="font-size:0.75rem; text-transform:uppercase; letter-spacing:0.5px; color:#6b7280; font-weight:600;">ชื่อ-นามสกุล</th>
+                        <th class="py-3" style="font-size:0.75rem; text-transform:uppercase; letter-spacing:0.5px; color:#6b7280; font-weight:600;">อีเมล</th>
+                        <th class="py-3" style="font-size:0.75rem; text-transform:uppercase; letter-spacing:0.5px; color:#6b7280; font-weight:600;">บทบาท</th>
+                        <th class="py-3" style="font-size:0.75rem; text-transform:uppercase; letter-spacing:0.5px; color:#6b7280; font-weight:600;">สถานะ</th>
+                        <th class="py-3" style="font-size:0.75rem; text-transform:uppercase; letter-spacing:0.5px; color:#6b7280; font-weight:600;">วันที่สมัคร</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @{
+                        var users = new[] {
+                            new { Name="Chinnaphat Supsombat", Email="chinnaphat@email.com", Role="Admin",  Active=true,  Date="10/01/2026" },
+                            new { Name="สมชาย ใจดี",           Email="somchai@email.com",    Role="User",   Active=true,  Date="15/02/2026" },
+                            new { Name="สมหญิง รักเรียน",      Email="somying@email.com",    Role="User",   Active=false, Date="20/03/2026" },
+                            new { Name="วิชัย เก่งมาก",         Email="wichai@email.com",     Role="Staff",  Active=true,  Date="05/04/2026" },
+                            new { Name="นภา สวยงาม",           Email="napa@email.com",       Role="User",   Active=true,  Date="01/05/2026" },
+                        };
+                    }
+                    @foreach (var u in users)
+                    {
+                        <tr>
+                            <td class="px-4 py-3">
+                                <div class="d-flex align-items-center gap-2">
+                                    <div class="avatar-xs">@u.Name.Substring(0,1)</div>
+                                    <span class="fw-semibold">@u.Name</span>
+                                </div>
+                            </td>
+                            <td class="py-3 text-muted">@u.Email</td>
+                            <td class="py-3">
+                                @if (u.Role == "Admin")
+                                {
+                                    <span class="badge-role bg-danger bg-opacity-10 text-danger">Admin</span>
+                                }
+                                else if (u.Role == "Staff")
+                                {
+                                    <span class="badge-role bg-warning bg-opacity-10 text-warning">Staff</span>
+                                }
+                                else
+                                {
+                                    <span class="badge-role bg-primary bg-opacity-10 text-primary">User</span>
+                                }
+                            </td>
+                            <td class="py-3">
+                                @if (u.Active)
+                                {
+                                    <span class="badge bg-success-subtle text-success" style="border-radius:20px; font-size:0.72rem; padding:0.28rem 0.65rem;">
+                                        <i class="bi bi-circle-fill me-1" style="font-size:0.4rem;"></i>เปิดใช้งาน
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-danger-subtle text-danger" style="border-radius:20px; font-size:0.72rem; padding:0.28rem 0.65rem;">
+                                        <i class="bi bi-circle-fill me-1" style="font-size:0.4rem;"></i>ปิดใช้งาน
+                                    </span>
+                                }
+                            </td>
+                            <td class="py-3 text-muted">@u.Date</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

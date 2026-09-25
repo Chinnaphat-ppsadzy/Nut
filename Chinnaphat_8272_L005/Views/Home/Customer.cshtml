@@ -1,0 +1,83 @@
+@{
+    ViewData["Title"] = "หน้าหลัก";
+    Layout = "_CustomerLayout";
+}
+
+<div class="row g-4 mb-4">
+    <!-- Welcome Card -->
+    <div class="col-12">
+        <div class="card border-0 shadow-sm" style="border-radius:16px; background: linear-gradient(135deg,#2d6a4f,#52b788); color:white;">
+            <div class="card-body p-4">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <h4 class="fw-bold mb-1"><i class="bi bi-hand-wave me-2"></i>ยินดีต้อนรับสู่ CourtBook!</h4>
+                        <p class="mb-0 opacity-75">ระบบจองสนามกีฬาออนไลน์ที่ง่ายและสะดวกที่สุด</p>
+                    </div>
+                    <i class="bi bi-dribbble" style="font-size:4rem; opacity:0.3;"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm h-100" style="border-radius:14px;">
+            <div class="card-body p-4 text-center">
+                <div class="mb-2" style="font-size:2.5rem; color:#52b788;"><i class="bi bi-building"></i></div>
+                <h3 class="fw-bold mb-0">12</h3>
+                <p class="text-muted mb-0">สนามกีฬาทั้งหมด</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm h-100" style="border-radius:14px;">
+            <div class="card-body p-4 text-center">
+                <div class="mb-2" style="font-size:2.5rem; color:#3b82f6;"><i class="bi bi-calendar-check"></i></div>
+                <h3 class="fw-bold mb-0">3</h3>
+                <p class="text-muted mb-0">การจองของฉัน</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm h-100" style="border-radius:14px;">
+            <div class="card-body p-4 text-center">
+                <div class="mb-2" style="font-size:2.5rem; color:#f59e0b;"><i class="bi bi-ticket-perforated"></i></div>
+                <h3 class="fw-bold mb-0">5</h3>
+                <p class="text-muted mb-0">โปรโมชั่นใช้ได้</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="card border-0 shadow-sm" style="border-radius:14px;">
+    <div class="card-body p-4">
+        <h5 class="fw-bold mb-3">เมนูด่วน</h5>
+        <div class="row g-3">
+            <div class="col-6 col-md-3">
+                <a href="#" class="btn btn-outline-success w-100 py-3" style="border-radius:12px;">
+                    <i class="bi bi-calendar-plus d-block mb-1" style="font-size:1.5rem;"></i>
+                    จองสนาม
+                </a>
+            </div>
+            <div class="col-6 col-md-3">
+                <a href="#" class="btn btn-outline-primary w-100 py-3" style="border-radius:12px;">
+                    <i class="bi bi-calendar-check d-block mb-1" style="font-size:1.5rem;"></i>
+                    การจองของฉัน
+                </a>
+            </div>
+            <div class="col-6 col-md-3">
+                <a href="#" class="btn btn-outline-warning w-100 py-3" style="border-radius:12px;">
+                    <i class="bi bi-ticket-perforated d-block mb-1" style="font-size:1.5rem;"></i>
+                    โปรโมชั่น
+                </a>
+            </div>
+            <div class="col-6 col-md-3">
+                <a asp-action="Login" asp-controller="User" class="btn btn-outline-danger w-100 py-3" style="border-radius:12px;">
+                    <i class="bi bi-box-arrow-right d-block mb-1" style="font-size:1.5rem;"></i>
+                    ออกจากระบบ
+                </a>
+            </div>
+        </div>
+    </div>
+</div>

@@ -8,19 +8,19 @@
     "net10.0": []
   },
   "packageFolders": {
-    "C:\\Users\\5-903\\.nuget\\packages\\": {}
+    "C:\\Users\\ppsadzy\\.nuget\\packages\\": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\5-903\\Desktop\\Chinnaphat_8272_L005\\Chinnaphat_8272_L005\\Chinnaphat_8272_L005.csproj",
+      "projectUniqueName": "C:\\Users\\ppsadzy\\Desktop\\8272 chinnaphat supsombat\\Nut\\Chinnaphat_8272_L005\\Chinnaphat_8272_L005.csproj",
       "projectName": "Chinnaphat_8272_L005",
-      "projectPath": "C:\\Users\\5-903\\Desktop\\Chinnaphat_8272_L005\\Chinnaphat_8272_L005\\Chinnaphat_8272_L005.csproj",
-      "packagesPath": "C:\\Users\\5-903\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\5-903\\Desktop\\Chinnaphat_8272_L005\\Chinnaphat_8272_L005\\obj\\",
+      "projectPath": "C:\\Users\\ppsadzy\\Desktop\\8272 chinnaphat supsombat\\Nut\\Chinnaphat_8272_L005\\Chinnaphat_8272_L005.csproj",
+      "packagesPath": "C:\\Users\\ppsadzy\\.nuget\\packages\\",
+      "outputPath": "C:\\Users\\ppsadzy\\Desktop\\8272 chinnaphat supsombat\\Nut\\Chinnaphat_8272_L005\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
-        "C:\\Users\\5-903\\AppData\\Roaming\\NuGet\\NuGet.Config"
+        "C:\\Users\\ppsadzy\\AppData\\Roaming\\NuGet\\NuGet.Config"
       ],
       "originalTargetFrameworks": [
         "net10.0"
@@ -70,7 +70,7 @@
             "privateAssets": "all"
           }
         },
-        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.400/PortableRuntimeIdentifierGraph.json",
+        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.401/PortableRuntimeIdentifierGraph.json",
         "packagesToPrune": {
           "Microsoft.AspNetCore": "(,10.0.32767]",
           "Microsoft.AspNetCore.Antiforgery": "(,10.0.32767]",

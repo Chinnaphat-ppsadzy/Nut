@@ -1,9 +1,18 @@
-﻿@{
+@{
     ViewData["Title"] = "Home Page";
     Layout = "_AdminLayout";
 }
 
-<div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+<div class="text-center py-5">
+    <i class="bi bi-dribbble" style="font-size:5rem; color:#52b788;"></i>
+    <h2 class="fw-bold mt-3">ยินดีต้อนรับ</h2>
+    <p class="text-muted mb-4">ระบบจัดการสนามกีฬาออนไลน์ CourtBook</p>
+    <div class="d-flex gap-3 justify-content-center">
+        <a asp-action="Admin" asp-controller="Home" class="btn btn-success px-4" style="border-radius:10px;">
+            <i class="bi bi-speedometer2 me-2"></i>ไปที่ Dashboard
+        </a>
+        <a asp-action="Customer" asp-controller="Home" class="btn btn-outline-success px-4" style="border-radius:10px;">
+            <i class="bi bi-person me-2"></i>หน้าลูกค้า
+        </a>
+    </div>
 </div>

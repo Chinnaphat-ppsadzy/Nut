@@ -1,0 +1,91 @@
+@model IEnumerable<Chinnaphat_8272_L005.Models.UserListItem>
+
+@{
+    ViewData["Title"] = "รายชื่อผู้ใช้งาน";
+    Layout = "_AdminLayout";
+}
+
+<style>
+    .user-table th { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; color: #6b7280; font-weight: 600; }
+    .user-table td { vertical-align: middle; font-size: 0.92rem; }
+    .badge-role { font-size: 0.75rem; padding: 0.3rem 0.7rem; border-radius: 20px; font-weight: 600; }
+    .avatar-sm { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg,#2d6a4f,#52b788); display: inline-flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 0.85rem; }
+</style>
+
+<!-- Toolbar -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <span class="text-muted small">ผู้ใช้ทั้งหมด <strong>@Model.Count()</strong> คน</span>
+    </div>
+    <a asp-action="AddUser" asp-controller="User" class="btn btn-success" id="btnAddUser" style="border-radius:10px;">
+        <i class="bi bi-person-plus me-1"></i> เพิ่มผู้ใช้
+    </a>
+</div>
+
+<!-- Table Card -->
+<div class="card border-0 shadow-sm" style="border-radius:14px; overflow:hidden;">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0 user-table">
+                <thead class="table-light">
+                    <tr>
+                        <th class="px-4 py-3">#</th>
+                        <th class="py-3">ชื่อ-นามสกุล</th>
+                        <th class="py-3">ชื่อผู้ใช้</th>
+                        <th class="py-3">อีเมล</th>
+                        <th class="py-3">เบอร์โทร</th>
+                        <th class="py-3">บทบาท</th>
+                        <th class="py-3">สถานะ</th>
+                        <th class="py-3">วันที่สมัคร</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var user in Model)
+                    {
+                        <tr>
+                            <td class="px-4">@user.Id</td>
+                            <td>
+                                <div class="d-flex align-items-center gap-2">
+                                    <div class="avatar-sm">@user.FullName.Substring(0,1)</div>
+                                    <span>@user.FullName</span>
+                                </div>
+                            </td>
+                            <td class="text-muted">@@user.Username</td>
+                            <td>@user.Email</td>
+                            <td>@user.Phone</td>
+                            <td>
+                                @if (user.Role == "Admin")
+                                {
+                                    <span class="badge-role bg-danger bg-opacity-10 text-danger">Admin</span>
+                                }
+                                else if (user.Role == "Staff")
+                                {
+                                    <span class="badge-role bg-warning bg-opacity-10 text-warning">Staff</span>
+                                }
+                                else
+                                {
+                                    <span class="badge-role bg-primary bg-opacity-10 text-primary">User</span>
+                                }
+                            </td>
+                            <td>
+                                @if (user.IsActive)
+                                {
+                                    <span class="badge bg-success-subtle text-success" style="border-radius:20px; font-size:0.75rem;">
+                                        <i class="bi bi-circle-fill me-1" style="font-size:0.45rem;"></i>เปิดใช้งาน
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-danger-subtle text-danger" style="border-radius:20px; font-size:0.75rem;">
+                                        <i class="bi bi-circle-fill me-1" style="font-size:0.45rem;"></i>ปิดใช้งาน
+                                    </span>
+                                }
+                            </td>
+                            <td class="text-muted">@user.CreatedAt.ToString("dd/MM/yyyy")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

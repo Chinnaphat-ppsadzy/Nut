@@ -10,7 +10,17 @@ public class HomeController : Controller
 {
     public IActionResult Index()
     {
-        return View();
+        // สร้าง IndexViewModel จากข้อมูลที่ UserController ส่งมาผ่าน TempData
+        var model = new IndexViewModel
+        {
+            IsLoggedIn = TempData["IsLoggedIn"] is bool b && b,
+            Username   = TempData["Username"]  as string ?? string.Empty,
+            FullName   = TempData["FullName"]   as string ?? string.Empty,
+            Email      = TempData["Email"]      as string ?? string.Empty,
+            LoginTime  = DateTime.TryParse(TempData["LoginTime"] as string, out var lt)
+                             ? lt : DateTime.Now,
+        };
+        return View(model);
     }
 
     public IActionResult Privacy()

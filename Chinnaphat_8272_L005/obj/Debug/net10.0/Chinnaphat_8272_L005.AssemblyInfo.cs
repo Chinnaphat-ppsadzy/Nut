@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Chinnaphat_8272_L005")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+43b957eed166aaaaa8b184259925b7798b220985")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+39695bdae357ab4058290e3582b2331290884380")]
 [assembly: System.Reflection.AssemblyProductAttribute("Chinnaphat_8272_L005")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Chinnaphat_8272_L005")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

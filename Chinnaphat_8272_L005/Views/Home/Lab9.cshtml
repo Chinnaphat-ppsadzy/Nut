@@ -1,0 +1,18 @@
+@model Chinnaphat_8272_L005.Models.Labstudent
+
+<form asp-action="Lab9" asp-controller="Home" method="post">
+    StdCode <input type="text" asp-for="StdId" class="form-control" /><br />
+    Password <input type="password" asp-for="StdPassword" class="form-control" /><br>
+    Name <input type="text" asp-for="StdName" class="form-control" /> <br />
+    Lastname <input type="text" asp-for="StdLastname" class="form-control" />
+    <button type="submit">submit</button>
+</form>
+
+@if (ViewBag.Status != null)
+{
+    <p style="color:red">@ViewBag.Status</p>
+}
+@if (Model != null && ViewBag.Status == null)
+{
+    <p style="color:green">บันทึกสำเร็จ: @Model.StdId - @Model.StdName @Model.StdLastname</p>
+}

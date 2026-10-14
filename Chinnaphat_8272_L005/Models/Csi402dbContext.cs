@@ -68,6 +68,8 @@ public partial class Csi402dbContext : DbContext
 
     public virtual DbSet<WalkInQueue> WalkInQueues { get; set; }
 
+    public virtual DbSet<Labstudent> Labstudents { get; set; }
+
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
 #warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
         => optionsBuilder.UseMySql("server=localhost;port=3306;database=csi402db;user=root;password=1101801447419Pp!", Microsoft.EntityFrameworkCore.ServerVersion.Parse("9.7.1-mysql"));
@@ -1470,6 +1472,11 @@ public partial class Csi402dbContext : DbContext
         });
 
         OnModelCreatingPartial(modelBuilder);
+        modelBuilder.Entity<Labstudent>(entity =>
+{
+    entity.HasKey(e => e.StdId);
+    entity.ToTable("labstudent");
+});
     }
 
     partial void OnModelCreatingPartial(ModelBuilder modelBuilder);

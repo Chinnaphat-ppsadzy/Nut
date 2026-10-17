@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 
 namespace Chinnaphat_8272_L005.ViewModels
 {
@@ -18,9 +18,7 @@ namespace Chinnaphat_8272_L005.ViewModels
         [Display(Name = "อีเมล")]
         public string Email { get; set; } = string.Empty;
 
-        [Required(ErrorMessage = "กรุณากรอกชื่อผู้ใช้")]
-        [StringLength(50, MinimumLength = 4, ErrorMessage = "ชื่อผู้ใช้ต้องมี 4-50 ตัวอักษร")]
-        [Display(Name = "ชื่อผู้ใช้")]
+        [Display(Name = "ชื่อผู้ใช้ (ไม่บังคับ)")]
         public string Username { get; set; } = string.Empty;
 
         [Required(ErrorMessage = "กรุณากรอกรหัสผ่าน")]

@@ -1,14 +1,20 @@
 using Microsoft.AspNetCore.Mvc;
 using Chinnaphat_8272_L005.Models;
 using Chinnaphat_8272_L005.ViewModels;
-using System.Text.Json;
 
 namespace Chinnaphat_8272_L005.Controllers
 {
     public class UserController : Controller
     {
+        private readonly Csi402dbContext _db;
+
+        public UserController(Csi402dbContext db)
+        {
+            _db = db;
+        }
+
         // ============================================================
-        // LOGIN
+        // LOGIN — READ: ตรวจสอบ Email + Password จากฐานข้อมูล
         // ============================================================
 
         [HttpGet]
@@ -24,14 +30,45 @@ namespace Chinnaphat_8272_L005.Controllers
         {
             if (ModelState.IsValid)
             {
+                // READ — ค้นหา User จากฐานข้อมูลด้วย Email และ Password
+                var user = (from u in _db.Users
+                            where u.Email == model.Email
+                               && u.PasswordHash == model.Password
+                            select u).FirstOrDefault();
+
+                if (user == null)
+                {
+                    ViewBag.ErrorMessage = "อีเมลหรือรหัสผ่านไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง";
+                    ViewData["Title"] = "เข้าสู่ระบบ";
+                    return View(model);
+                }
+
+                // ตรวจสอบสถานะ: ห้ามเข้าถ้า status เป็น inactive/banned/disabled เท่านั้น
+                // อนุญาตทุก status อื่น (active, Active, ACTIVE, null, ว่าง, ฯลฯ)
+                var statusLower = (user.Status ?? "").ToLower().Trim();
+                var blockedStatuses = new[] { "inactive", "banned", "disabled", "suspended" };
+                if (blockedStatuses.Contains(statusLower))
+                {
+                    ViewBag.ErrorMessage = $"บัญชีนี้ถูกระงับการใช้งาน (สถานะ: {user.Status}) กรุณาติดต่อผู้ดูแลระบบ";
+                    ViewData["Title"] = "เข้าสู่ระบบ";
+                    return View(model);
+                }
+
+                // UPDATE — บันทึกเวลาล็อกอินล่าสุดลงฐานข้อมูล
+                user.LastLoginAt = DateTime.Now;
+                _db.SaveChanges();
+
                 // เก็บข้อมูลผู้ใช้ที่ล็อกอินผ่าน TempData
                 TempData["IsLoggedIn"]  = true;
-                TempData["Username"]    = model.Username;
+                TempData["UserId"]      = user.UserId.ToString();
+                TempData["Username"]    = user.Email;
+                TempData["FullName"]    = user.FullName;
+                TempData["Email"]       = user.Email;
                 TempData["LoginTime"]   = DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss");
                 TempData["RememberMe"]  = model.RememberMe;
 
                 TempData["SuccessMessage"] =
-                    $"เข้าสู่ระบบสำเร็จ! ยินดีต้อนรับ {model.Username}";
+                    $"เข้าสู่ระบบสำเร็จ! ยินดีต้อนรับ {user.FullName}";
 
                 return RedirectToAction("Index", "Home");
             }
@@ -42,7 +79,7 @@ namespace Chinnaphat_8272_L005.Controllers
 
 
         // ============================================================
-        // REGISTER
+        // REGISTER — CREATE: บันทึกผู้ใช้ใหม่ลงฐานข้อมูล
         // ============================================================
 
         [HttpGet]
@@ -58,37 +95,41 @@ namespace Chinnaphat_8272_L005.Controllers
         {
             if (ModelState.IsValid)
             {
-                // สร้าง UserListItemViewModel จากข้อมูลที่ Register
-                var newUser = new UserListItemViewModel
+                // READ — ตรวจสอบว่า Email ซ้ำหรือไม่
+                var existingUser = (from u in _db.Users
+                                    where u.Email == model.Email
+                                    select u).FirstOrDefault();
+
+                if (existingUser != null)
                 {
-                    FullName  = $"{model.FirstName} {model.LastName}",
-                    Username  = model.Username,
-                    Email     = model.Email,
-                    Phone     = model.Phone,
-                    Gender    = model.Gender,
-                    Role      = "User",
-                    IsActive  = true,
-                    CreatedAt = DateTime.Now,
-                    Source    = "Register"
+                    ModelState.AddModelError("Email", "อีเมลนี้ถูกใช้งานแล้ว");
+                    ViewData["Title"] = "สมัครสมาชิก";
+                    return View(model);
+                }
+
+                // READ — ดึง RoleId ของ "CUSTOMER"
+                var customerRole = (from r in _db.Roles
+                                    where r.RoleCode == "CUSTOMER"
+                                    select r).FirstOrDefault();
+
+                byte roleId = customerRole != null ? customerRole.RoleId : (byte)1;
+
+                // CREATE — สร้าง User ใหม่แล้วบันทึกลงฐานข้อมูล
+                var newUser = new User
+                {
+                    RoleId       = roleId,
+                    Email        = model.Email,
+                    PasswordHash = model.Password,
+                    FullName     = $"{model.FirstName} {model.LastName}",
+                    Phone        = model.Phone,
+                    Status       = "active",
+                    HasBooked    = false,
+                    CreatedAt    = DateTime.Now,
+                    UpdatedAt    = DateTime.Now
                 };
 
-                // โหลดรายชื่อที่มีอยู่แล้วจาก Session JSON แล้วเพิ่มเข้าไป
-                var existingJson = TempData.Peek("RegisteredUsers") as string;
-                var registeredUsers = string.IsNullOrEmpty(existingJson)
-                    ? new List<UserListItemViewModel>()
-                    : JsonSerializer.Deserialize<List<UserListItemViewModel>>(existingJson)
-                      ?? new List<UserListItemViewModel>();
-
-                // กำหนด Id ต่อจากผู้ใช้คนสุดท้าย
-                newUser.Id = (registeredUsers.Count > 0
-                    ? registeredUsers.Max(u => u.Id)
-                    : 5) + 1;
-
-                registeredUsers.Add(newUser);
-
-                // บันทึกกลับลง TempData
-                TempData["RegisteredUsers"] = JsonSerializer.Serialize(registeredUsers);
-                TempData["NewUserName"]     = $"{model.FirstName} {model.LastName}";
+                _db.Users.Add(newUser);
+                _db.SaveChanges();
 
                 TempData["SuccessMessage"] =
                     $"สมัครสมาชิกสำเร็จ! ยินดีต้อนรับ {model.FirstName} กรุณาเข้าสู่ระบบ";
@@ -102,13 +143,15 @@ namespace Chinnaphat_8272_L005.Controllers
 
 
         // ============================================================
-        // ADD USER (Admin)
+        // ADD USER (Admin) — CREATE: เพิ่มผู้ใช้ใหม่ลงฐานข้อมูล
         // ============================================================
 
         [HttpGet]
         public IActionResult AddUser()
         {
             ViewData["Title"] = "เพิ่มผู้ใช้งาน";
+            // READ — ดึงรายการ Role จากฐานข้อมูล
+            ViewBag.Roles = (from r in _db.Roles select r).ToList();
             return View(new AddUserViewModel());
         }
 
@@ -118,100 +161,194 @@ namespace Chinnaphat_8272_L005.Controllers
         {
             if (ModelState.IsValid)
             {
-                // สร้าง UserListItemViewModel จากข้อมูล AddUser
-                var newUser = new UserListItemViewModel
+                // READ — ตรวจสอบว่า Email ซ้ำหรือไม่
+                var existingUser = (from u in _db.Users
+                                    where u.Email == model.Email
+                                    select u).FirstOrDefault();
+
+                if (existingUser != null)
                 {
-                    FullName  = $"{model.FirstName} {model.LastName}",
-                    Username  = model.Username,
-                    Email     = model.Email,
-                    Phone     = model.Phone,
-                    Gender    = model.Gender,
-                    Role      = model.Role,
-                    IsActive  = model.IsActive,
-                    CreatedAt = DateTime.Now,
-                    Source    = "AddUser"
+                    ModelState.AddModelError("Email", "อีเมลนี้ถูกใช้งานแล้ว");
+                    ViewBag.Roles = (from r in _db.Roles select r).ToList();
+                    ViewData["Title"] = "เพิ่มผู้ใช้งาน";
+                    return View(model);
+                }
+
+                // READ — ค้นหา RoleId จาก RoleCode
+                var role = (from r in _db.Roles
+                            where r.RoleCode == model.Role
+                            select r).FirstOrDefault();
+
+                byte roleId = role != null ? role.RoleId : (byte)1;
+
+                // CREATE — บันทึกผู้ใช้ใหม่ลงฐานข้อมูล
+                var newUser = new User
+                {
+                    RoleId       = roleId,
+                    Email        = model.Email,
+                    PasswordHash = model.Password,
+                    FullName     = $"{model.FirstName} {model.LastName}",
+                    Phone        = model.Phone,
+                    Status       = model.IsActive ? "active" : "inactive",
+                    HasBooked    = false,
+                    CreatedAt    = DateTime.Now,
+                    UpdatedAt    = DateTime.Now
                 };
 
-                // โหลดรายชื่อที่มีอยู่แล้วจาก TempData แล้วเพิ่มเข้าไป
-                var existingJson = TempData.Peek("RegisteredUsers") as string;
-                var registeredUsers = string.IsNullOrEmpty(existingJson)
-                    ? new List<UserListItemViewModel>()
-                    : JsonSerializer.Deserialize<List<UserListItemViewModel>>(existingJson)
-                      ?? new List<UserListItemViewModel>();
+                _db.Users.Add(newUser);
+                _db.SaveChanges();
 
-                newUser.Id = (registeredUsers.Count > 0
-                    ? registeredUsers.Max(u => u.Id)
-                    : 5) + 1;
-
-                registeredUsers.Add(newUser);
-                TempData["RegisteredUsers"] = JsonSerializer.Serialize(registeredUsers);
-
-                TempData["SuccessMessage"] =
-                    $"เพิ่มผู้ใช้ {model.Username} สำเร็จ!";
-
+                TempData["SuccessMessage"] = $"เพิ่มผู้ใช้ {model.Email} สำเร็จ!";
                 return RedirectToAction("UserList");
             }
 
+            ViewBag.Roles = (from r in _db.Roles select r).ToList();
             ViewData["Title"] = "เพิ่มผู้ใช้งาน";
             return View(model);
         }
 
 
         // ============================================================
-        // USER LIST
+        // USER LIST — READ: ดึงรายชื่อผู้ใช้ทั้งหมดจากฐานข้อมูล
         // ============================================================
 
         public IActionResult UserList()
         {
             ViewData["Title"] = "รายชื่อผู้ใช้งาน";
 
-            // ข้อมูลตัวอย่าง (Mock Data) — ผู้ใช้เริ่มต้น
-            var defaultUsers = new List<UserListItemViewModel>
-            {
-                new() { Id = 1, FullName = "Chinnaphat Supsombat", Username = "chinnaphat",
-                         Email = "chinnaphat@email.com", Role = "Admin",
-                         Phone = "081-234-5678", Gender = "ชาย",
-                         IsActive = true, CreatedAt = new DateTime(2026, 1, 10), Source = "Default" },
+            // READ — ดึงข้อมูลผู้ใช้ทั้งหมดจากฐานข้อมูลพร้อม Role
+            var usersFromDb = (from u in _db.Users
+                               join r in _db.Roles on u.RoleId equals r.RoleId into roleGroup
+                               from rg in roleGroup.DefaultIfEmpty()
+                               orderby u.CreatedAt descending
+                               select new UserListItemViewModel
+                               {
+                                   Id        = (int)u.UserId,
+                                   FullName  = u.FullName,
+                                   Username  = u.Email,
+                                   Email     = u.Email,
+                                   Role      = rg != null ? rg.RoleName : "User",
+                                   Phone     = u.Phone ?? "-",
+                                   Gender    = "-",
+                                   IsActive  = u.Status == "active",
+                                   CreatedAt = u.CreatedAt,
+                                   Source    = "Database"
+                               }).ToList();
 
-                new() { Id = 2, FullName = "สมชาย ใจดี", Username = "somchai",
-                         Email = "somchai@email.com", Role = "User",
-                         Phone = "082-111-2222", Gender = "ชาย",
-                         IsActive = true, CreatedAt = new DateTime(2026, 2, 15), Source = "Default" },
-
-                new() { Id = 3, FullName = "สมหญิง รักเรียน", Username = "somying",
-                         Email = "somying@email.com", Role = "User",
-                         Phone = "083-333-4444", Gender = "หญิง",
-                         IsActive = false, CreatedAt = new DateTime(2026, 3, 20), Source = "Default" },
-
-                new() { Id = 4, FullName = "วิชัย เก่งมาก", Username = "wichai",
-                         Email = "wichai@email.com", Role = "Staff",
-                         Phone = "084-555-6666", Gender = "ชาย",
-                         IsActive = true, CreatedAt = new DateTime(2026, 4, 5), Source = "Default" },
-
-                new() { Id = 5, FullName = "นภา สวยงาม", Username = "napa",
-                         Email = "napa@email.com", Role = "User",
-                         Phone = "085-777-8888", Gender = "หญิง",
-                         IsActive = true, CreatedAt = new DateTime(2026, 5, 1), Source = "Default" }
-            };
-
-            // ดึงผู้ใช้ที่ Register / AddUser เพิ่มเข้ามา
-            var existingJson = TempData.Peek("RegisteredUsers") as string;
-            if (!string.IsNullOrEmpty(existingJson))
-            {
-                var registeredUsers = JsonSerializer.Deserialize<List<UserListItemViewModel>>(existingJson);
-                if (registeredUsers != null)
-                    defaultUsers.AddRange(registeredUsers);
-            }
-
-            // สร้าง UserListViewModel รวมทุกอย่าง
             var viewModel = new UserListViewModel
             {
-                Users            = defaultUsers,
+                Users            = usersFromDb,
                 IsLoggedIn       = TempData.Peek("IsLoggedIn") is bool b && b,
-                LoggedInUsername = TempData.Peek("Username") as string ?? string.Empty
+                LoggedInUsername = TempData.Peek("FullName") as string ?? string.Empty
             };
 
             return View(viewModel);
+        }
+
+
+        // ============================================================
+        // DELETE USER — DELETE: ลบผู้ใช้ออกจากฐานข้อมูล
+        // ============================================================
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public IActionResult DeleteUser(int id)
+        {
+            // READ — ค้นหา User ที่ต้องการลบ
+            var user = (from u in _db.Users
+                        where u.UserId == (uint)id
+                        select u).FirstOrDefault();
+
+            if (user != null)
+            {
+                // DELETE — ลบออกจากฐานข้อมูล
+                _db.Users.Remove(user);
+                _db.SaveChanges();
+                TempData["SuccessMessage"] = $"ลบผู้ใช้ {user.Email} สำเร็จ!";
+            }
+            else
+            {
+                TempData["ErrorMessage"] = "ไม่พบผู้ใช้ที่ต้องการลบ";
+            }
+
+            return RedirectToAction("UserList");
+        }
+
+
+        // ============================================================
+        // EDIT USER — READ+UPDATE: แก้ไขข้อมูลผู้ใช้ในฐานข้อมูล
+        // ============================================================
+
+        [HttpGet]
+        public IActionResult EditUser(int id)
+        {
+            ViewData["Title"] = "แก้ไขผู้ใช้งาน";
+
+            // READ — ดึงข้อมูล User จากฐานข้อมูล
+            var user = (from u in _db.Users
+                        where u.UserId == (uint)id
+                        select u).FirstOrDefault();
+
+            if (user == null)
+                return RedirectToAction("UserList");
+
+            ViewBag.Roles  = (from r in _db.Roles select r).ToList();
+            ViewBag.EditId = id;
+
+            var model = new AddUserViewModel
+            {
+                FirstName = user.FullName.Contains(" ")
+                    ? user.FullName.Split(' ')[0] : user.FullName,
+                LastName  = user.FullName.Contains(" ")
+                    ? string.Join(" ", user.FullName.Split(' ').Skip(1)) : "",
+                Email     = user.Email,
+                Username  = user.Email,
+                Phone     = user.Phone ?? "",
+                IsActive  = user.Status == "active"
+            };
+
+            return View("EditUser", model);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public IActionResult EditUser(int id, AddUserViewModel model)
+        {
+            if (ModelState.IsValid)
+            {
+                // READ — ค้นหา User ที่ต้องการแก้ไข
+                var user = (from u in _db.Users
+                            where u.UserId == (uint)id
+                            select u).FirstOrDefault();
+
+                if (user != null)
+                {
+                    // READ — ค้นหา Role จาก RoleCode
+                    var role = (from r in _db.Roles
+                                where r.RoleCode == model.Role
+                                select r).FirstOrDefault();
+
+                    // UPDATE — อัปเดตข้อมูลในฐานข้อมูล
+                    user.FullName  = $"{model.FirstName} {model.LastName}";
+                    user.Email     = model.Email;
+                    user.Phone     = model.Phone;
+                    user.Status    = model.IsActive ? "active" : "inactive";
+                    user.UpdatedAt = DateTime.Now;
+                    if (role != null) user.RoleId = role.RoleId;
+                    if (!string.IsNullOrEmpty(model.Password))
+                        user.PasswordHash = model.Password;
+
+                    _db.SaveChanges();
+                    TempData["SuccessMessage"] = $"แก้ไขข้อมูลผู้ใช้ {user.Email} สำเร็จ!";
+                }
+
+                return RedirectToAction("UserList");
+            }
+
+            ViewBag.Roles  = (from r in _db.Roles select r).ToList();
+            ViewBag.EditId = id;
+            ViewData["Title"] = "แก้ไขผู้ใช้งาน";
+            return View("EditUser", model);
         }
     }
 }

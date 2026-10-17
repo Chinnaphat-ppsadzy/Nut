@@ -1,0 +1,199 @@
+@model Chinnaphat_8272_L005.Models.AddUserViewModel
+
+@{
+    ViewData["Title"] = "แก้ไขผู้ใช้งาน";
+    Layout = "_AdminLayout";
+    int editId = ViewBag.EditId ?? 0;
+}
+
+<style>
+    .form-card {
+        background: #fff;
+        border-radius: 16px;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+        padding: 2rem;
+    }
+
+    .section-title {
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: #2d6a4f;
+        border-bottom: 2px solid #e8f5e9;
+        padding-bottom: 0.5rem;
+        margin-bottom: 1.2rem;
+    }
+
+    .form-label { font-weight: 600; font-size: 0.88rem; color: #2d3748; }
+
+    .form-control, .form-select {
+        border: 1.5px solid #e2e8f0;
+        border-radius: 10px;
+        padding: 0.6rem 1rem 0.6rem 2.5rem;
+        font-size: 0.92rem;
+        transition: all 0.25s;
+    }
+
+    .form-select { padding-left: 2.5rem; }
+
+    .form-control:focus, .form-select:focus {
+        border-color: #52b788;
+        box-shadow: 0 0 0 3px rgba(82,183,136,0.2);
+        outline: none;
+    }
+
+    .input-wrapper { position: relative; }
+
+    .input-wrapper .bi-icon {
+        position: absolute;
+        left: 0.85rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #52b788;
+        font-size: 1rem;
+        pointer-events: none;
+    }
+
+    .btn-save {
+        background: linear-gradient(135deg, #2d6a4f, #52b788);
+        border: none;
+        border-radius: 10px;
+        padding: 0.7rem 2rem;
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: white;
+        transition: all 0.25s;
+    }
+
+    .btn-save:hover {
+        background: linear-gradient(135deg, #1a472a, #2d6a4f);
+        transform: translateY(-1px);
+        box-shadow: 0 5px 20px rgba(45,106,79,0.4);
+        color: white;
+    }
+</style>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h4 class="fw-bold mb-1">
+            <i class="bi bi-pencil-square text-success me-2"></i>แก้ไขข้อมูลผู้ใช้
+        </h4>
+        <p class="text-muted small mb-0">แก้ไขข้อมูล UPDATE ลงฐานข้อมูล</p>
+    </div>
+    <a asp-action="UserList" asp-controller="User" class="btn btn-outline-secondary" style="border-radius:10px;">
+        <i class="bi bi-arrow-left me-1"></i> กลับ
+    </a>
+</div>
+
+<div class="form-card">
+    @if (!ViewData.ModelState.IsValid && ViewData.ModelState.ErrorCount > 0)
+    {
+        <div class="alert alert-danger py-2 mb-3" style="border-radius:10px;">
+            <i class="bi bi-exclamation-triangle me-2"></i>กรุณาตรวจสอบข้อมูลให้ครบถ้วน
+        </div>
+    }
+
+    <form asp-action="EditUser" asp-controller="User" asp-route-id="@editId" method="post" id="editUserForm">
+        @Html.AntiForgeryToken()
+
+        <!-- ข้อมูลส่วนตัว -->
+        <p class="section-title"><i class="bi bi-person me-1"></i>ข้อมูลส่วนตัว</p>
+
+        <div class="row g-3 mb-3">
+            <div class="col-md-6">
+                <label asp-for="FirstName" class="form-label">ชื่อ <span class="text-danger">*</span></label>
+                <div class="input-wrapper">
+                    <i class="bi bi-person bi-icon"></i>
+                    <input asp-for="FirstName" class="form-control" id="editFirstName" placeholder="ชื่อ" />
+                </div>
+                <span asp-validation-for="FirstName" class="text-danger small"></span>
+            </div>
+            <div class="col-md-6">
+                <label asp-for="LastName" class="form-label">นามสกุล <span class="text-danger">*</span></label>
+                <div class="input-wrapper">
+                    <i class="bi bi-person bi-icon"></i>
+                    <input asp-for="LastName" class="form-control" id="editLastName" placeholder="นามสกุล" />
+                </div>
+                <span asp-validation-for="LastName" class="text-danger small"></span>
+            </div>
+        </div>
+
+        <div class="row g-3 mb-3">
+            <div class="col-md-6">
+                <label asp-for="Phone" class="form-label">เบอร์โทรศัพท์</label>
+                <div class="input-wrapper">
+                    <i class="bi bi-telephone bi-icon"></i>
+                    <input asp-for="Phone" class="form-control" id="editPhone" placeholder="0XX-XXX-XXXX" />
+                </div>
+                <span asp-validation-for="Phone" class="text-danger small"></span>
+            </div>
+            <div class="col-md-6">
+                <label asp-for="Role" class="form-label">บทบาท</label>
+                <div class="input-wrapper">
+                    <i class="bi bi-shield-check bi-icon"></i>
+                    <select asp-for="Role" class="form-select" id="editRole">
+                        <option value="">-- เลือกบทบาท --</option>
+                        @if (ViewBag.Roles != null)
+                        {
+                            foreach (var role in ViewBag.Roles)
+                            {
+                                <option value="@role.RoleCode">@role.RoleName</option>
+                            }
+                        }
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- ข้อมูลบัญชี -->
+        <p class="section-title mt-3"><i class="bi bi-shield-lock me-1"></i>ข้อมูลบัญชีผู้ใช้</p>
+
+        <div class="mb-3">
+            <label asp-for="Email" class="form-label">อีเมล <span class="text-danger">*</span></label>
+            <div class="input-wrapper">
+                <i class="bi bi-envelope bi-icon"></i>
+                <input asp-for="Email" class="form-control" id="editEmail" placeholder="example@email.com" type="email" />
+            </div>
+            <span asp-validation-for="Email" class="text-danger small"></span>
+        </div>
+
+        <div class="mb-3">
+            <label asp-for="Password" class="form-label">รหัสผ่านใหม่ <small class="text-muted">(เว้นว่างไว้หากไม่ต้องการเปลี่ยน)</small></label>
+            <div class="input-wrapper">
+                <i class="bi bi-lock bi-icon"></i>
+                <input asp-for="Password" class="form-control" id="editPassword" placeholder="รหัสผ่านใหม่ (ถ้ามี)" />
+            </div>
+            <span asp-validation-for="Password" class="text-danger small"></span>
+        </div>
+
+        <div class="mb-4">
+            <div class="form-check form-switch">
+                <input asp-for="IsActive" class="form-check-input" id="editIsActive" type="checkbox" />
+                <label class="form-check-label" for="editIsActive" style="font-weight:600;">เปิดใช้งาน</label>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="d-flex gap-2">
+            <button type="submit" class="btn-save" id="btnSaveEdit">
+                <i class="bi bi-floppy me-2"></i>บันทึกการแก้ไข (UPDATE)
+            </button>
+            <a asp-action="UserList" asp-controller="User"
+               class="btn btn-outline-secondary" style="border-radius:10px; padding:0.7rem 1.5rem;">
+                <i class="bi bi-x-circle me-1"></i>ยกเลิก
+            </a>
+        </div>
+
+        <!-- แสดง CRUD operation info -->
+        <div class="alert alert-info mt-3 py-2" style="border-radius:10px; font-size:0.85rem;">
+            <i class="bi bi-info-circle me-2"></i>
+            <strong>CRUD: UPDATE</strong> — แก้ไขข้อมูลผู้ใช้ ID: @editId ในตาราง <code>users</code> ของฐานข้อมูล
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

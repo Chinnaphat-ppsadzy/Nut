@@ -3,6 +3,38 @@
 @{
     ViewData["Title"] = "เพิ่มผู้ใช้งาน";
     Layout = "_AdminLayout";
+
+    // บทบาทผู้ใช้งานตามในเว็บ (ตรงกับหน้า UserList)
+    var roleDisplayMap = new Dictionary<string, (string Name, string BadgeClass)>
+    {
+        ["ADMIN"]       = ("ผู้ดูแลระบบ", "bg-danger bg-opacity-10 text-danger"),
+        ["COURT_STAFF"] = ("พนักงานสนาม", "bg-warning bg-opacity-10 text-warning"),
+        ["SALES_STAFF"] = ("พนักงานขาย", "bg-info bg-opacity-10 text-info"),
+        ["ACCOUNTING"]  = ("บัญชี",       "bg-purple bg-opacity-10 text-purple"),
+        ["CUSTOMER"]    = ("ลูกค้า",      "bg-primary bg-opacity-10 text-primary")
+    };
+
+    var systemRoles = new List<(string Code, string Name, string BadgeClass)>();
+    var knownCodes = new HashSet<string>();
+
+    foreach (var kvp in roleDisplayMap)
+    {
+        systemRoles.Add((kvp.Key, kvp.Value.Name, kvp.Value.BadgeClass));
+        knownCodes.Add(kvp.Key);
+    }
+
+    if (ViewBag.Roles != null)
+    {
+        foreach (var r in ViewBag.Roles)
+        {
+            string code = r.RoleCode ?? "";
+            if (!string.IsNullOrEmpty(code) && !knownCodes.Contains(code))
+            {
+                systemRoles.Add((code, r.RoleName ?? code, "bg-secondary bg-opacity-10 text-secondary"));
+                knownCodes.Add(code);
+            }
+        }
+    }
 }
 
 <style>
@@ -114,7 +146,13 @@
         border-radius: 20px;
         font-size: 0.78rem;
         font-weight: 600;
+        font-family: 'Sarabun', sans-serif;
+        white-space: nowrap;
     }
+
+    /* สีสำหรับบทบาท ACCOUNTING */
+    .text-purple { color: #7c3aed !important; }
+    .bg-purple   { background-color: #7c3aed !important; }
 </style>
 
 @if (TempData["SuccessMessage"] != null)
@@ -154,18 +192,13 @@
                 <hr>
                 <div class="text-start">
                     <p class="section-title">บทบาทในระบบ</p>
-                    <div class="mb-2">
-                        <span class="role-badge bg-danger bg-opacity-10 text-danger">Admin</span>
-                        <small class="text-muted ms-2">ผู้ดูแลระบบ</small>
-                    </div>
-                    <div class="mb-2">
-                        <span class="role-badge bg-warning bg-opacity-10 text-warning">Staff</span>
-                        <small class="text-muted ms-2">พนักงาน</small>
-                    </div>
-                    <div>
-                        <span class="role-badge bg-primary bg-opacity-10 text-primary">User</span>
-                        <small class="text-muted ms-2">ผู้ใช้ทั่วไป</small>
-                    </div>
+                    @foreach (var r in systemRoles)
+                    {
+                        <div class="mb-1 d-flex align-items-center gap-2">
+                            <span class="role-badge @r.BadgeClass">@r.Name</span>
+                            <small class="text-muted" style="font-size:0.75rem;">(@r.Code)</small>
+                        </div>
+                    }
                 </div>
             </div>
         </div>
@@ -254,12 +287,9 @@
                             <i class="bi bi-shield bi-icon"></i>
                             <select asp-for="Role" class="form-select" id="addRole">
                                 <option value="">-- เลือกบทบาท --</option>
-                                @if (ViewBag.Roles != null)
+                                @foreach (var r in systemRoles)
                                 {
-                                    foreach (var role in ViewBag.Roles)
-                                    {
-                                        <option value="@role.RoleCode">@role.RoleName</option>
-                                    }
+                                    <option value="@r.Code">@r.Name</option>
                                 }
                             </select>
                         </div>

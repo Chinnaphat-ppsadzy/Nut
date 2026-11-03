@@ -63,7 +63,36 @@ public class HomeController : Controller
         var Student = (from s in _db.Labstudents select s).ToList();
         return View(Student);
     }
-    
+    public IActionResult Lab10( string? StdId)
+    {
+        var User = (from s in _db.Labstudents where s.StdId == StdId select s).FirstOrDefault();
+        return View(User);
+    }
+    [HttpPost]
+    public IActionResult Lab10(Labstudent data)
+    {
+       var User = (from s in _db.Labstudents where s.StdId == data.StdId select s).FirstOrDefault();
+           User.StdPassword = data.StdPassword;
+           User.StdName = data.StdName;
+           User.StdLastname = data.StdLastname;
+           _db.SaveChanges();
+       
+       return View(User);
+    }
+    public IActionResult Lab10_1(string? StdId)
+    {
+        var Check = (from s in _db.Labstudents where s.StdId == StdId select s).FirstOrDefault();
+        if(Check !=null)
+        {
+        _db.Remove(Check);
+        _db.SaveChanges();
+        return RedirectToAction("Lab9_1","Home",new{ status = "ลบสำเร็จ"});
+        }
+        else
+        {
+            return RedirectToAction("Lab9_1","Home",new{ status = "ลบไม่สำเร็จ"});
+        }
+    }
 
     public IActionResult Index()
     {

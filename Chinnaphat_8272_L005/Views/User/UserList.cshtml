@@ -21,6 +21,8 @@
         padding: 0.3rem 0.7rem;
         border-radius: 20px;
         font-weight: 600;
+        font-family: 'Sarabun', sans-serif;
+        white-space: nowrap;
     }
 
     .avatar-sm {
@@ -54,6 +56,20 @@
     }
 
     .stat-card:hover { transform: translateY(-2px); }
+
+    /* ✅ แสดงเบอร์โทรเป็นตัวเลขสากล ไม่เปลี่ยนเป็นเลขไทย */
+    .phone-number {
+        font-variant-numeric: tabular-nums;
+        font-feature-settings: "tnum";
+        font-family: 'Sarabun', 'Roboto', 'Noto Sans', sans-serif;
+        letter-spacing: 0.3px;
+        direction: ltr;
+        unicode-bidi: bidi-override;
+    }
+
+    /* ✅ สีสำหรับ badge บทบาท ACCOUNTING */
+    .text-purple  { color: #7c3aed !important; }
+    .bg-purple    { background-color: #7c3aed !important; }
 </style>
 
 @* แสดง Success/Error Message *@
@@ -124,8 +140,7 @@
                 <thead class="table-light">
                     <tr>
                         <th class="px-4 py-3">#</th>
-                        <th class="py-3">ชื่อ-นามสกุล</th>
-                        <th class="py-3">อีเมล</th>
+                        <th class="py-3">ชื่อ-นามสกุล / อีเมล</th>
                         <th class="py-3">เบอร์โทร</th>
                         <th class="py-3">บทบาท</th>
                         <th class="py-3">สถานะ</th>
@@ -149,13 +164,16 @@
                                     </div>
                                 </div>
                             </td>
-                            <td>@user.Phone</td>
+                            <td><span class="phone-number">@user.Phone</span></td>
                             <td>
                                 @{
-                                    var roleBadge = user.Role switch {
-                                        var r when r.Contains("Admin") || r == "ADMIN" => ("bg-danger bg-opacity-10 text-danger", "Admin"),
-                                        var r when r.Contains("Staff") || r.Contains("STAFF") => ("bg-warning bg-opacity-10 text-warning", "Staff"),
-                                        _ => ("bg-primary bg-opacity-10 text-primary", user.Role)
+                                    var roleBadge = user.RoleCode switch {
+                                        "ADMIN"       => ("bg-danger bg-opacity-10 text-danger",   "ผู้ดูแลระบบ"),
+                                        "COURT_STAFF" => ("bg-warning bg-opacity-10 text-warning", "พนักงานสนาม"),
+                                        "SALES_STAFF" => ("bg-info bg-opacity-10 text-info",       "พนักงานขาย"),
+                                        "ACCOUNTING"  => ("bg-purple bg-opacity-10 text-purple",   "บัญชี"),
+                                        "CUSTOMER"    => ("bg-primary bg-opacity-10 text-primary", "ลูกค้า"),
+                                        _             => ("bg-secondary bg-opacity-10 text-secondary", user.Role)
                                     };
                                 }
                                 <span class="badge-role @roleBadge.Item1">@roleBadge.Item2</span>

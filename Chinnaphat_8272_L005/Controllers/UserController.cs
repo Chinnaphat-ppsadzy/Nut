@@ -227,7 +227,8 @@ namespace Chinnaphat_8272_L005.Controllers
                                    FullName  = u.FullName,
                                    Username  = u.Email,
                                    Email     = u.Email,
-                                   Role      = rg != null ? rg.RoleName : "User",
+                                   Role      = rg != null ? rg.RoleName : "ผู้ใช้ทั่วไป",
+                                   RoleCode  = rg != null ? rg.RoleCode : "CUSTOMER",
                                    Phone     = u.Phone ?? "-",
                                    Gender    = "-",
                                    IsActive  = u.Status == "active",
@@ -292,18 +293,23 @@ namespace Chinnaphat_8272_L005.Controllers
             if (user == null)
                 return RedirectToAction("UserList");
 
-            ViewBag.Roles  = (from r in _db.Roles select r).ToList();
-            ViewBag.EditId = id;
+            ViewBag.Roles = (from r in _db.Roles select r).ToList();
 
-            var model = new AddUserViewModel
+            var currentRole = (from r in _db.Roles
+                               where r.RoleId == user.RoleId
+                               select r).FirstOrDefault();
+
+            // READ — แปลง User entity ไปเป็น EditUserViewModel
+            var model = new EditUserViewModel
             {
+                UserId    = id,
                 FirstName = user.FullName.Contains(" ")
                     ? user.FullName.Split(' ')[0] : user.FullName,
                 LastName  = user.FullName.Contains(" ")
                     ? string.Join(" ", user.FullName.Split(' ').Skip(1)) : "",
                 Email     = user.Email,
-                Username  = user.Email,
                 Phone     = user.Phone ?? "",
+                Role      = currentRole?.RoleCode ?? "CUSTOMER",
                 IsActive  = user.Status == "active"
             };
 
@@ -312,7 +318,7 @@ namespace Chinnaphat_8272_L005.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public IActionResult EditUser(int id, AddUserViewModel model)
+        public IActionResult EditUser(int id, EditUserViewModel model)
         {
             if (ModelState.IsValid)
             {
@@ -323,10 +329,14 @@ namespace Chinnaphat_8272_L005.Controllers
 
                 if (user != null)
                 {
-                    // READ — ค้นหา Role จาก RoleCode
-                    var role = (from r in _db.Roles
-                                where r.RoleCode == model.Role
-                                select r).FirstOrDefault();
+                    // READ — ค้นหา Role จาก RoleCode (ถ้ามีการเลือกมา)
+                    if (!string.IsNullOrEmpty(model.Role))
+                    {
+                        var role = (from r in _db.Roles
+                                    where r.RoleCode == model.Role
+                                    select r).FirstOrDefault();
+                        if (role != null) user.RoleId = role.RoleId;
+                    }
 
                     // UPDATE — อัปเดตข้อมูลในฐานข้อมูล
                     user.FullName  = $"{model.FirstName} {model.LastName}";
@@ -334,19 +344,23 @@ namespace Chinnaphat_8272_L005.Controllers
                     user.Phone     = model.Phone;
                     user.Status    = model.IsActive ? "active" : "inactive";
                     user.UpdatedAt = DateTime.Now;
-                    if (role != null) user.RoleId = role.RoleId;
+
+                    // UPDATE Password เฉพาะเมื่อกรอกมาเท่านั้น
                     if (!string.IsNullOrEmpty(model.Password))
                         user.PasswordHash = model.Password;
 
                     _db.SaveChanges();
-                    TempData["SuccessMessage"] = $"แก้ไขข้อมูลผู้ใช้ {user.Email} สำเร็จ!";
+                    TempData["SuccessMessage"] = $"\u2713 แก้ไขข้อมูลผู้ใช้ {user.Email} สำเร็จ!";
+                    return RedirectToAction("UserList");
                 }
 
+                TempData["ErrorMessage"] = "ไม่พบผู้ใช้ที่ต้องการแก้ไข";
                 return RedirectToAction("UserList");
             }
 
-            ViewBag.Roles  = (from r in _db.Roles select r).ToList();
-            ViewBag.EditId = id;
+            // ModelState ไม่ผ่าน — โหลด Roles ใหม่แล้ว return view เดิม
+            ViewBag.Roles = (from r in _db.Roles select r).ToList();
+            model.UserId  = id;
             ViewData["Title"] = "แก้ไขผู้ใช้งาน";
             return View("EditUser", model);
         }

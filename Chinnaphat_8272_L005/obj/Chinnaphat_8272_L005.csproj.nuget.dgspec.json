@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\ppsadzy\\Desktop\\8272 chinnaphat supsombat\\Nut\\Chinnaphat_8272_L005\\Chinnaphat_8272_L005.csproj": {}
+    "C:\\Users\\ppsadzy\\Desktop\\8272 chinnaphat supsombat\\Nut\\Chinnaphat_8272_l005\\Chinnaphat_8272_L005.csproj": {}
   },
   "projects": {
-    "C:\\Users\\ppsadzy\\Desktop\\8272 chinnaphat supsombat\\Nut\\Chinnaphat_8272_L005\\Chinnaphat_8272_L005.csproj": {
+    "C:\\Users\\ppsadzy\\Desktop\\8272 chinnaphat supsombat\\Nut\\Chinnaphat_8272_l005\\Chinnaphat_8272_L005.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\ppsadzy\\Desktop\\8272 chinnaphat supsombat\\Nut\\Chinnaphat_8272_L005\\Chinnaphat_8272_L005.csproj",
+        "projectUniqueName": "C:\\Users\\ppsadzy\\Desktop\\8272 chinnaphat supsombat\\Nut\\Chinnaphat_8272_l005\\Chinnaphat_8272_L005.csproj",
         "projectName": "Chinnaphat_8272_L005",
-        "projectPath": "C:\\Users\\ppsadzy\\Desktop\\8272 chinnaphat supsombat\\Nut\\Chinnaphat_8272_L005\\Chinnaphat_8272_L005.csproj",
+        "projectPath": "C:\\Users\\ppsadzy\\Desktop\\8272 chinnaphat supsombat\\Nut\\Chinnaphat_8272_l005\\Chinnaphat_8272_L005.csproj",
         "packagesPath": "C:\\Users\\ppsadzy\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\ppsadzy\\Desktop\\8272 chinnaphat supsombat\\Nut\\Chinnaphat_8272_L005\\obj\\",
+        "outputPath": "C:\\Users\\ppsadzy\\Desktop\\8272 chinnaphat supsombat\\Nut\\Chinnaphat_8272_l005\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\ppsadzy\\AppData\\Roaming\\NuGet\\NuGet.Config"
@@ -86,7 +86,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.402/PortableRuntimeIdentifierGraph.json",
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.403/PortableRuntimeIdentifierGraph.json",
           "packagesToPrune": {
             "Microsoft.AspNetCore": "(,10.0.32767]",
             "Microsoft.AspNetCore.Antiforgery": "(,10.0.32767]",

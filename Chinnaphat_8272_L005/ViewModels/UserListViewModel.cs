@@ -21,6 +21,9 @@ namespace Chinnaphat_8272_L005.ViewModels
         [Display(Name = "บทบาท")]
         public string Role { get; set; } = "User";
 
+        /// <summary>รหัสบทบาท (ADMIN, CUSTOMER, COURT_STAFF, SALES_STAFF, ACCOUNTING)</summary>
+        public string RoleCode { get; set; } = string.Empty;
+
         [Display(Name = "เบอร์โทร")]
         public string Phone { get; set; } = string.Empty;
 
@@ -52,6 +55,6 @@ namespace Chinnaphat_8272_L005.ViewModels
         // สรุปจำนวน
         public int TotalUsers => Users.Count;
         public int ActiveUsers => Users.Count(u => u.IsActive);
-        public int AdminCount => Users.Count(u => u.Role == "Admin");
+        public int AdminCount => Users.Count(u => u.RoleCode == "ADMIN");
     }
 }

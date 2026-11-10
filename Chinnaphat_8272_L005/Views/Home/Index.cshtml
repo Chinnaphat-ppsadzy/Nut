@@ -1,18 +1,297 @@
 @{
-    ViewData["Title"] = "Home Page";
+    ViewData["Title"] = "เลือกระบบการใช้งาน - CourtBook";
     Layout = "_CustomerLayout";
 }
 
-<div class="text-center py-5">
-    <i class="bi bi-dribbble" style="font-size:5rem; color:#52b788;"></i>
-    <h2 class="fw-bold mt-3">ยินดีต้อนรับ</h2>
-    <p class="text-muted mb-4">ระบบจัดการสนามกีฬาออนไลน์ CourtBook</p>
-    <div class="d-flex gap-3 justify-content-center">
-        <a asp-action="Admin" asp-controller="Home" class="btn btn-success px-4" style="border-radius:10px;">
-            <i class="bi bi-speedometer2 me-2"></i>ไปที่ Dashboard
-        </a>
-        <a asp-action="Customer" asp-controller="Home" class="btn btn-outline-success px-4" style="border-radius:10px;">
-            <i class="bi bi-person me-2"></i>หน้าลูกค้า
-        </a>
+<style>
+    .portal-banner {
+        background: linear-gradient(135deg, #1a472a 0%, #2d6a4f 55%, #52b788 100%);
+        border-radius: 20px;
+        padding: 2.5rem 2rem;
+        color: white;
+        margin-bottom: 2rem;
+        box-shadow: 0 8px 30px rgba(45, 106, 79, 0.15);
+    }
+    .portal-card {
+        background: #ffffff;
+        border-radius: 20px;
+        border: 2px solid #e2e8f0;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+        transition: all 0.25s ease-in-out;
+        overflow: hidden;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+    }
+    .portal-card:hover {
+        transform: translateY(-6px);
+        box-shadow: 0 16px 36px rgba(0,0,0,0.1);
+    }
+    .portal-card.customer-card:hover {
+        border-color: #52b788;
+    }
+    .portal-card.admin-card:hover {
+        border-color: #1a472a;
+    }
+    .portal-card-header {
+        padding: 2rem 2rem 1.5rem;
+        text-align: center;
+    }
+    .portal-icon-circle {
+        width: 80px;
+        height: 80px;
+        border-radius: 24px;
+        margin: 0 auto 1.25rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2.4rem;
+        transition: transform 0.3s ease;
+    }
+    .portal-card:hover .portal-icon-circle {
+        transform: scale(1.08);
+    }
+    .feature-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+    .feature-list li {
+        padding: 0.65rem 0;
+        border-bottom: 1px dashed #f1f5f9;
+        font-size: 0.95rem;
+        display: flex;
+        align-items: center;
+        gap: 0.65rem;
+    }
+    .feature-list li:last-child {
+        border-bottom: none;
+    }
+</style>
+
+<!-- Banner -->
+<div class="portal-banner text-center">
+    <div class="d-inline-flex align-items-center gap-2 px-3 py-1 bg-white bg-opacity-25 rounded-pill mb-3">
+        <i class="bi bi-dribbble"></i>
+        <span class="small fw-bold">CourtBook Badminton Arena</span>
+    </div>
+    <h2 class="fw-bold mb-2">ยินดีต้อนรับสู่ระบบจัดการสนามกีฬา CourtBook</h2>
+    <p class="text-white-50 mb-0 mx-auto" style="max-width: 650px;">
+        กรุณาเลือกระบบที่ต้องการเข้าใช้งาน ระหว่าง <strong class="text-white">หน้าระบบลูกค้า (หน้าบ้าน)</strong> หรือ <strong class="text-white">ระบบจัดการผู้ดูแล (หลังบ้าน)</strong>
+    </p>
+</div>
+
+<!-- Two Main Portals -->
+<div class="row g-4 mb-4">
+
+    <!-- 1. CUSTOMER PORTAL -->
+    <div class="col-lg-6">
+        <div class="portal-card customer-card">
+            <div class="portal-card-header" style="background: linear-gradient(180deg, #f0fdf4 0%, #ffffff 100%);">
+                <div class="portal-icon-circle" style="background: linear-gradient(135deg, #2d6a4f, #52b788); color: white;">
+                    <i class="bi bi-shop"></i>
+                </div>
+                <span class="badge bg-success-subtle text-success px-3 py-2 rounded-pill font-monospace fw-bold mb-2">
+                    FRONT-END PORTAL
+                </span>
+                <h3 class="fw-bold text-dark mb-1">หน้าระบบลูกค้า (Customer)</h3>
+                <p class="text-muted small mb-0">สำหรับผู้ใช้งานทั่วไปที่ต้องการจองสนามและเลือกซื้อสินค้า</p>
+            </div>
+
+            <div class="p-4 flex-grow-1">
+                <h6 class="fw-bold text-secondary text-uppercase small mb-3">ฟังก์ชันการใช้งานของลูกค้า:</h6>
+                <ul class="feature-list mb-4">
+                    <li>
+                        <i class="bi bi-check-circle-fill text-success"></i>
+                        <span><strong>ตารางจองสนามสไตล์ Matchday:</strong> เลือกรอบเวลาและคอร์ทว่างแบบเรียลไทม์</span>
+                    </li>
+                    <li>
+                        <i class="bi bi-check-circle-fill text-success"></i>
+                        <span><strong>คำนวณส่วนลดอัตโนมัติ:</strong> เชื่อมโยงโปรโมชั่นจากหลังบ้าน Live Preview</span>
+                    </li>
+                    <li>
+                        <i class="bi bi-check-circle-fill text-success"></i>
+                        <span><strong>เลือกซื้อ/เช่าอุปกรณ์:</strong> สั่งลูกแบดมินตัน ไม้แบด รองเท้า และน้ำดื่มในบิลเดียว</span>
+                    </li>
+                    <li>
+                        <i class="bi bi-check-circle-fill text-success"></i>
+                        <span><strong>ชำระเงิน QR PromptPay:</strong> พร้อมสรุปใบจองและเลขที่บิลทันที</span>
+                    </li>
+                </ul>
+
+                <div class="p-3 bg-light rounded-3 text-muted small mb-3">
+                    <i class="bi bi-link-45deg me-1"></i> เส้นทาง URL: <code class="text-success fw-bold">/Home/Customer</code>
+                </div>
+            </div>
+
+            <div class="p-4 bg-light border-top">
+                <a asp-action="Customer" asp-controller="Home" class="btn btn-success w-100 py-3 fw-bold fs-5 shadow-sm" style="border-radius:12px; background:linear-gradient(135deg, #1a472a, #2d6a4f); border:none;">
+                    <i class="bi bi-box-arrow-in-right me-2"></i>เข้าสู่หน้าระบบลูกค้า
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. ADMIN PORTAL -->
+    <div class="col-lg-6">
+        <div class="portal-card admin-card">
+            <div class="portal-card-header" style="background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);">
+                <div class="portal-icon-circle" style="background: linear-gradient(135deg, #1a472a, #334155); color: white;">
+                    <i class="bi bi-shield-check"></i>
+                </div>
+                <span class="badge bg-warning text-dark px-3 py-2 rounded-pill font-monospace fw-bold mb-2">
+                    ADMIN & STAFF ONLY
+                </span>
+                <h3 class="fw-bold text-dark mb-1">ระบบหลังบ้านผู้ดูแล (Admin)</h3>
+                <p class="text-muted small mb-0">สำหรับผู้ดูแลระบบและเจ้าหน้าที่สนาม จัดการข้อมูลและโปรโมชั่น</p>
+            </div>
+
+            <div class="p-4 flex-grow-1">
+                <h6 class="fw-bold text-secondary text-uppercase small mb-3">ฟังก์ชันการใช้งานของผู้ดูแลระบบ:</h6>
+                <ul class="feature-list mb-4">
+                    <li>
+                        <i class="bi bi-check-circle-fill text-success"></i>
+                        <span><strong>Dashboard ภาพรวม:</strong> สถิติผู้ใช้งาน ยอดจอง รายได้ และอัตราการใช้สนาม</span>
+                    </li>
+                    <li>
+                        <i class="bi bi-check-circle-fill text-success"></i>
+                        <span><strong>จัดการโปรโมชั่น 5 แบบ:</strong> แก้ไขตัวเลขส่วนลดและเงื่อนไขเปลี่ยนทั้งเว็บ</span>
+                    </li>
+                    <li>
+                        <i class="bi bi-check-circle-fill text-success"></i>
+                        <span><strong>จัดการสนามแบดมินตัน:</strong> ปรับราคาต่อชม. และเปิด-ปิดสถานะปรับปรุงสนาม</span>
+                    </li>
+                    <li>
+                        <i class="bi bi-check-circle-fill text-success"></i>
+                        <span><strong>จัดการสินค้าและอุปกรณ์:</strong> ควบคุมราคาสินค้าขาย/เช่า และค่ามัดจำ</span>
+                    </li>
+                    <li>
+                        <i class="bi bi-check-circle-fill text-success"></i>
+                        <span><strong>จัดการบุคลากร (User List):</strong> กำหนด 5 บทบาทผู้ใช้งาน เพิ่ม/แก้ไข/ลบ</span>
+                    </li>
+                </ul>
+
+                <div class="p-3 bg-light rounded-3 text-muted small mb-3">
+                    <i class="bi bi-link-45deg me-1"></i> เส้นทาง URL: <code class="text-dark fw-bold">/Home/Admin</code> หรือ <code class="text-dark fw-bold">/Admin/Promotion</code>
+                </div>
+            </div>
+
+            <div class="p-4 bg-light border-top">
+                <a asp-action="Admin" asp-controller="Home" class="btn btn-outline-dark w-100 py-3 fw-bold fs-5 shadow-sm" style="border-radius:12px;">
+                    <i class="bi bi-shield-lock me-2 text-success"></i>เข้าสู่ระบบจัดการหลังบ้าน
+                </a>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- Quick Link Table for Reference -->
+<div class="card border-0 shadow-sm rounded-4 bg-white mb-4">
+    <div class="card-body p-4">
+        <h5 class="fw-bold text-dark mb-3">
+            <i class="bi bi-map me-2 text-success"></i>แผนผังหน้าเว็บทั้งหมด (Sitemap Navigation)
+        </h5>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width: 220px;">หมวดหมู่</th>
+                        <th style="width: 240px;">ชื่อหน้า</th>
+                        <th>URL Route</th>
+                        <th style="width: 160px;">สิทธิ์การเข้าถึง</th>
+                        <th class="text-center" style="width: 140px;">ไปยังหน้า</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Customer Group -->
+                    <tr>
+                        <td rowspan="2" class="fw-bold text-success bg-light bg-opacity-50">
+                            <i class="bi bi-shop me-1"></i> ระบบลูกค้า (หน้าบ้าน)
+                        </td>
+                        <td><strong>หน้าหลัก / จองสนาม</strong></td>
+                        <td><code>/Home/Customer</code></td>
+                        <td><span class="badge bg-success-subtle text-success">ลูกค้าทั่วไป</span></td>
+                        <td class="text-center">
+                            <a href="/Home/Customer" class="btn btn-sm btn-outline-success">เปิดหน้า <i class="bi bi-arrow-right"></i></a>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><strong>ตารางจองคอร์ทแบบ Matchday</strong></td>
+                        <td><code>/Home/Customer#bookingSection</code></td>
+                        <td><span class="badge bg-success-subtle text-success">ลูกค้าทั่วไป</span></td>
+                        <td class="text-center">
+                            <a href="/Home/Customer#bookingSection" class="btn btn-sm btn-outline-success">เปิดหน้า <i class="bi bi-arrow-right"></i></a>
+                        </td>
+                    </tr>
+
+                    <!-- Admin Group -->
+                    <tr>
+                        <td rowspan="5" class="fw-bold text-dark bg-light bg-opacity-75">
+                            <i class="bi bi-shield-lock me-1"></i> ระบบจัดการ (หลังบ้าน)
+                        </td>
+                        <td><strong>Dashboard ภาพรวม</strong></td>
+                        <td><code>/Home/Admin</code> หรือ <code>/Admin</code></td>
+                        <td><span class="badge bg-warning text-dark">Admin / Staff</span></td>
+                        <td class="text-center">
+                            <a href="/Home/Admin" class="btn btn-sm btn-outline-dark">เปิดหน้า <i class="bi bi-arrow-right"></i></a>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><strong>จัดการสนาม (Courts)</strong></td>
+                        <td><code>/Admin/Court</code></td>
+                        <td><span class="badge bg-warning text-dark">Admin</span></td>
+                        <td class="text-center">
+                            <a href="/Admin/Court" class="btn btn-sm btn-outline-dark">เปิดหน้า <i class="bi bi-arrow-right"></i></a>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><strong>จัดการโปรโมชั่น 5 แบบ</strong></td>
+                        <td><code>/Admin/Promotion</code></td>
+                        <td><span class="badge bg-warning text-dark">Admin</span></td>
+                        <td class="text-center">
+                            <a href="/Admin/Promotion" class="btn btn-sm btn-outline-dark">เปิดหน้า <i class="bi bi-arrow-right"></i></a>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><strong>จัดการสินค้าและอุปกรณ์</strong></td>
+                        <td><code>/Admin/Product</code></td>
+                        <td><span class="badge bg-warning text-dark">Admin / Staff</span></td>
+                        <td class="text-center">
+                            <a href="/Admin/Product" class="btn btn-sm btn-outline-dark">เปิดหน้า <i class="bi bi-arrow-right"></i></a>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><strong>รายชื่อผู้ใช้ (User List)</strong></td>
+                        <td><code>/User/UserList</code></td>
+                        <td><span class="badge bg-warning text-dark">Admin</span></td>
+                        <td class="text-center">
+                            <a href="/User/UserList" class="btn btn-sm btn-outline-dark">เปิดหน้า <i class="bi bi-arrow-right"></i></a>
+                        </td>
+                    </tr>
+
+                    <!-- Auth Group -->
+                    <tr>
+                        <td rowspan="2" class="fw-bold text-secondary bg-light">
+                            <i class="bi bi-key me-1"></i> เข้าสู่ระบบ / สมัคร
+                        </td>
+                        <td><strong>เข้าสู่ระบบ (Login)</strong></td>
+                        <td><code>/User/Login</code></td>
+                        <td><span class="badge bg-secondary">ทุกคน</span></td>
+                        <td class="text-center">
+                            <a href="/User/Login" class="btn btn-sm btn-outline-secondary">เปิดหน้า <i class="bi bi-arrow-right"></i></a>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><strong>สมัครสมาชิก (Register)</strong></td>
+                        <td><code>/User/Register</code></td>
+                        <td><span class="badge bg-secondary">ทุกคน</span></td>
+                        <td class="text-center">
+                            <a href="/User/Register" class="btn btn-sm btn-outline-secondary">เปิดหน้า <i class="bi bi-arrow-right"></i></a>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>

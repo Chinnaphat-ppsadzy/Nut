@@ -59,6 +59,36 @@
     }
 </style>
 
+<!-- ========== ADMIN TOP BAR & QUICK ACTIONS ========== -->
+<div class="card border-0 shadow-sm mb-4" style="border-radius:16px; background:linear-gradient(135deg, #1a472a 0%, #2d6a4f 60%, #52b788 100%); color:white;">
+    <div class="card-body p-4">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+            <div>
+                <div class="d-flex align-items-center gap-2 mb-1">
+                    <span class="badge bg-warning text-dark font-monospace">ADMIN DASHBOARD</span>
+                    <span class="badge bg-white bg-opacity-25 text-white">CourtBook Arena</span>
+                </div>
+                <h3 class="fw-bold mb-1"><i class="bi bi-speedometer2 me-2"></i>แดชบอร์ดระบบจัดการหลังบ้าน</h3>
+                <p class="mb-0 text-white-50 small">ภาพรวมสถิติ ข้อมูลการจอง และทางลัดจัดการระบบทั้งหมด</p>
+            </div>
+            <div class="d-flex gap-2 flex-wrap">
+                <a asp-action="Court" asp-controller="Admin" class="btn btn-light fw-bold text-success shadow-sm" style="border-radius:10px;">
+                    <i class="bi bi-building me-1"></i>จัดการสนาม
+                </a>
+                <a asp-action="Promotion" asp-controller="Admin" class="btn btn-warning fw-bold text-dark shadow-sm" style="border-radius:10px;">
+                    <i class="bi bi-ticket-perforated me-1"></i>จัดการโปรโมชั่น 5 แบบ
+                </a>
+                <a asp-action="Product" asp-controller="Admin" class="btn btn-light fw-bold text-dark shadow-sm" style="border-radius:10px;">
+                    <i class="bi bi-box-seam me-1 text-primary"></i>สินค้า
+                </a>
+                <a asp-action="Customer" asp-controller="Home" class="btn btn-outline-light fw-bold" style="border-radius:10px;">
+                    <i class="bi bi-shop me-1"></i>ไปหน้าลูกค้า
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- ========== STAT CARDS ========== -->
 <div class="row g-3 mb-4">
 

@@ -1,0 +1,573 @@
+@model List<Chinnaphat_8272_L005.Models.Promotion>
+
+@{
+    ViewData["Title"] = "จัดการโปรโมชั่น (Admin)";
+    Layout = "_AdminLayout";
+}
+
+<style>
+    .promo-header {
+        background: linear-gradient(135deg, #1a472a 0%, #2d6a4f 55%, #52b788 100%);
+        border-radius: 16px;
+        padding: 1.6rem 2rem;
+        color: white;
+        margin-bottom: 1.5rem;
+        position: relative;
+        overflow: hidden;
+    }
+    .promo-header::after {
+        content: '\F5C1';
+        font-family: 'bootstrap-icons';
+        position: absolute;
+        right: 1.5rem;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 5rem;
+        opacity: 0.12;
+    }
+    .promo-card {
+        background: #fff;
+        border-radius: 16px;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+        transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+    }
+    .promo-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(45,106,79,0.12);
+        border-color: #52b788;
+    }
+    .promo-card.inactive {
+        opacity: 0.65;
+        background: #f8fafc;
+        border-style: dashed;
+    }
+    .promo-icon-wrap {
+        width: 56px;
+        height: 56px;
+        border-radius: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.6rem;
+        flex-shrink: 0;
+    }
+    /* Stat cards */
+    .stat-card {
+        border-radius: 14px;
+        padding: 1.1rem 1.4rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        border: 1px solid #e2e8f0;
+        background: #fff;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.04);
+    }
+    .stat-icon {
+        width: 48px; height: 48px;
+        border-radius: 12px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1.4rem;
+        flex-shrink: 0;
+    }
+    /* Summary box in card */
+    .summary-box {
+        border-radius: 12px;
+        padding: 0.75rem 1rem;
+        font-size: 0.88rem;
+        margin-bottom: 0.75rem;
+    }
+    /* "What you get" highlight */
+    .reward-highlight {
+        font-size: 1.05rem;
+        font-weight: 700;
+        padding: 0.5rem 1rem;
+        border-radius: 10px;
+        display: inline-block;
+        margin-top: 0.4rem;
+    }
+    /* Condition chips */
+    .cond-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        padding: 0.25rem 0.65rem;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+    /* Type label badge */
+    .type-badge {
+        font-size: 0.75rem;
+        font-weight: 700;
+        padding: 0.2rem 0.7rem;
+        border-radius: 20px;
+        letter-spacing: 0.3px;
+    }
+    .form-control:focus, .form-select:focus {
+        border-color: #52b788;
+        box-shadow: 0 0 0 3px rgba(82,183,136,0.2);
+    }
+</style>
+
+<!-- Header Banner -->
+<div class="promo-header">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+        <div>
+            <div class="d-flex align-items-center gap-2 mb-1">
+                <span class="badge bg-white text-success px-2 py-1 fw-bold" style="border-radius:8px;">
+                    <i class="bi bi-shield-lock-fill me-1"></i> ADMIN ONLY
+                </span>
+                <span class="badge px-2 py-1" style="background:rgba(255,255,255,0.2); color:#fff;">
+                    5 รูปแบบโปรโมชั่น
+                </span>
+            </div>
+            <h4 class="fw-bold mb-1 text-white">
+                <i class="bi bi-ticket-perforated me-2"></i>จัดการโปรโมชั่นระบบหลังบ้าน
+            </h4>
+            <p class="mb-0 text-white-50 small">
+                เปิด-ปิด หรือแก้ไขตัวเลขส่วนลดและเงื่อนไขได้ที่นี่ &mdash; การเปลี่ยนแปลงมีผลกับลูกค้าทันที
+            </p>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+            <a asp-action="Admin" asp-controller="Home" class="btn btn-light btn-sm px-3 py-2 fw-semibold" style="border-radius:10px;">
+                <i class="bi bi-speedometer2 me-1"></i> Dashboard
+            </a>
+            <a asp-action="Court" asp-controller="Admin" class="btn btn-light btn-sm px-3 py-2 fw-semibold" style="border-radius:10px;">
+                <i class="bi bi-building me-1"></i> จัดการสนาม
+            </a>
+            <a asp-action="Product" asp-controller="Admin" class="btn btn-light btn-sm px-3 py-2 fw-semibold" style="border-radius:10px;">
+                <i class="bi bi-box-seam me-1"></i> สินค้า
+            </a>
+            <a href="/Home/Customer" target="_blank" class="btn btn-outline-light btn-sm px-3 py-2" style="border-radius:10px;">
+                <i class="bi bi-eye me-1"></i> ดูหน้าลูกค้า
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Alerts -->
+@if (TempData["SuccessMessage"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show mb-4 shadow-sm" style="border-radius:12px;" role="alert">
+        <i class="bi bi-check-circle-fill me-2 fs-5"></i>
+        <strong>สำเร็จ:</strong> @TempData["SuccessMessage"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+@if (TempData["ErrorMessage"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show mb-4 shadow-sm" style="border-radius:12px;" role="alert">
+        <i class="bi bi-exclamation-triangle-fill me-2 fs-5"></i>
+        <strong>ข้อผิดพลาด:</strong> @TempData["ErrorMessage"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+<!-- Summary Stats -->
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="stat-card">
+            <div class="stat-icon" style="background:#f0fdf4; color:#16a34a;">
+                <i class="bi bi-ticket-perforated-fill"></i>
+            </div>
+            <div>
+                <div class="fs-2 fw-bold text-dark lh-1">@Model.Count</div>
+                <div class="text-muted small mt-1">โปรโมชั่นทั้งหมดในระบบ</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="stat-card">
+            <div class="stat-icon" style="background:#eff6ff; color:#2563eb;">
+                <i class="bi bi-check-circle-fill"></i>
+            </div>
+            <div>
+                <div class="fs-2 fw-bold text-primary lh-1">@Model.Count(p => p.IsActive == true)</div>
+                <div class="text-muted small mt-1">เปิดใช้งาน (มีผลกับลูกค้า)</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="stat-card">
+            <div class="stat-icon" style="background:#f8fafc; color:#94a3b8;">
+                <i class="bi bi-pause-circle-fill"></i>
+            </div>
+            <div>
+                <div class="fs-2 fw-bold text-secondary lh-1">@Model.Count(p => p.IsActive != true)</div>
+                <div class="text-muted small mt-1">ปิดใช้งานชั่วคราว</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 5 Promotion Cards -->
+<div class="row g-4 mb-5">
+    @foreach (var promo in Model)
+    {
+        bool isActive = promo.IsActive == true;
+
+        string iconClass = "bi-tag-fill";
+        string iconBg    = "#e8f5e9";
+        string iconColor = "#2d6a4f";
+        string typeLabel = "โปรโมชั่น";
+        string typeBadgeBg   = "#e8f5e9";
+        string typeBadgeColor = "#1a472a";
+
+        // ข้อความสรุปเงื่อนไข (เพิ่มให้อ่านง่ายขึ้น)
+        string conditionSummary = "";
+        string rewardText = "";
+        string rewardBg   = "#dcfce7";
+        string rewardColor = "#15803d";
+
+        switch (promo.PromoType)
+        {
+            case "TIME_BASED":
+                iconClass = "bi-clock-history";
+                iconBg = "#e0f2fe"; iconColor = "#0284c7";
+                typeBadgeBg = "#e0f2fe"; typeBadgeColor = "#0369a1";
+                typeLabel = "โปรฯ ที่ 1 — เช่าสนาม (Time-based)";
+                conditionSummary = $"จองคอร์ทช่วง {promo.TimeStart?.ToString("HH:mm") ?? "09:00"} – {promo.TimeEnd?.ToString("HH:mm") ?? "15:00"} น. (จันทร์–ศุกร์)";
+                rewardText = $"ลดค่าเช่าคอร์ท {promo.DiscountValue.ToString("N0")}%";
+                rewardBg = "#e0f2fe"; rewardColor = "#0369a1";
+                break;
+            case "VOLUME_SALE":
+                iconClass = "bi-box-seam-fill";
+                iconBg = "#fef9c3"; iconColor = "#b45309";
+                typeBadgeBg = "#fef9c3"; typeBadgeColor = "#92400e";
+                typeLabel = "โปรฯ ที่ 2 — ส่งเสริมการขาย (Volume Sale)";
+                conditionSummary = "ซื้อลูกแบดมินตัน 2 หลอดขึ้นไปในบิลเดียวกัน";
+                rewardText = $"ลูกแบดหลอดที่ 2 ลด {promo.DiscountValue.ToString("N0")}%";
+                rewardBg = "#fef9c3"; rewardColor = "#92400e";
+                break;
+            case "BUNDLE_RENTAL":
+                iconClass = "bi-collection-fill";
+                iconBg = "#ede9fe"; iconColor = "#5b21b6";
+                typeBadgeBg = "#ede9fe"; typeBadgeColor = "#5b21b6";
+                typeLabel = "โปรฯ ที่ 3 — ส่งเสริมการเช่า (Bundle Rental)";
+                conditionSummary = "เช่าไม้แบด 2 ไม้ + รองเท้า 2 คู่ ในบิลเดียวกัน";
+                rewardText = $"ลดค่าเช่าอุปกรณ์เซ็ตนี้ {promo.DiscountValue.ToString("N0")}%";
+                rewardBg = "#ede9fe"; rewardColor = "#5b21b6";
+                break;
+            case "CROSS_SELL":
+                iconClass = "bi-arrow-left-right";
+                iconBg = "#ffe4e6"; iconColor = "#e11d48";
+                typeBadgeBg = "#ffe4e6"; typeBadgeColor = "#be123c";
+                typeLabel = "โปรฯ ที่ 4 — ซื้อคู่เช่า (Cross-selling)";
+                conditionSummary = "ซื้อลูกแบด 1 หลอด + เช่าไม้แบด 2 ไม้ ในบิลเดียวกัน";
+                rewardText = $"เช่ารองเท้าฟรี {promo.DiscountValue.ToString("N0")} คู่";
+                rewardBg = "#ffe4e6"; rewardColor = "#be123c";
+                break;
+            case "TOTAL_BILL":
+                iconClass = "bi-receipt-cutoff";
+                iconBg = "#dcfce7"; iconColor = "#16a34a";
+                typeBadgeBg = "#dcfce7"; typeBadgeColor = "#15803d";
+                typeLabel = "โปรฯ ที่ 5 — ยอดซื้อรวม (Total Bill)";
+                conditionSummary = $"สมาชิกใหม่จองครั้งแรก ยอดรวมบิลตั้งแต่ {promo.MinBillAmount?.ToString("N0") ?? "600"} บาทขึ้นไป";
+                rewardText = $"ลดท้ายบิลทันที {promo.DiscountValue.ToString("N0")} บาท";
+                rewardBg = "#dcfce7"; rewardColor = "#15803d";
+                break;
+        }
+
+        <div class="col-lg-6">
+            <div class="promo-card @(isActive ? "" : "inactive")">
+
+                <!-- Card Top Bar -->
+                <div class="p-4 pb-0">
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <!-- Type Label -->
+                        <span class="type-badge" style="background:@typeBadgeBg; color:@typeBadgeColor;">
+                            @typeLabel
+                        </span>
+                        <!-- Toggle Button -->
+                        <form asp-action="TogglePromoStatus" asp-controller="Admin" method="post" class="d-inline">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="id" value="@promo.PromotionId" />
+                            <button type="submit"
+                                    class="btn btn-sm @(isActive ? "btn-success" : "btn-outline-secondary")"
+                                    style="border-radius:20px; font-size:0.75rem; padding:0.25rem 0.8rem;"
+                                    title="คลิกเพื่อเปิด/ปิดโปรโมชั่น">
+                                <i class="bi @(isActive ? "bi-toggle-on" : "bi-toggle-off") me-1"></i>
+                                @(isActive ? "เปิดอยู่" : "ปิดอยู่")
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Icon + Title -->
+                    <div class="d-flex align-items-center gap-3 mb-3">
+                        <div class="promo-icon-wrap" style="background:@iconBg; color:@iconColor;">
+                            <i class="bi @iconClass"></i>
+                        </div>
+                        <div>
+                            <h5 class="fw-bold mb-0 text-dark" style="font-size:1rem;">@promo.PromoName</h5>
+                            <span class="text-muted" style="font-size:0.78rem; font-family:monospace;">@promo.PromoCode</span>
+                        </div>
+                    </div>
+
+                    <!-- Condition Summary Box -->
+                    <div class="summary-box mb-2" style="background:#f8fafc; border:1px solid #e2e8f0;">
+                        <div class="d-flex align-items-start gap-2">
+                            <i class="bi bi-check2-circle text-success mt-1" style="font-size:1rem; flex-shrink:0;"></i>
+                            <div>
+                                <div class="text-muted" style="font-size:0.78rem; font-weight:600; letter-spacing:0.3px;">เงื่อนไข</div>
+                                <div class="fw-semibold text-dark" style="font-size:0.9rem; line-height:1.4;">@conditionSummary</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Reward Highlight -->
+                    <div class="mb-3">
+                        <div class="text-muted" style="font-size:0.78rem; font-weight:600; margin-bottom:0.3rem;">
+                            <i class="bi bi-gift-fill me-1"></i>สิทธิ์ที่ลูกค้าได้รับ
+                        </div>
+                        <span class="reward-highlight" style="background:@rewardBg; color:@rewardColor; font-size:1rem;">
+                            <i class="bi bi-stars me-1"></i>@rewardText
+                        </span>
+                    </div>
+
+                    <!-- Description (ถ้ามี) -->
+                    @if (!string.IsNullOrWhiteSpace(promo.Description))
+                    {
+                        <p class="text-muted mb-3" style="font-size:0.83rem; line-height:1.5; border-left:3px solid #e2e8f0; padding-left:0.75rem;">
+                            @promo.Description
+                        </p>
+                    }
+                </div>
+
+                <!-- Card Footer -->
+                <div class="d-flex justify-content-between align-items-center px-4 py-3 mt-auto border-top" style="background:#fafafa; border-radius:0 0 16px 16px;">
+                    <small class="text-muted">
+                        <i class="bi bi-clock me-1"></i>แก้ไขล่าสุด: @promo.UpdatedAt.ToString("dd/MM/yyyy HH:mm")
+                    </small>
+                    <button type="button" class="btn btn-sm btn-outline-success px-3" style="border-radius:10px;"
+                            onclick="openEditPromoModal({
+                                id: @promo.PromotionId,
+                                name: '@Html.Raw(promo.PromoName)',
+                                code: '@Html.Raw(promo.PromoCode)',
+                                type: '@promo.PromoType',
+                                desc: '@Html.Raw(promo.Description?.Replace("'", "\\'"))',
+                                discount: @promo.DiscountValue,
+                                discountType: '@promo.DiscountType',
+                                minBill: @(promo.MinBillAmount ?? 0),
+                                timeStart: '@(promo.TimeStart?.ToString("HH:mm") ?? "09:00")',
+                                timeEnd: '@(promo.TimeEnd?.ToString("HH:mm") ?? "15:00")',
+                                isActive: @(isActive ? "true" : "false")
+                            })">
+                        <i class="bi bi-pencil-square me-1"></i> แก้ไขเงื่อนไข
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<!-- ============================================================
+     EDIT PROMOTION MODAL
+     ============================================================ -->
+<div class="modal fade" id="editPromoModal" tabindex="-1" aria-labelledby="editPromoModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content" style="border-radius:18px; border:none; box-shadow:0 20px 60px rgba(0,0,0,0.2);">
+            <form asp-action="UpdatePromotion" asp-controller="Admin" method="post" id="editPromoForm">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="promotionId" id="modalPromoId" />
+                <input type="hidden" name="discountType" id="modalDiscountType" />
+
+                <div class="modal-header text-white" style="background:linear-gradient(135deg,#1a472a 0%,#2d6a4f 60%,#52b788 100%); border-top-left-radius:18px; border-top-right-radius:18px; padding:1.25rem 1.75rem;">
+                    <div>
+                        <h5 class="modal-title fw-bold" id="editPromoModalLabel">
+                            <i class="bi bi-pencil-square me-2"></i>แก้ไขโปรโมชั่นหลังบ้าน
+                        </h5>
+                        <small class="text-white-50">เมื่อบันทึก การเปลี่ยนแปลงจะมีผลทั่วทั้งเว็บทันที</small>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+
+                <div class="modal-body p-4">
+                    <div class="row g-3">
+                        <!-- ชื่อโปรโมชั่น -->
+                        <div class="col-md-8">
+                            <label class="form-label fw-semibold small">ชื่อโปรโมชั่น <span class="text-danger">*</span></label>
+                            <input type="text" name="promoName" id="modalPromoName" class="form-control" required />
+                        </div>
+                        <!-- รหัสโค้ด -->
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold small">รหัสโปรโมชั่น (Code) <span class="text-danger">*</span></label>
+                            <input type="text" name="promoCode" id="modalPromoCode" class="form-control text-uppercase font-monospace" required />
+                        </div>
+
+                        <!-- คำอธิบาย -->
+                        <div class="col-12">
+                            <label class="form-label fw-semibold small">คำอธิบาย (แสดงให้ลูกค้าเห็น)</label>
+                            <textarea name="description" id="modalDescription" class="form-control" rows="2"></textarea>
+                        </div>
+
+                        <!-- ตัวเลขส่วนลด -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold small" id="lblDiscountValue">
+                                ตัวเลขส่วนลด <span class="text-danger">*</span>
+                            </label>
+                            <div class="input-group">
+                                <input type="number" step="0.5" min="0" max="10000"
+                                       name="discountValue" id="modalDiscountValue"
+                                       class="form-control fw-bold fs-5 text-success" required />
+                                <span class="input-group-text fw-bold" id="discountUnitText">%</span>
+                            </div>
+                            <small class="text-muted" id="discountHintText">ปรับตัวเลขส่วนลดตามต้องการ</small>
+                        </div>
+
+                        <!-- สถานะ -->
+                        <div class="col-md-6 d-flex align-items-center">
+                            <div class="p-3 bg-light rounded-3 w-100 border">
+                                <div class="form-check form-switch mb-0">
+                                    <input class="form-check-input" type="checkbox" role="switch"
+                                           name="isActive" id="modalIsActive" value="true"
+                                           style="width:2.5rem; height:1.3rem; cursor:pointer;" />
+                                    <label class="form-check-label fw-bold ms-2" for="modalIsActive" id="modalIsActiveLabel">
+                                        เปิดใช้งานโปรโมชั่นนี้
+                                    </label>
+                                </div>
+                                <small class="text-muted d-block mt-1">หากปิด ลูกค้าจะไม่ได้รับส่วนลดนี้</small>
+                            </div>
+                        </div>
+
+                        <!-- ฟิลด์เฉพาะ: Time-based -->
+                        <div class="col-12" id="fieldGroupTimeBased" style="display:none;">
+                            <div class="p-3 rounded-3 border" style="background:#f0f9ff; border-color:#bae6fd !important;">
+                                <h6 class="fw-bold text-primary mb-2 small">
+                                    <i class="bi bi-clock me-1"></i>กำหนดช่วงเวลา (Time-based)
+                                </h6>
+                                <div class="row g-2">
+                                    <div class="col-6">
+                                        <label class="small text-muted">เวลาเริ่มต้น</label>
+                                        <input type="time" name="timeStart" id="modalTimeStart" class="form-control form-control-sm" />
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="small text-muted">เวลาสิ้นสุด</label>
+                                        <input type="time" name="timeEnd" id="modalTimeEnd" class="form-control form-control-sm" />
+                                    </div>
+                                </div>
+                                <small class="text-muted mt-1 d-block">เช่น 09:00 – 15:00 น. เฉพาะวันจันทร์–ศุกร์</small>
+                            </div>
+                        </div>
+
+                        <!-- ฟิลด์เฉพาะ: Total Bill -->
+                        <div class="col-12" id="fieldGroupTotalBill" style="display:none;">
+                            <div class="p-3 rounded-3 border" style="background:#f0fdf4; border-color:#bbf7d0 !important;">
+                                <h6 class="fw-bold text-success mb-2 small">
+                                    <i class="bi bi-cash-coin me-1"></i>กำหนดยอดรวมบิลขั้นต่ำ
+                                </h6>
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text">ยอดบิลขั้นต่ำ</span>
+                                    <input type="number" step="10" min="0"
+                                           name="minBillAmount" id="modalMinBillAmount" class="form-control" />
+                                    <span class="input-group-text">บาท</span>
+                                </div>
+                                <small class="text-muted mt-1 d-block">รวมทั้ง ค่าเช่าคอร์ท + ค่าซื้อสินค้า + ค่าเช่าอุปกรณ์</small>
+                            </div>
+                        </div>
+
+                        <!-- ฟิลด์เฉพาะ: Rules (สำหรับโปรฯ 2, 3, 4) -->
+                        <div class="col-12" id="fieldGroupRules" style="display:none;">
+                            <div class="p-3 rounded-3 border" style="background:#fafafa;">
+                                <h6 class="fw-bold text-secondary mb-2 small">
+                                    <i class="bi bi-sliders me-1"></i>เงื่อนไขจำนวนชิ้น (Rules)
+                                </h6>
+                                <div class="row g-2">
+                                    <div class="col-6">
+                                        <label class="small text-muted">จำนวนขั้นต่ำที่ต้องซื้อ/เช่า</label>
+                                        <input type="number" min="1" max="100"
+                                               name="requiredQty" id="modalRequiredQty"
+                                               class="form-control form-control-sm" value="2" />
+                                    </div>
+                                    <div class="col-6" id="fieldNthItem">
+                                        <label class="small text-muted">ลดเฉพาะชิ้นที่ N (เช่น หลอดที่ 2)</label>
+                                        <input type="number" min="1" max="100"
+                                               name="nthItem" id="modalNthItem"
+                                               class="form-control form-control-sm" value="2" />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer bg-light px-4 py-3" style="border-bottom-left-radius:18px; border-bottom-right-radius:18px;">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal" style="border-radius:10px;">
+                        ยกเลิก
+                    </button>
+                    <button type="submit" class="btn btn-success fw-bold px-4"
+                            style="border-radius:10px; background:linear-gradient(135deg,#1a472a,#2d6a4f); border:none;">
+                        <i class="bi bi-floppy me-1"></i> บันทึก (มีผลทั้งเว็บ)
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function openEditPromoModal(data) {
+            document.getElementById('modalPromoId').value       = data.id;
+            document.getElementById('modalPromoName').value     = data.name;
+            document.getElementById('modalPromoCode').value     = data.code;
+            document.getElementById('modalDescription').value   = data.desc;
+            document.getElementById('modalDiscountValue').value = data.discount;
+            document.getElementById('modalDiscountType').value  = data.discountType;
+            document.getElementById('modalIsActive').checked    = data.isActive;
+
+            // Label & hint ตาม discount type
+            const unitEl = document.getElementById('discountUnitText');
+            const lblEl  = document.getElementById('lblDiscountValue');
+            const hintEl = document.getElementById('discountHintText');
+
+            if (data.discountType === 'PERCENT') {
+                unitEl.innerText = '%';
+                lblEl.innerText  = 'อัตราส่วนลด (%) *';
+                hintEl.innerText = 'เช่น 20 = ลด 20%, 50 = ลด 50%';
+            } else if (data.discountType === 'FIXED_AMOUNT') {
+                unitEl.innerText = 'บาท';
+                lblEl.innerText  = 'จำนวนเงินส่วนลด (บาท) *';
+                hintEl.innerText = 'เช่น 100 = หักท้ายบิลทันที 100 บาท';
+            } else if (data.discountType === 'FREE_ITEM') {
+                unitEl.innerText = 'คู่/ชิ้นฟรี';
+                lblEl.innerText  = 'จำนวนของแถมที่ให้ฟรี *';
+                hintEl.innerText = 'เช่น 1 = ให้เช่ารองเท้าฟรี 1 คู่';
+            }
+
+            // Show/hide field groups
+            const grpTime  = document.getElementById('fieldGroupTimeBased');
+            const grpTotal = document.getElementById('fieldGroupTotalBill');
+            const grpRules = document.getElementById('fieldGroupRules');
+            const nthItem  = document.getElementById('fieldNthItem');
+
+            grpTime.style.display  = data.type === 'TIME_BASED' ? 'block' : 'none';
+            grpTotal.style.display = data.type === 'TOTAL_BILL' ? 'block' : 'none';
+            grpRules.style.display = ['VOLUME_SALE','BUNDLE_RENTAL','CROSS_SELL'].includes(data.type) ? 'block' : 'none';
+            nthItem.style.display  = data.type === 'VOLUME_SALE' ? 'block' : 'none';
+
+            if (data.type === 'TIME_BASED') {
+                document.getElementById('modalTimeStart').value = data.timeStart || '09:00';
+                document.getElementById('modalTimeEnd').value   = data.timeEnd   || '15:00';
+            }
+            if (data.type === 'TOTAL_BILL') {
+                document.getElementById('modalMinBillAmount').value = data.minBill || 600;
+            }
+
+            new bootstrap.Modal(document.getElementById('editPromoModal')).show();
+        }
+
+        // Toggle active label
+        document.getElementById('modalIsActive').addEventListener('change', function () {
+            const lbl = document.getElementById('modalIsActiveLabel');
+            lbl.innerText   = this.checked ? 'เปิดใช้งานโปรโมชั่นนี้' : 'ปิดใช้งานโปรโมชั่นนี้';
+            lbl.className   = this.checked
+                ? 'form-check-label fw-bold ms-2 text-success'
+                : 'form-check-label fw-bold ms-2 text-muted';
+        });
+    </script>
+}

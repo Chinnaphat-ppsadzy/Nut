@@ -114,9 +114,48 @@ public class HomeController : Controller
         return View();
     }
 
-    public IActionResult Customer()
+    public IActionResult Customer(string? date)
     {
         ViewData["Title"] = "หน้าหลัก";
+        string selectedDate = string.IsNullOrWhiteSpace(date)
+            ? DateTime.Today.ToString("yyyy-MM-dd")
+            : date.Trim();
+        ViewBag.SelectedDate = selectedDate;
+
+        try
+        {
+            var courts = _db.Courts.Where(c => c.Status == "AVAILABLE").ToList();
+            if (!courts.Any())
+            {
+                courts = _db.Courts.ToList();
+            }
+            ViewBag.Courts = courts;
+
+            var slots = _db.TimeSlots.Where(s => s.IsActive == true || s.IsActive == null)
+                                     .OrderBy(s => s.SlotId).ToList();
+            ViewBag.TimeSlots = slots;
+
+            // ดึงโปรโมชั่นที่เปิดใช้งานอยู่จากฐานข้อมูลหลังบ้าน
+            var activePromos = _db.Promotions
+                                  .Where(p => p.IsActive == true)
+                                  .OrderBy(p => p.Priority)
+                                  .ToList();
+            ViewBag.Promotions = activePromos;
+
+            if (DateOnly.TryParse(selectedDate, out DateOnly targetDate))
+            {
+                var booked = _db.BookingSlots
+                                .Where(bs => bs.PlayDate == targetDate)
+                                .Select(bs => new { bs.CourtId, bs.SlotId })
+                                .ToList();
+                ViewBag.BookedSlots = booked;
+            }
+        }
+        catch
+        {
+            // Graceful fallback
+        }
+
         return View();
     }
 

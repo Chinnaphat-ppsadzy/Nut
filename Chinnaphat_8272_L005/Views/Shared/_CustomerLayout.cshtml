@@ -74,132 +74,79 @@
                 <!-- Menu -->
 
                 <div class="text-secondary small fw-bold mb-3">
-
-                    เมนูหลัก
-
+                    <i class="bi bi-person me-1 text-success"></i>เมนูสำหรับลูกค้า (Customer)
                 </div>
 
+                @{
+                    string curAct = ViewContext.RouteData.Values["action"]?.ToString() ?? "";
+                    string curCtrl = ViewContext.RouteData.Values["controller"]?.ToString() ?? "";
+                }
 
                 <!-- Dashboard / Home -->
-
-                <a href="/Home/Customer"
-                   class="btn btn-success w-100 text-start mb-2">
-
+                <a asp-action="Customer" asp-controller="Home"
+                   class="btn @(curCtrl == "Home" && curAct == "Customer" ? "btn-success" : "btn-light") w-100 text-start mb-2">
                     <i class="bi bi-house-door me-2"></i>
-
                     หน้าหลัก
-
                 </a>
-
-
-                <!-- สนามกีฬา -->
-
-                <a href="#"
-                   class="btn btn-light w-100 text-start mb-2">
-
-                    <i class="bi bi-building me-2"></i>
-
-                    สนามกีฬา
-
-                </a>
-
 
                 <!-- จองสนาม -->
-
-                <a href="#"
+                <a href="/Home/Customer#bookingSection"
                    class="btn btn-light w-100 text-start mb-2">
-
-                    <i class="bi bi-calendar-plus me-2"></i>
-
-                    จองสนาม
-
+                    <i class="bi bi-calendar-plus me-2 text-success"></i>
+                    จองสนามแบดมินตัน
                 </a>
 
-
-                <!-- การจอง -->
-
-                <a href="#"
+                <!-- โปรโมชั่น -->
+                <a href="javascript:void(0)" onclick="if(window.showPromoInfo){showPromoInfo();}else{window.location.href='/Home/Customer';}"
                    class="btn btn-light w-100 text-start mb-2">
-
-                    <i class="bi bi-calendar-check me-2"></i>
-
-                    การจองของฉัน
-
+                    <i class="bi bi-ticket-perforated me-2 text-warning"></i>
+                    ดูโปรโมชั่นที่ใช้ได้
                 </a>
-
 
                 <hr />
-
 
                 <!-- Account -->
-
                 <div class="text-secondary small fw-bold mb-3">
-
-                    บัญชีของฉัน
-
+                    <i class="bi bi-person-circle me-1 text-primary"></i>บัญชีผู้ใช้งาน
                 </div>
 
-
-                <!-- Profile -->
-
-                <a href="#"
-                   class="btn btn-light w-100 text-start mb-2">
-
-                    <i class="bi bi-person me-2"></i>
-
-                    โปรไฟล์
-
+                <!-- Login -->
+                <a asp-action="Login" asp-controller="User"
+                   class="btn btn-outline-success w-100 mb-2 text-start">
+                    <i class="bi bi-box-arrow-in-right me-2"></i>
+                    เข้าสู่ระบบ
                 </a>
 
-
-                <!-- History -->
-
-                <a href="#"
-                   class="btn btn-light w-100 text-start mb-2">
-
-                    <i class="bi bi-clock-history me-2"></i>
-
-                    ประวัติการจอง
-
+                <!-- Register -->
+                <a asp-action="Register" asp-controller="User"
+                   class="btn btn-success w-100 mb-3 text-start">
+                    <i class="bi bi-person-plus me-2"></i>
+                    สมัครสมาชิก
                 </a>
-
-
-                <!-- Promotion -->
-
-                <a href="#"
-                   class="btn btn-light w-100 text-start mb-2">
-
-                    <i class="bi bi-ticket-perforated me-2"></i>
-
-                    โปรโมชั่น
-
-                </a>
-
 
                 <hr />
 
+                <!-- Admin Section -->
+                <div class="text-secondary small fw-bold mb-3">
+                    <i class="bi bi-shield-lock me-1 text-danger"></i>สำหรับผู้ดูแลระบบ
+                </div>
 
-                <!-- Login -->
-
-                <a asp-action="Login" asp-controller="User"
-                   class="btn btn-outline-success w-100 mb-2">
-
-                    <i class="bi bi-box-arrow-in-right me-2"></i>
-
-                    เข้าสู่ระบบ
-
+                <a asp-action="Admin" asp-controller="Home"
+                   class="btn btn-outline-dark w-100 text-start mb-2" style="font-size:0.9rem;">
+                    <i class="bi bi-speedometer2 me-2 text-success"></i>
+                    ไปยังระบบหลังบ้าน (Admin)
                 </a>
 
+                <a asp-action="Promotion" asp-controller="Admin"
+                   class="btn btn-light border w-100 text-start mb-2 text-muted" style="font-size:0.85rem;">
+                    <i class="bi bi-ticket-perforated me-2 text-warning"></i>
+                    ระบบจัดการโปรโมชั่น
+                </a>
 
-                <!-- Register -->
-
-                <a asp-action="Register" asp-controller="User"
-                   class="btn btn-success w-100">
-
-                    <i class="bi bi-person-plus me-2"></i>
-
-                    สมัครสมาชิก
-
+                <a asp-action="Index" asp-controller="Home"
+                   class="btn btn-light w-100 text-start mb-2 text-muted" style="font-size:0.85rem;">
+                    <i class="bi bi-grid me-2"></i>
+                    หน้าเลือกระบบ (Home)
                 </a>
 
 
@@ -216,53 +163,26 @@
 
                 <nav class="navbar bg-white border-bottom shadow-sm px-4">
 
-
-                    <div>
-
-                        <span class="fw-semibold">
-
-                            @ViewData["Title"]
-
-                        </span>
-
-                    </div>
-
-
                     <div class="d-flex align-items-center">
-
-
-                        <button class="btn btn-light me-3">
-
-                            <i class="bi bi-bell"></i>
-
-                        </button>
-
-
-                        <div class="d-flex align-items-center">
-
-                            <i class="bi bi-person-circle fs-4 text-success me-2"></i>
-
-                            <div>
-
-                                <div class="fw-semibold">
-
-                                    Customer
-
-                                </div>
-
-                                <small class="text-muted">
-
-                                    ผู้ใช้งาน
-
-                                </small>
-
-                            </div>
-
-                        </div>
-
-
+                        <span class="fw-bold text-dark fs-6">
+                            @ViewData["Title"]
+                        </span>
+                        <span class="badge bg-success-subtle text-success ms-2 font-monospace d-none d-sm-inline-block">หน้าระบบลูกค้า (Customer Portal)</span>
                     </div>
 
+                    <div class="d-flex align-items-center gap-3">
+                        <a asp-action="Admin" asp-controller="Home" class="btn btn-sm btn-outline-dark fw-semibold">
+                            <i class="bi bi-shield-lock me-1 text-success"></i> ระบบหลังบ้าน Admin
+                        </a>
+
+                        <div class="d-flex align-items-center border-start ps-3">
+                            <i class="bi bi-person-circle fs-4 text-success me-2"></i>
+                            <div>
+                                <div class="fw-semibold lh-1">Customer</div>
+                                <small class="text-muted" style="font-size:0.75rem;">ผู้ใช้งาน</small>
+                            </div>
+                        </div>
+                    </div>
 
                 </nav>
 

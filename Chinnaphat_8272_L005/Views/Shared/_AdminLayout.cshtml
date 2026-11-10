@@ -44,32 +44,27 @@
 
         <div class="container-fluid">
 
-            <a class="navbar-brand fw-bold"
-               asp-action="Admin" asp-controller="Home">
+            <div class="d-flex align-items-center">
+                <a class="navbar-brand fw-bold mb-0"
+                   asp-action="Admin" asp-controller="Home">
+                    <i class="bi bi-shield-check me-2"></i>
+                    CourtBook Admin
+                </a>
+                <span class="badge bg-warning text-dark font-monospace d-none d-sm-inline-block">ระบบหลังบ้าน (ADMIN)</span>
+            </div>
 
-                <i class="bi bi-dribbble me-2"></i>
+            <div class="d-flex align-items-center gap-3">
+                <a asp-action="Customer" asp-controller="Home" class="btn btn-sm btn-light fw-bold text-success shadow-sm">
+                    <i class="bi bi-shop me-1"></i> หน้าระบบลูกค้า
+                </a>
 
-                CourtBook Admin
-
-            </a>
-
-
-            <div class="d-flex align-items-center text-white">
-
-                <i class="bi bi-person-circle fs-4 me-2"></i>
-
-                <div>
-
-                    <div class="fw-semibold">
-                        Admin
+                <div class="d-flex align-items-center text-white border-start ps-3">
+                    <i class="bi bi-person-circle fs-4 me-2"></i>
+                    <div>
+                        <div class="fw-semibold lh-1">Admin</div>
+                        <small class="text-white-50" style="font-size:0.75rem;">ผู้ดูแลระบบ</small>
                     </div>
-
-                    <small>
-                        ผู้ดูแลระบบ
-                    </small>
-
                 </div>
-
             </div>
 
         </div>
@@ -91,108 +86,88 @@
 
 
                 <div class="text-secondary small fw-bold mb-3">
-
-                    เมนูหลัก
-
+                    <i class="bi bi-shield-lock me-1 text-success"></i>เมนูจัดการระบบหลังบ้าน (Admin)
                 </div>
 
+                @{
+                    string currentAct = ViewContext.RouteData.Values["action"]?.ToString() ?? "";
+                    string currentCtrl = ViewContext.RouteData.Values["controller"]?.ToString() ?? "";
+                }
 
                 <!-- Dashboard -->
-
                 <a asp-action="Admin" asp-controller="Home"
-                   class="btn btn-success w-100 text-start mb-2">
-
+                   class="btn @((currentCtrl == "Home" && currentAct == "Admin") || (currentCtrl == "Admin" && (currentAct == "Dashboard" || currentAct == "Index")) ? "btn-success" : "btn-light") w-100 text-start mb-2">
                     <i class="bi bi-speedometer2 me-2"></i>
-
-                    Dashboard
-
+                    Dashboard ภาพรวม
                 </a>
-
 
                 <!-- Court -->
-
-                <a href="/Admin/Court"
-                   class="btn btn-light w-100 text-start mb-2">
-
+                <a asp-action="Court" asp-controller="Admin"
+                   class="btn @(currentCtrl == "Admin" && currentAct == "Court" ? "btn-success" : "btn-light") w-100 text-start mb-2">
                     <i class="bi bi-building me-2"></i>
-
                     จัดการสนาม
-
                 </a>
-
 
                 <!-- Promotion -->
-
-                <a href="/Admin/Promotion"
-                   class="btn btn-light w-100 text-start mb-2">
-
+                <a asp-action="Promotion" asp-controller="Admin"
+                   class="btn @(currentCtrl == "Admin" && currentAct == "Promotion" ? "btn-success" : "btn-light") w-100 text-start mb-2">
                     <i class="bi bi-ticket-perforated me-2"></i>
-
-                    โปรโมชั่น
-
+                    จัดการโปรโมชั่น (5 แบบ)
                 </a>
-
 
                 <!-- Product -->
-
-                <a href="/Admin/Product"
-                   class="btn btn-light w-100 text-start mb-2">
-
+                <a asp-action="Product" asp-controller="Admin"
+                   class="btn @(currentCtrl == "Admin" && currentAct == "Product" ? "btn-success" : "btn-light") w-100 text-start mb-2">
                     <i class="bi bi-box-seam me-2"></i>
-
-                    สินค้า
-
+                    สินค้าและอุปกรณ์
                 </a>
 
-
-
                 <hr />
-
 
                 <div class="text-secondary small fw-bold mb-3">
-
-                    จัดการบุคลากร
-
+                    <i class="bi bi-people me-1 text-primary"></i>จัดการบุคลากร
                 </div>
 
-
                 <!-- Employee -->
-
                 <a asp-action="UserList" asp-controller="User"
-                   class="btn btn-light w-100 text-start mb-2">
-
+                   class="btn @(currentCtrl == "User" && currentAct == "UserList" ? "btn-success" : "btn-light") w-100 text-start mb-2">
                     <i class="bi bi-people me-2"></i>
-
                     รายชื่อผู้ใช้
-
                 </a>
-
 
                 <!-- AddUser -->
-
                 <a asp-action="AddUser" asp-controller="User"
-                   class="btn btn-light w-100 text-start mb-2">
-
+                   class="btn @(currentCtrl == "User" && currentAct == "AddUser" ? "btn-success" : "btn-light") w-100 text-start mb-2">
                     <i class="bi bi-person-plus me-2"></i>
-
                     เพิ่มผู้ใช้
-
                 </a>
-
-
 
                 <hr />
 
+                <div class="text-secondary small fw-bold mb-3">
+                    <i class="bi bi-arrow-left-right me-1 text-info"></i>สลับไปยังหน้าลูกค้า
+                </div>
+
+                <!-- Switch to Customer Portal -->
+                <a asp-action="Customer" asp-controller="Home"
+                   class="btn btn-outline-success w-100 text-start mb-2">
+                    <i class="bi bi-shop me-2"></i>
+                    หน้าระบบลูกค้า (Customer)
+                </a>
+
+                <a asp-action="Index" asp-controller="Home"
+                   class="btn btn-light w-100 text-start mb-2 text-muted">
+                    <i class="bi bi-house me-2"></i>
+                    หน้าแรก (Hub)
+                </a>
+
+                <hr />
 
                 <!-- Logout -->
-
                 <a asp-action="Login" asp-controller="User"
                    class="btn btn-outline-danger w-100 text-start">
-
                     <i class="bi bi-box-arrow-right me-2"></i>
-
                     ออกจากระบบ
-
                 </a>
 
 

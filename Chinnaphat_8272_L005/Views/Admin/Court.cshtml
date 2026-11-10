@@ -1,0 +1,249 @@
+@model List<Chinnaphat_8272_L005.Models.Court>
+
+@{
+    ViewData["Title"] = "จัดการสนามแบดมินตัน (Admin)";
+    Layout = "_AdminLayout";
+}
+
+<style>
+    .page-header-card {
+        background: linear-gradient(135deg, #1a472a 0%, #2d6a4f 55%, #52b788 100%);
+        border-radius: 16px;
+        padding: 1.6rem 2rem;
+        color: white;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+    }
+    .court-card {
+        background: #fff;
+        border-radius: 16px;
+        border: 1px solid #e2e8f0;
+        transition: transform 0.2s, box-shadow 0.2s;
+        overflow: hidden;
+    }
+    .court-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+    }
+    .court-card-header {
+        padding: 1.25rem 1.5rem;
+        border-bottom: 1px solid #f1f5f9;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    .badge-status-available {
+        background: #e8f5e9;
+        color: #1a472a;
+        font-weight: 600;
+        font-size: 0.8rem;
+        padding: 0.35rem 0.75rem;
+        border-radius: 20px;
+    }
+    .badge-status-maintenance {
+        background: #fee2e2;
+        color: #991b1b;
+        font-weight: 600;
+        font-size: 0.8rem;
+        padding: 0.35rem 0.75rem;
+        border-radius: 20px;
+    }
+</style>
+
+<!-- Alert messages -->
+@if (TempData["SuccessMessage"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show rounded-3 shadow-sm mb-4" role="alert">
+        <i class="bi bi-check-circle-fill me-2"></i>@TempData["SuccessMessage"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+<!-- Header -->
+<div class="page-header-card">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+        <div>
+            <div class="d-flex align-items-center gap-2 mb-1">
+                <span class="badge bg-warning text-dark font-monospace">ADMIN ONLY</span>
+                <span class="badge bg-white text-dark bg-opacity-25 text-white">Court Management</span>
+            </div>
+            <h3 class="fw-bold mb-1">
+                <i class="bi bi-building me-2"></i>จัดการสนามแบดมินตัน
+            </h3>
+            <p class="mb-0 opacity-75">
+                ตรวจสอบคอร์ททั้งหมด ปรับเปลี่ยนราคาค่าเช่าต่อชั่วโมง หรือเปิด-ปิดสถานะปรับปรุงสนาม
+            </p>
+        </div>
+        <div class="d-flex gap-2">
+            <a asp-action="Admin" asp-controller="Home" class="btn btn-light fw-semibold px-3 py-2" style="border-radius:10px;">
+                <i class="bi bi-speedometer2 me-1"></i> Dashboard
+            </a>
+            <a href="/Home/Customer#bookingSection" target="_blank" class="btn btn-outline-light fw-semibold px-3 py-2" style="border-radius:10px;">
+                <i class="bi bi-eye me-1"></i> ดูมุมมองลูกค้า
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Stats -->
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm p-3 rounded-4 bg-white">
+            <div class="d-flex align-items-center gap-3">
+                <div style="width:50px; height:50px; border-radius:14px; background:#e8f5e9; color:#2d6a4f; display:flex; align-items:center; justify-content:center; font-size:1.5rem;">
+                    <i class="bi bi-building"></i>
+                </div>
+                <div>
+                    <h4 class="fw-bold mb-0">@Model.Count</h4>
+                    <small class="text-muted">จำนวนสนามทั้งหมด</small>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm p-3 rounded-4 bg-white">
+            <div class="d-flex align-items-center gap-3">
+                <div style="width:50px; height:50px; border-radius:14px; background:#ecfdf5; color:#059669; display:flex; align-items:center; justify-content:center; font-size:1.5rem;">
+                    <i class="bi bi-check-circle"></i>
+                </div>
+                <div>
+                    <h4 class="fw-bold mb-0 text-success">@Model.Count(c => c.Status == "AVAILABLE")</h4>
+                    <small class="text-muted">เปิดให้บริการปกติ</small>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm p-3 rounded-4 bg-white">
+            <div class="d-flex align-items-center gap-3">
+                <div style="width:50px; height:50px; border-radius:14px; background:#fef2f2; color:#dc2626; display:flex; align-items:center; justify-content:center; font-size:1.5rem;">
+                    <i class="bi bi-tools"></i>
+                </div>
+                <div>
+                    <h4 class="fw-bold mb-0 text-danger">@Model.Count(c => c.Status != "AVAILABLE")</h4>
+                    <small class="text-muted">ปิดปรับปรุง / ซ่อมแซม</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Court Cards Grid -->
+<div class="row g-4">
+    @foreach (var court in Model)
+    {
+        bool isAvail = court.Status == "AVAILABLE";
+        <div class="col-md-6 col-xl-3">
+            <div class="court-card h-100 shadow-sm d-flex flex-column">
+                <div class="court-card-header">
+                    <div>
+                        <h5 class="fw-bold mb-0 text-dark">
+                            <i class="bi bi-dribbble me-1 text-success"></i>@court.CourtName
+                        </h5>
+                        <small class="text-muted">รหัสสนาม #@court.CourtId</small>
+                    </div>
+                    @if (isAvail)
+                    {
+                        <span class="badge-status-available">
+                            <i class="bi bi-check-circle-fill me-1"></i>เปิดให้บริการ
+                        </span>
+                    }
+                    else
+                    {
+                        <span class="badge-status-maintenance">
+                            <i class="bi bi-tools me-1"></i>ปิดปรับปรุง
+                        </span>
+                    }
+                </div>
+
+                <div class="p-3 flex-grow-1">
+                    <p class="text-muted small mb-3">
+                        <i class="bi bi-info-circle me-1"></i>@(string.IsNullOrWhiteSpace(court.Description) ? "พื้นยาง BWF มาตรฐานสากล" : court.Description)
+                    </p>
+                    <div class="p-3 bg-light rounded-3 mb-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <small class="text-muted">ค่าเช่าต่อชั่วโมง:</small>
+                            <span class="fs-5 fw-bold text-success">@court.PricePerHour.ToString("N0") ฿</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="p-3 bg-light border-top d-flex gap-2">
+                    <!-- Toggle Status -->
+                    <form asp-action="ToggleCourtStatus" asp-controller="Admin" method="post" class="flex-grow-1">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="courtId" value="@court.CourtId" />
+                        @if (isAvail)
+                        {
+                            <button type="submit" class="btn btn-outline-warning w-100 btn-sm fw-semibold" style="border-radius:8px;">
+                                <i class="bi bi-pause-circle me-1"></i>ปิดปรับปรุง
+                            </button>
+                        }
+                        else
+                        {
+                            <button type="submit" class="btn btn-success w-100 btn-sm fw-semibold" style="border-radius:8px;">
+                                <i class="bi bi-play-circle me-1"></i>เปิดใช้งาน
+                            </button>
+                        }
+                    </form>
+
+                    <!-- Edit Price Button -->
+                    <button type="button" class="btn btn-outline-secondary btn-sm px-3" style="border-radius:8px;"
+                            onclick="openEditCourtModal(@court.CourtId, '@court.CourtName', @court.PricePerHour, '@(court.Description ?? "")')">
+                        <i class="bi bi-pencil-square"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<!-- Edit Court Modal -->
+<div class="modal fade" id="editCourtModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius:18px; border:none; box-shadow:0 20px 50px rgba(0,0,0,0.2);">
+            <form asp-action="UpdateCourtPrice" asp-controller="Admin" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" id="editCourtId" name="courtId" />
+                <div class="modal-header bg-success text-white" style="border-top-left-radius:18px; border-top-right-radius:18px;">
+                    <h5 class="modal-title fw-bold mb-0">
+                        <i class="bi bi-pencil-square me-2"></i>แก้ไขสนาม: <span id="modalCourtName"></span>
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">ราคาต่อชั่วโมง (บาท):</label>
+                        <div class="input-group">
+                            <span class="input-group-text">฿</span>
+                            <input type="number" step="10" min="0" class="form-control" id="editPricePerHour" name="pricePerHour" required />
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">รายละเอียดสนาม / พื้นผิว:</label>
+                        <textarea class="form-control" id="editDescription" name="description" rows="3"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light" style="border-bottom-left-radius:18px; border-bottom-right-radius:18px;">
+                    <button type="button" class="btn btn-secondary px-3" data-bs-dismiss="modal">ยกเลิก</button>
+                    <button type="submit" class="btn btn-success px-4 fw-semibold">
+                        <i class="bi bi-check-circle me-1"></i>บันทึกการเปลี่ยนแปลง
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function openEditCourtModal(id, name, price, desc) {
+            document.getElementById('editCourtId').value = id;
+            document.getElementById('modalCourtName').innerText = name;
+            document.getElementById('editPricePerHour').value = price;
+            document.getElementById('editDescription').value = desc;
+            new bootstrap.Modal(document.getElementById('editCourtModal')).show();
+        }
+    </script>
+}
+

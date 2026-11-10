@@ -4,22 +4,22 @@
     ViewData["Title"] = "เพิ่มผู้ใช้งาน";
     Layout = "_AdminLayout";
 
-    // บทบาทผู้ใช้งานตามในเว็บ (ตรงกับหน้า UserList)
-    var roleDisplayMap = new Dictionary<string, (string Name, string BadgeClass)>
+    // 5 บทบาทผู้ใช้งานในระบบ ตามสิทธิ์การใช้งาน
+    var roleDisplayMap = new Dictionary<string, (string Name, string BadgeClass, string Desc, string Icon)>
     {
-        ["ADMIN"]       = ("ผู้ดูแลระบบ", "bg-danger bg-opacity-10 text-danger"),
-        ["COURT_STAFF"] = ("พนักงานสนาม", "bg-warning bg-opacity-10 text-warning"),
-        ["SALES_STAFF"] = ("พนักงานขาย", "bg-info bg-opacity-10 text-info"),
-        ["ACCOUNTING"]  = ("บัญชี",       "bg-purple bg-opacity-10 text-purple"),
-        ["CUSTOMER"]    = ("ลูกค้า",      "bg-primary bg-opacity-10 text-primary")
+        ["CUSTOMER"]    = ("ลูกค้า / สมาชิก",              "bg-primary bg-opacity-10 text-primary", "จองคอร์ท ซื้อ/เช่าอุปกรณ์ ชำระเงิน ติดตามสถานะ",        "bi-person"),
+        ["COURT_STAFF"] = ("ฝ่ายดูแลคอร์ท",               "bg-warning bg-opacity-10 text-warning", "ตารางจอง Check-in/Out ล็อกคอร์ท คิว Walk-in",             "bi-building"),
+        ["SALES_STAFF"] = ("ฝ่ายซื้อ-เช่าอุปกรณ์",        "bg-info bg-opacity-10 text-info",       "ออเดอร์ ส่งมอบ/รับคืนอุปกรณ์ บันทึกความเสียหาย สต็อก", "bi-box-seam"),
+        ["ACCOUNTING"]  = ("ฝ่ายบัญชีและการเงิน",          "bg-purple bg-opacity-10 text-purple",   "ตรวจสลิป อนุมัติคิว ใบเสร็จ ค่าปรับ/คืนเงิน รายงาน",   "bi-calculator"),
+        ["ADMIN"]       = ("ผู้ดูแลระบบ / เจ้าของคอร์ท",   "bg-danger bg-opacity-10 text-danger",   "โปรโมชั่น ข้อมูลคอร์ท/สินค้า กำหนดสิทธิ์ Dashboard",   "bi-shield-check")
     };
 
-    var systemRoles = new List<(string Code, string Name, string BadgeClass)>();
+    var systemRoles = new List<(string Code, string Name, string BadgeClass, string Desc, string Icon)>();
     var knownCodes = new HashSet<string>();
 
     foreach (var kvp in roleDisplayMap)
     {
-        systemRoles.Add((kvp.Key, kvp.Value.Name, kvp.Value.BadgeClass));
+        systemRoles.Add((kvp.Key, kvp.Value.Name, kvp.Value.BadgeClass, kvp.Value.Desc, kvp.Value.Icon));
         knownCodes.Add(kvp.Key);
     }
 
@@ -30,7 +30,7 @@
             string code = r.RoleCode ?? "";
             if (!string.IsNullOrEmpty(code) && !knownCodes.Contains(code))
             {
-                systemRoles.Add((code, r.RoleName ?? code, "bg-secondary bg-opacity-10 text-secondary"));
+                systemRoles.Add((code, r.RoleName ?? code, "bg-secondary bg-opacity-10 text-secondary", "", "bi-person"));
                 knownCodes.Add(code);
             }
         }
@@ -191,12 +191,17 @@
 
                 <hr>
                 <div class="text-start">
-                    <p class="section-title">บทบาทในระบบ</p>
+                    <p class="section-title">บทบาทในระบบ (5 บทบาท)</p>
                     @foreach (var r in systemRoles)
                     {
-                        <div class="mb-1 d-flex align-items-center gap-2">
-                            <span class="role-badge @r.BadgeClass">@r.Name</span>
-                            <small class="text-muted" style="font-size:0.75rem;">(@r.Code)</small>
+                        <div class="mb-2 p-2 rounded-3 border" style="background:#fafbfc;">
+                            <div class="d-flex align-items-center gap-2 mb-1">
+                                <span class="role-badge @r.BadgeClass">@r.Name</span>
+                            </div>
+                            @if (!string.IsNullOrEmpty(r.Desc))
+                            {
+                                <small class="text-muted" style="font-size:0.72rem; line-height:1.3;">@r.Desc</small>
+                            }
                         </div>
                     }
                 </div>
@@ -285,8 +290,8 @@
                         <label asp-for="Role" class="form-label">บทบาท <span class="required-star">*</span></label>
                         <div class="input-wrapper">
                             <i class="bi bi-shield bi-icon"></i>
-                            <select asp-for="Role" class="form-select" id="addRole">
-                                <option value="">-- เลือกบทบาท --</option>
+                            <select asp-for="Role" class="form-select" id="addRole" onchange="updateRoleDesc(this.value)">
+                                <option value="">-- เลือกบทบาทผู้ใช้งาน --</option>
                                 @foreach (var r in systemRoles)
                                 {
                                     <option value="@r.Code">@r.Name</option>
@@ -294,6 +299,10 @@
                             </select>
                         </div>
                         <span asp-validation-for="Role" class="text-danger small"></span>
+                        <!-- คำอธิบายบทบาทที่เลือก -->
+                        <div id="roleDescBox" class="mt-2 p-2 rounded-3 d-none" style="background:#f0fdf4; border:1px solid #bbf7d0; font-size:0.82rem; color:#1a472a;">
+                            <i class="bi bi-info-circle me-1"></i><span id="roleDescText"></span>
+                        </div>
                     </div>
                 </div>
 
@@ -366,4 +375,28 @@
 
     document.getElementById('addFirstName').addEventListener('input', updateAvatar);
     document.getElementById('addLastName').addEventListener('input', updateAvatar);
+
+    // คำอธิบายบทบาทที่เลือก
+    const roleDescriptions = {
+        'CUSTOMER':    'จองคอร์ท ซื้อ/เช่าอุปกรณ์ ชำระเงิน ติดตามสถานะการจองของตนเอง',
+        'COURT_STAFF': 'ดูตารางการจองประจำวัน Check-in/Check-out จัดการคิว Walk-in ล็อกคอร์ทชั่วคราว แจ้งอุปกรณ์ชำรุด',
+        'SALES_STAFF': 'ดูรายการออเดอร์ ส่งมอบสินค้า ตรวจรับคืนอุปกรณ์เช่า บันทึกความเสียหาย อัปเดตสต็อกหน้าร้าน',
+        'ACCOUNTING':  'ตรวจสอบสลิปโอนเงิน อนุมัติคิว ออกใบเสร็จ/ใบกำกับภาษี คิดค่าปรับ จัดการคืนเงิน ดูรายงานการเงิน',
+        'ADMIN':       'จัดการโปรโมชั่น 5 แบบ เพิ่ม/ลบ/แก้ไขข้อมูลคอร์ทและสินค้า กำหนดสิทธิ์พนักงาน ดู Dashboard ภาพรวมธุรกิจ'
+    };
+
+    function updateRoleDesc(code) {
+        const box = document.getElementById('roleDescBox');
+        const txt = document.getElementById('roleDescText');
+        if (code && roleDescriptions[code]) {
+            box.classList.remove('d-none');
+            txt.textContent = roleDescriptions[code];
+        } else {
+            box.classList.add('d-none');
+        }
+    }
+
+    // กรณีมีค่า default ตอน load
+    const initRole = document.getElementById('addRole').value;
+    if (initRole) updateRoleDesc(initRole);
 </script>

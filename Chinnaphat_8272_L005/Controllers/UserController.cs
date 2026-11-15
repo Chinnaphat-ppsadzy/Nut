@@ -54,6 +54,12 @@ namespace Chinnaphat_8272_L005.Controllers
                     return View(model);
                 }
 
+                // READ — ดึง Role ของผู้ใช้เพื่อพาไปยังหน้าระบบที่ถูกต้อง
+                var userRole = (from r in _db.Roles
+                                where r.RoleId == user.RoleId
+                                select r).FirstOrDefault();
+                string roleCode = userRole?.RoleCode ?? "CUSTOMER";
+
                 // UPDATE — บันทึกเวลาล็อกอินล่าสุดลงฐานข้อมูล
                 user.LastLoginAt = DateTime.Now;
                 _db.SaveChanges();
@@ -64,13 +70,27 @@ namespace Chinnaphat_8272_L005.Controllers
                 TempData["Username"]    = user.Email;
                 TempData["FullName"]    = user.FullName;
                 TempData["Email"]       = user.Email;
+                TempData["RoleCode"]    = roleCode;
+                TempData["RoleName"]    = userRole?.RoleName ?? roleCode;
                 TempData["LoginTime"]   = DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss");
                 TempData["RememberMe"]  = model.RememberMe;
 
                 TempData["SuccessMessage"] =
-                    $"เข้าสู่ระบบสำเร็จ! ยินดีต้อนรับ {user.FullName}";
+                    $"เข้าสู่ระบบสำเร็จ! ยินดีต้อนรับ {user.FullName} ({userRole?.RoleName ?? roleCode})";
 
-                return RedirectToAction("Index", "Home");
+                // นำผู้ใช้ไปยังหน้าระบบตามบทบาทของตนเอง
+                if (roleCode == "SALES_STAFF")
+                {
+                    return RedirectToAction("Sales", "SalesStaff");
+                }
+                else if (roleCode == "ADMIN")
+                {
+                    return RedirectToAction("Admin", "Home");
+                }
+                else
+                {
+                    return RedirectToAction("Customer", "Home");
+                }
             }
 
             ViewData["Title"] = "เข้าสู่ระบบ";

@@ -35,6 +35,10 @@ build_property.EnableCodeStyleSeverity =
 build_metadata.AdditionalFiles.TargetPath = Vmlld3NcQWRtaW5cQ291cnQuY3NodG1s
 build_metadata.AdditionalFiles.CssScope = 
 
+[C:/Users/ppsadzy/Desktop/8272 chinnaphat supsombat/Nut/Chinnaphat_8272_L005/Views/Admin/Index.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcQWRtaW5cSW5kZXguY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
 [C:/Users/ppsadzy/Desktop/8272 chinnaphat supsombat/Nut/Chinnaphat_8272_L005/Views/Admin/Product.cshtml]
 build_metadata.AdditionalFiles.TargetPath = Vmlld3NcQWRtaW5cUHJvZHVjdC5jc2h0bWw=
 build_metadata.AdditionalFiles.CssScope = 
@@ -83,6 +87,22 @@ build_metadata.AdditionalFiles.CssScope =
 build_metadata.AdditionalFiles.TargetPath = Vmlld3NcSG9tZVxQcml2YWN5LmNzaHRtbA==
 build_metadata.AdditionalFiles.CssScope = 
 
+[C:/Users/ppsadzy/Desktop/8272 chinnaphat supsombat/Nut/Chinnaphat_8272_L005/Views/SalesStaff/Index.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcU2FsZXNTdGFmZlxJbmRleC5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/ppsadzy/Desktop/8272 chinnaphat supsombat/Nut/Chinnaphat_8272_L005/Views/SalesStaff/Rentals.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcU2FsZXNTdGFmZlxSZW50YWxzLmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/ppsadzy/Desktop/8272 chinnaphat supsombat/Nut/Chinnaphat_8272_L005/Views/SalesStaff/Sales.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcU2FsZXNTdGFmZlxTYWxlcy5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/ppsadzy/Desktop/8272 chinnaphat supsombat/Nut/Chinnaphat_8272_L005/Views/SalesStaff/Stock.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcU2FsZXNTdGFmZlxTdG9jay5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
 [C:/Users/ppsadzy/Desktop/8272 chinnaphat supsombat/Nut/Chinnaphat_8272_L005/Views/Shared/Error.cshtml]
 build_metadata.AdditionalFiles.TargetPath = Vmlld3NcU2hhcmVkXEVycm9yLmNzaHRtbA==
 build_metadata.AdditionalFiles.CssScope = 
@@ -93,6 +113,10 @@ build_metadata.AdditionalFiles.CssScope =
 
 [C:/Users/ppsadzy/Desktop/8272 chinnaphat supsombat/Nut/Chinnaphat_8272_L005/Views/Shared/_CustomerLayout.cshtml]
 build_metadata.AdditionalFiles.TargetPath = Vmlld3NcU2hhcmVkXF9DdXN0b21lckxheW91dC5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/ppsadzy/Desktop/8272 chinnaphat supsombat/Nut/Chinnaphat_8272_L005/Views/Shared/_SalesStaffLayout.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcU2hhcmVkXF9TYWxlc1N0YWZmTGF5b3V0LmNzaHRtbA==
 build_metadata.AdditionalFiles.CssScope = 
 
 [C:/Users/ppsadzy/Desktop/8272 chinnaphat supsombat/Nut/Chinnaphat_8272_L005/Views/Shared/_ValidationScriptsPartial.cshtml]

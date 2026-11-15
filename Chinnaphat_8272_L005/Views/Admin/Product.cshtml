@@ -14,6 +14,18 @@
         color: white;
         margin-bottom: 1.5rem;
         box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+        position: relative;
+        overflow: hidden;
+    }
+    .page-header-card::after {
+        content: '\F1B9'; /* Bootstrap bi-box-seam */
+        font-family: 'bootstrap-icons';
+        position: absolute;
+        right: 1.5rem;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 5rem;
+        opacity: 0.12;
     }
     .product-table-wrapper {
         background: #fff;
@@ -27,29 +39,95 @@
         border-bottom: 2px solid #e2e8f0;
         color: #334155;
         font-weight: 700;
-        font-size: 0.9rem;
-        padding: 1rem 0.75rem;
+        font-size: 0.85rem;
+        padding: 0.9rem 0.75rem;
+        white-space: nowrap;
     }
     .table td {
         padding: 0.85rem 0.75rem;
         vertical-align: middle;
         border-color: #f1f5f9;
+        font-size: 0.9rem;
     }
     .badge-sale {
         background: #dbeafe;
         color: #1e40af;
         font-weight: 600;
         font-size: 0.75rem;
-        padding: 0.3rem 0.6rem;
+        padding: 0.3rem 0.65rem;
         border-radius: 12px;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
     }
     .badge-rent {
         background: #fef3c7;
         color: #b45309;
         font-weight: 600;
         font-size: 0.75rem;
-        padding: 0.3rem 0.6rem;
+        padding: 0.3rem 0.65rem;
         border-radius: 12px;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+    }
+    .role-badge-pill {
+        font-size: 0.72rem;
+        font-weight: 600;
+        padding: 0.2rem 0.55rem;
+        border-radius: 10px;
+        display: inline-block;
+        margin: 0.1rem 0;
+        white-space: nowrap;
+    }
+    .role-sales {
+        background: #e0f2fe;
+        color: #0369a1;
+        border: 1px solid #bae6fd;
+    }
+    .role-accounting {
+        background: #f3e8ff;
+        color: #6d28d9;
+        border: 1px solid #ddd6fe;
+    }
+    .role-customer {
+        background: #dcfce7;
+        color: #15803d;
+        border: 1px solid #bbf7d0;
+    }
+    .filter-btn.active {
+        background-color: #2d6a4f !important;
+        color: white !important;
+        border-color: #2d6a4f !important;
+    }
+    .form-control:focus, .form-select:focus {
+        border-color: #52b788;
+        box-shadow: 0 0 0 3px rgba(82,183,136,0.2);
+    }
+    /* Pagination styling */
+    .pagination .page-link {
+        color: #2d6a4f;
+        border-radius: 8px;
+        margin: 0 2px;
+        border: 1px solid #e2e8f0;
+        font-weight: 500;
+        padding: 0.35rem 0.75rem;
+        transition: all 0.2s;
+    }
+    .pagination .page-item.active .page-link {
+        background-color: #2d6a4f;
+        border-color: #2d6a4f;
+        color: #fff;
+        font-weight: 700;
+    }
+    .pagination .page-link:hover {
+        background-color: #e8f5e9;
+        color: #1a472a;
+    }
+    .pagination .page-item.disabled .page-link {
+        color: #94a3b8;
+        background-color: #f8fafc;
+        border-color: #e2e8f0;
     }
 </style>
 
@@ -57,7 +135,16 @@
 @if (TempData["SuccessMessage"] != null)
 {
     <div class="alert alert-success alert-dismissible fade show rounded-3 shadow-sm mb-4" role="alert">
-        <i class="bi bi-check-circle-fill me-2"></i>@TempData["SuccessMessage"]
+        <i class="bi bi-check-circle-fill me-2 fs-5"></i>
+        <strong>สำเร็จ:</strong> @TempData["SuccessMessage"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+@if (TempData["ErrorMessage"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show rounded-3 shadow-sm mb-4" role="alert">
+        <i class="bi bi-exclamation-triangle-fill me-2 fs-5"></i>
+        <strong>ข้อผิดพลาด:</strong> @TempData["ErrorMessage"]
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     </div>
 }
@@ -67,104 +154,194 @@
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
         <div>
             <div class="d-flex align-items-center gap-2 mb-1">
-                <span class="badge bg-warning text-dark font-monospace">ADMIN ONLY</span>
-                <span class="badge bg-white text-dark bg-opacity-25 text-white">Product & Equipment</span>
+                <span class="badge bg-warning text-dark font-monospace fw-bold">ADMIN ONLY</span>
+                <span class="badge" style="background:rgba(255,255,255,0.2); color:#fff;">
+                    ระบบจัดการสินค้าและอุปกรณ์ (DB Connected)
+                </span>
             </div>
             <h3 class="fw-bold mb-1">
                 <i class="bi bi-box-seam me-2"></i>จัดการสินค้าและอุปกรณ์
             </h3>
-            <p class="mb-0 opacity-75">
-                รายการสินค้าขาย (ลูกแบดมินตัน, น้ำดื่ม) และสินค้าเช่า (ไม้แบดมินตัน, รองเท้า) สำหรับเชื่อมต่อโปรโมชั่น
+            <p class="mb-0 opacity-75 small">
+                แอดมินสามารถเพิ่ม แก้ไข ลบ รายการสินค้าขาย (ลูกแบด, เครื่องดื่ม) และอุปกรณ์เช่า (ไม้แบด, รองเท้า) ซึ่งเชื่อมต่อไปยังบทบาทที่เกี่ยวข้องโดยตรง
             </p>
         </div>
-        <div class="d-flex gap-2">
+        <div class="d-flex gap-2 flex-wrap">
+            <button type="button" class="btn btn-warning fw-bold text-dark px-3 py-2 shadow-sm" style="border-radius:10px;"
+                    onclick="openAddProductModal()">
+                <i class="bi bi-plus-circle-fill me-1"></i> เพิ่มสินค้า/อุปกรณ์ใหม่
+            </button>
             <a asp-action="Admin" asp-controller="Home" class="btn btn-light fw-semibold px-3 py-2" style="border-radius:10px;">
                 <i class="bi bi-speedometer2 me-1"></i> Dashboard
             </a>
-            <a href="/Admin/Promotion" class="btn btn-outline-light fw-semibold px-3 py-2" style="border-radius:10px;">
-                <i class="bi bi-ticket-perforated me-1"></i> ไปจัดการโปรโมชั่น
+            <a asp-action="Promotion" asp-controller="Admin" class="btn btn-outline-light fw-semibold px-3 py-2" style="border-radius:10px;">
+                <i class="bi bi-ticket-perforated me-1"></i> จัดการโปรโมชั่น
             </a>
+        </div>
+    </div>
+</div>
+
+<!-- Role Responsibilities Explainer Card -->
+<div class="card border-0 shadow-sm p-3 mb-4 rounded-4" style="background:#f8fafc; border:1px solid #e2e8f0 !important;">
+    <div class="d-flex align-items-center gap-2 mb-2">
+        <i class="bi bi-diagram-3-fill text-success fs-5"></i>
+        <h6 class="fw-bold mb-0 text-dark">บทบาทในระบบที่เกี่ยวข้องกับสินค้าและอุปกรณ์ (Relevant Roles)</h6>
+    </div>
+    <div class="row g-3 small">
+        <div class="col-md-4">
+            <div class="p-2 bg-white rounded-3 border h-100">
+                <span class="role-badge-pill role-sales mb-1">
+                    <i class="bi bi-box-seam me-1"></i>ฝ่ายซื้อ-เช่าอุปกรณ์ (Sales & Rental Staff)
+                </span>
+                <p class="text-muted mb-0" style="font-size:0.8rem; line-height:1.4;">
+                    • ตรวจสอบออเดอร์สินค้าที่ลูกค้าสั่งจองล่วงหน้า<br>
+                    • จัดเตรียมส่งมอบสินค้าขาย และตรวจรับคืนอุปกรณ์เช่า<br>
+                    • อัปเดตสต็อกหน้าร้านและบันทึกความเสียหาย
+                </p>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="p-2 bg-white rounded-3 border h-100">
+                <span class="role-badge-pill role-accounting mb-1">
+                    <i class="bi bi-calculator me-1"></i>ฝ่ายบัญชีและการเงิน (Accounting / Finance)
+                </span>
+                <p class="text-muted mb-0" style="font-size:0.8rem; line-height:1.4;">
+                    • ตรวจสอบยอดชำระและค่ามัดจำอุปกรณ์เช่า<br>
+                    • ออกใบเสร็จรับเงิน/ใบกำกับภาษีสำหรับยอดซื้อ-เช่า<br>
+                    • บันทึกคิดค่าปรับกรณีอุปกรณ์เช่าชำรุดเสียหาย
+                </p>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="p-2 bg-white rounded-3 border h-100">
+                <span class="role-badge-pill role-customer mb-1">
+                    <i class="bi bi-person me-1"></i>ลูกค้า / สมาชิก (Customer)
+                </span>
+                <p class="text-muted mb-0" style="font-size:0.8rem; line-height:1.4;">
+                    • เลือกซื้อลูกแบด/น้ำดื่ม หรือกดเช่าไม้แบด/รองเท้าลงตะกร้า<br>
+                    • ระบบจับคู่โปรโมชั่นอัตโนมัติ (เช่น หลอดที่ 2 ลด 50%, เช่าเป็นเซ็ตลด 20%)<br>
+                    • ชำระเงินและรับสินค้าเมื่อมาถึงสนาม
+                </p>
+            </div>
         </div>
     </div>
 </div>
 
 <!-- Stats -->
 <div class="row g-3 mb-4">
-    <div class="col-md-4">
+    <div class="col-md-3">
         <div class="card border-0 shadow-sm p-3 rounded-4 bg-white">
             <div class="d-flex align-items-center gap-3">
-                <div style="width:50px; height:50px; border-radius:14px; background:#e8f5e9; color:#2d6a4f; display:flex; align-items:center; justify-content:center; font-size:1.5rem;">
+                <div style="width:48px; height:48px; border-radius:12px; background:#e8f5e9; color:#2d6a4f; display:flex; align-items:center; justify-content:center; font-size:1.4rem;">
                     <i class="bi bi-box-seam"></i>
                 </div>
                 <div>
                     <h4 class="fw-bold mb-0">@Model.Count</h4>
-                    <small class="text-muted">รายการสินค้าทั้งหมด</small>
+                    <small class="text-muted">สินค้าทั้งหมดในระบบ</small>
                 </div>
             </div>
         </div>
     </div>
-    <div class="col-md-4">
+    <div class="col-md-3">
         <div class="card border-0 shadow-sm p-3 rounded-4 bg-white">
             <div class="d-flex align-items-center gap-3">
-                <div style="width:50px; height:50px; border-radius:14px; background:#eff6ff; color:#2563eb; display:flex; align-items:center; justify-content:center; font-size:1.5rem;">
+                <div style="width:48px; height:48px; border-radius:12px; background:#eff6ff; color:#2563eb; display:flex; align-items:center; justify-content:center; font-size:1.4rem;">
                     <i class="bi bi-cart-check"></i>
                 </div>
                 <div>
                     <h4 class="fw-bold mb-0 text-primary">@Model.Count(p => p.ProductType == "SALE")</h4>
-                    <small class="text-muted">สินค้าสำหรับขาย</small>
+                    <small class="text-muted">สินค้าสำหรับขาย (SALE)</small>
                 </div>
             </div>
         </div>
     </div>
-    <div class="col-md-4">
+    <div class="col-md-3">
         <div class="card border-0 shadow-sm p-3 rounded-4 bg-white">
             <div class="d-flex align-items-center gap-3">
-                <div style="width:50px; height:50px; border-radius:14px; background:#fef3c7; color:#d97706; display:flex; align-items:center; justify-content:center; font-size:1.5rem;">
+                <div style="width:48px; height:48px; border-radius:12px; background:#fef3c7; color:#d97706; display:flex; align-items:center; justify-content:center; font-size:1.4rem;">
                     <i class="bi bi-arrow-repeat"></i>
                 </div>
                 <div>
                     <h4 class="fw-bold mb-0 text-warning">@Model.Count(p => p.ProductType == "RENT")</h4>
-                    <small class="text-muted">อุปกรณ์สำหรับเช่า</small>
+                    <small class="text-muted">อุปกรณ์สำหรับเช่า (RENT)</small>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm p-3 rounded-4 bg-white">
+            <div class="d-flex align-items-center gap-3">
+                <div style="width:48px; height:48px; border-radius:12px; background:#dcfce7; color:#16a34a; display:flex; align-items:center; justify-content:center; font-size:1.4rem;">
+                    <i class="bi bi-check2-all"></i>
+                </div>
+                <div>
+                    <h4 class="fw-bold mb-0 text-success">@Model.Count(p => p.IsActive == true)</h4>
+                    <small class="text-muted">เปิดใช้งาน (พร้อมขาย/เช่า)</small>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Products Table -->
+<!-- Products Table Card -->
 <div class="product-table-wrapper">
+    <!-- Top toolbar & Filter buttons -->
     <div class="p-3 border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2">
-        <h5 class="fw-bold mb-0 text-dark">
-            <i class="bi bi-list-ul me-2 text-success"></i>รายการสินค้าและอุปกรณ์ทั้งหมด
-        </h5>
-        <div class="d-flex gap-2">
-            <span class="badge bg-light text-dark border px-3 py-2">
-                <i class="bi bi-tags me-1 text-primary"></i> มี @categories.Count หมวดหมู่
-            </span>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <h5 class="fw-bold mb-0 text-dark me-2">
+                <i class="bi bi-list-ul me-2 text-success"></i>รายการสินค้าและอุปกรณ์ในฐานข้อมูล
+            </h5>
+            <!-- Filter buttons -->
+            <button type="button" class="btn btn-sm btn-outline-secondary filter-btn active" onclick="filterProducts('ALL', this)">
+                ทั้งหมด (@Model.Count)
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-primary filter-btn" onclick="filterProducts('SALE', this)">
+                <i class="bi bi-cart me-1"></i>ขาย (@Model.Count(p => p.ProductType == "SALE"))
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-warning filter-btn" onclick="filterProducts('RENT', this)">
+                <i class="bi bi-arrow-repeat me-1"></i>เช่า (@Model.Count(p => p.ProductType == "RENT"))
+            </button>
+        </div>
+
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <!-- Search box -->
+            <div class="input-group input-group-sm" style="width: 220px;">
+                <span class="input-group-text bg-white text-muted border-end-0"><i class="bi bi-search"></i></span>
+                <input type="text" id="productSearchInput" class="form-control border-start-0" placeholder="ค้นหาชื่อสินค้า / SKU..." onkeyup="onSearchProduct(this.value)" />
+            </div>
+
+            <button type="button" class="btn btn-success btn-sm px-3 py-1 fw-bold shadow-sm" style="border-radius:8px;"
+                    onclick="openAddProductModal()">
+                <i class="bi bi-plus-lg me-1"></i> เพิ่มรายการใหม่
+            </button>
         </div>
     </div>
 
+    <!-- Table -->
     <div class="table-responsive">
-        <table class="table align-middle mb-0">
+        <table class="table align-middle mb-0" id="productsTable">
             <thead>
                 <tr>
-                    <th style="width: 80px;">SKU</th>
-                    <th>ชื่อสินค้า / รายการ</th>
+                    <th style="width: 100px;">SKU</th>
+                    <th>ชื่อสินค้า / อุปกรณ์</th>
                     <th>หมวดหมู่</th>
                     <th>ประเภท</th>
-                    <th class="text-end">ราคา (บาท)</th>
-                    <th class="text-end">มัดจำ (บาท)</th>
-                    <th class="text-center">หน่วย</th>
-                    <th class="text-center" style="width: 100px;">จัดการ</th>
+                    <th>บทบาทที่เกี่ยวข้อง</th>
+                    <th class="text-end">ราคา</th>
+                    <th class="text-end">มัดจำ</th>
+                    <th class="text-center">สต็อก</th>
+                    <th class="text-center">สถานะ</th>
+                    <th class="text-center" style="width: 140px;">จัดการ</th>
                 </tr>
             </thead>
             <tbody>
                 @if (!Model.Any())
                 {
-                    <tr>
-                        <td colspan="8" class="text-center py-5 text-muted">
-                            <i class="bi bi-box mb-2" style="font-size:2rem;"></i>
-                            <div>ยังไม่มีข้อมูลสินค้าในระบบ</div>
+                    <tr id="emptyRow">
+                        <td colspan="10" class="text-center py-5 text-muted">
+                            <i class="bi bi-box mb-2" style="font-size:2.5rem; color:#cbd5e1;"></i>
+                            <div class="fw-bold">ยังไม่มีข้อมูลสินค้าหรืออุปกรณ์ในฐานข้อมูล</div>
+                            <small class="text-muted">คลิกปุ่ม "เพิ่มสินค้า/อุปกรณ์ใหม่" ด้านบนเพื่อเริ่มต้นสร้างรายการ</small>
                         </td>
                     </tr>
                 }
@@ -172,35 +349,64 @@
                 {
                     @foreach (var prod in Model)
                     {
-                        <tr>
+                        bool isSale = prod.ProductType == "SALE";
+                        bool isActive = prod.IsActive == true;
+
+                        <tr class="product-row" data-type="@prod.ProductType" data-cat="@prod.CategoryId">
                             <td>
-                                <span class="font-monospace fw-bold small text-secondary">@prod.Sku</span>
+                                <span class="badge bg-light text-dark border font-monospace fw-bold" style="font-size:0.75rem;">
+                                    @prod.Sku
+                                </span>
                             </td>
                             <td>
-                                <div class="fw-bold text-dark">@prod.ProductName</div>
+                                <div class="fw-bold text-dark product-name-cell">@prod.ProductName</div>
+                                <small class="text-muted">หน่วย: @prod.Unit</small>
                             </td>
                             <td>
-                                <span class="badge bg-light text-dark border">
+                                <span class="badge bg-white text-secondary border">
                                     @(prod.Category?.CategoryName ?? "-")
                                 </span>
                             </td>
                             <td>
-                                @if (prod.ProductType == "SALE")
+                                @if (isSale)
                                 {
-                                    <span class="badge-sale"><i class="bi bi-cart me-1"></i>ขาย</span>
+                                    <span class="badge-sale">
+                                        <i class="bi bi-cart"></i> ขาย
+                                    </span>
                                 }
                                 else
                                 {
-                                    <span class="badge-rent"><i class="bi bi-clock-history me-1"></i>เช่า</span>
+                                    <span class="badge-rent">
+                                        <i class="bi bi-arrow-repeat"></i> เช่า
+                                    </span>
                                 }
                             </td>
+                            <td>
+                                <!-- บทบาทที่เกี่ยวข้องกับสินค้านี้ -->
+                                <div class="d-flex flex-column gap-1">
+                                    <span class="role-badge-pill role-sales" title="ฝ่ายดูแลสต็อกและส่งมอบสินค้า">
+                                        <i class="bi bi-box-seam me-1"></i>ฝ่ายซื้อ-เช่า (จัดการสต็อก/ส่งมอบ)
+                                    </span>
+                                    @if (!isSale)
+                                    {
+                                        <span class="role-badge-pill role-accounting" title="ฝ่ายดูแลเงินมัดจำและคิดค่าปรับ">
+                                            <i class="bi bi-calculator me-1"></i>ฝ่ายบัญชี (มัดจำ/ค่าปรับ)
+                                        </span>
+                                    }
+                                    <span class="role-badge-pill role-customer" title="ลูกค้าเป็นผู้เลือกซื้อ/เช่า">
+                                        <i class="bi bi-person me-1"></i>ลูกค้า (@(isSale ? "ซื้อ" : "เช่า"))
+                                    </span>
+                                </div>
+                            </td>
                             <td class="text-end">
-                                <span class="fw-bold text-success">@prod.Price.ToString("N0") ฿</span>
+                                <span class="fw-bold text-success fs-6">@prod.Price.ToString("N0") ฿</span>
+                                <div class="text-muted" style="font-size:0.72rem;">ต่อ @prod.Unit</div>
                             </td>
                             <td class="text-end">
                                 @if (prod.Deposit > 0)
                                 {
                                     <span class="fw-semibold text-warning">@prod.Deposit.ToString("N0") ฿</span>
+                                    <div class="text-muted" style="font-size:0.72rem;">(คืนเมื่อส่งมอบ)</div>
                                 }
                                 else
                                 {
@@ -208,13 +414,55 @@
                                 }
                             </td>
                             <td class="text-center">
-                                <span class="small text-muted">@prod.Unit</span>
+                                @if (prod.StockQty <= 5)
+                                {
+                                    <span class="badge bg-danger bg-opacity-10 text-danger border border-danger fw-bold">
+                                        @prod.StockQty @prod.Unit (เหลือน้อย)
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-light text-dark border fw-bold">
+                                        @prod.StockQty @prod.Unit
+                                    </span>
+                                }
                             </td>
                             <td class="text-center">
-                                <button type="button" class="btn btn-outline-success btn-sm px-2 py-1" style="border-radius:8px;"
-                                        onclick="openEditProductModal(@prod.ProductId, '@prod.ProductName', @prod.Price, @prod.Deposit, '@prod.Unit')">
-                                    <i class="bi bi-pencil-square me-1"></i>แก้ไข
-                                </button>
+                                <form asp-action="ToggleProductStatus" asp-controller="Admin" method="post" class="d-inline">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="id" value="@prod.ProductId" />
+                                    <button type="submit" class="btn btn-sm @(isActive ? "btn-outline-success" : "btn-outline-secondary")"
+                                            style="border-radius:20px; font-size:0.75rem; padding:0.2rem 0.65rem;"
+                                            title="คลิกเพื่อสลับเปิด/ปิดใช้งาน">
+                                        <i class="bi @(isActive ? "bi-check-circle-fill text-success" : "bi-pause-circle text-muted") me-1"></i>
+                                        @(isActive ? "เปิด" : "ปิด")
+                                    </button>
+                                </form>
+                            </td>
+                            <td class="text-center">
+                                <div class="d-flex justify-content-center gap-1">
+                                    <!-- ปุ่มแก้ไข -->
+                                    <button type="button" class="btn btn-outline-primary btn-sm px-2 py-1" style="border-radius:8px;"
+                                            onclick="openEditProductModal({
+                                                id: @prod.ProductId,
+                                                name: '@Html.Raw(prod.ProductName.Replace("'", "\\'"))',
+                                                catId: @prod.CategoryId,
+                                                type: '@prod.ProductType',
+                                                price: @prod.Price,
+                                                deposit: @prod.Deposit,
+                                                unit: '@Html.Raw(prod.Unit)',
+                                                stock: @prod.StockQty,
+                                                isActive: @(isActive ? "true" : "false")
+                                            })" title="แก้ไขข้อมูล">
+                                        <i class="bi bi-pencil-square"></i>
+                                    </button>
+
+                                    <!-- ปุ่มลบ -->
+                                    <button type="button" class="btn btn-outline-danger btn-sm px-2 py-1" style="border-radius:8px;"
+                                            onclick="openDeleteProductModal(@prod.ProductId, '@Html.Raw(prod.ProductName.Replace("'", "\\'"))')" title="ลบรายการ">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
                             </td>
                         </tr>
                     }
@@ -222,43 +470,269 @@
             </tbody>
         </table>
     </div>
+
+    <!-- Pagination Footer (แบ่งหน้า และปุ่มถัดไป/ก่อนหน้า) -->
+    <div class="p-3 border-top bg-light d-flex justify-content-between align-items-center flex-wrap gap-3">
+        <div class="d-flex align-items-center gap-2 small text-muted">
+            <span>แสดง</span>
+            <select class="form-select form-select-sm d-inline-block bg-white" id="pageSizeSelect" style="width: 80px;" onchange="changePageSize(this.value)">
+                <option value="5" selected>5</option>
+                <option value="10">10</option>
+                <option value="20">20</option>
+                <option value="50">50</option>
+            </select>
+            <span>รายการต่อหน้า &bull; แสดงรายการที่ <strong id="pageStart" class="text-dark">1</strong> ถึง <strong id="pageEnd" class="text-dark">5</strong> จากทั้งหมด <strong id="pageTotal" class="text-dark">@Model.Count</strong> รายการ</span>
+        </div>
+
+        <nav aria-label="Product table pagination">
+            <ul class="pagination pagination-sm mb-0 justify-content-end" id="paginationControls">
+                <!-- Injected dynamically by JavaScript -->
+            </ul>
+        </nav>
+    </div>
 </div>
 
-<!-- Edit Product Modal -->
-<div class="modal fade" id="editProductModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content" style="border-radius:18px; border:none; box-shadow:0 20px 50px rgba(0,0,0,0.2);">
-            <form asp-action="UpdateProductPrice" asp-controller="Admin" method="post">
+<!-- ============================================================
+     MODAL 1: เพิ่มสินค้าและอุปกรณ์ใหม่ (Add Product)
+     ============================================================ -->
+<div class="modal fade" id="addProductModal" tabindex="-1" aria-labelledby="addProductModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content" style="border-radius:18px; border:none; box-shadow:0 20px 60px rgba(0,0,0,0.2);">
+            <form asp-action="AddProduct" asp-controller="Admin" method="post" id="addProductForm">
                 @Html.AntiForgeryToken()
-                <input type="hidden" id="editProductId" name="productId" />
-                <div class="modal-header bg-success text-white" style="border-top-left-radius:18px; border-top-right-radius:18px;">
-                    <h5 class="modal-title fw-bold mb-0">
-                        <i class="bi bi-pencil-square me-2"></i>แก้ไขราคา: <span id="modalProductName"></span>
-                    </h5>
+
+                <div class="modal-header text-white" style="background:linear-gradient(135deg, #1a472a 0%, #2d6a4f 60%, #52b788 100%); border-top-left-radius:18px; border-top-right-radius:18px; padding:1.25rem 1.75rem;">
+                    <div>
+                        <h5 class="modal-title fw-bold" id="addProductModalLabel">
+                            <i class="bi bi-plus-circle-fill me-2"></i>เพิ่มสินค้าหรืออุปกรณ์ใหม่ลงฐานข้อมูล
+                        </h5>
+                        <small class="text-white-50">เมื่อบันทึก สินค้าจะถูกบันทึกลงในระบบและแสดงในบทบาทที่เกี่ยวข้องทันที</small>
+                    </div>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
+
                 <div class="modal-body p-4">
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold">ราคา (บาท ต่อ <span id="modalProductUnit">หน่วย</span>):</label>
-                        <div class="input-group">
-                            <span class="input-group-text">฿</span>
-                            <input type="number" step="1" min="0" class="form-control" id="editPrice" name="price" required />
+                    <div class="row g-3">
+                        <!-- ชื่อสินค้า/อุปกรณ์ -->
+                        <div class="col-md-8">
+                            <label class="form-label fw-semibold small">ชื่อสินค้า / อุปกรณ์ <span class="text-danger">*</span></label>
+                            <input type="text" name="productName" id="addProductName" class="form-control"
+                                   placeholder="เช่น ลูกแบดมินตัน Yonex Aerosensa 30 หรือ ไม้แบด Yonex Astrox" required />
                         </div>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold">ค่ามัดจำ (สำหรับสินค้าเช่า):</label>
-                        <div class="input-group">
-                            <span class="input-group-text">฿</span>
-                            <input type="number" step="1" min="0" class="form-control" id="editDeposit" name="deposit" />
+
+                        <!-- รหัส SKU -->
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold small">รหัสสินค้า (SKU)</label>
+                            <input type="text" name="sku" id="addSku" class="form-control text-uppercase font-monospace"
+                                   placeholder="เช่น SHT-01 (เว้นว่างเพื่อ auto)" />
+                            <small class="text-muted" style="font-size:0.75rem;">เว้นว่างไว้หากต้องการให้ระบบสร้างให้อัตโนมัติ</small>
                         </div>
-                        <small class="text-muted">ใส่ 0 หากไม่ต้องวางมัดจำ</small>
+
+                        <!-- หมวดหมู่ -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold small">หมวดหมู่สินค้า <span class="text-danger">*</span></label>
+                            <select name="categoryId" id="addCategoryId" class="form-select" required onchange="onCategoryChanged(this)">
+                                @foreach (var cat in categories)
+                                {
+                                    <option value="@cat.CategoryId" data-type="@cat.ProductType">
+                                        @cat.CategoryName (@(cat.ProductType == "SALE" ? "สินค้าขาย" : "อุปกรณ์เช่า"))
+                                    </option>
+                                }
+                            </select>
+                        </div>
+
+                        <!-- ประเภท: ขาย หรือ เช่า -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold small">ประเภทรายการ <span class="text-danger">*</span></label>
+                            <select name="productType" id="addProductType" class="form-select fw-bold text-dark" required onchange="onProductTypeChanged(this.value)">
+                                <option value="SALE">🛒 สินค้าสำหรับขาย (SALE)</option>
+                                <option value="RENT">🏸 อุปกรณ์สำหรับเช่า (RENT)</option>
+                            </select>
+                        </div>
+
+                        <!-- ราคา -->
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold small" id="lblAddPrice">ราคาขาย (บาท) <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <span class="input-group-text">฿</span>
+                                <input type="number" step="1" min="0" name="price" id="addPrice" class="form-control fw-bold fs-5 text-success" placeholder="0" required />
+                            </div>
+                        </div>
+
+                        <!-- ค่ามัดจำ (สำหรับเช่า) -->
+                        <div class="col-md-4" id="grpAddDeposit" style="display:none;">
+                            <label class="form-label fw-semibold small">ค่ามัดจำอุปกรณ์ (บาท)</label>
+                            <div class="input-group">
+                                <span class="input-group-text">฿</span>
+                                <input type="number" step="1" min="0" name="deposit" id="addDeposit" class="form-control fw-bold fs-5 text-warning" value="0" />
+                            </div>
+                            <small class="text-muted" style="font-size:0.72rem;">คืนให้ลูกค้าเมื่อตรวจรับคืนอุปกรณ์</small>
+                        </div>
+
+                        <!-- หน่วยนับ -->
+                        <div class="col-md-4" id="grpAddUnit">
+                            <label class="form-label fw-semibold small">หน่วยนับ <span class="text-danger">*</span></label>
+                            <input type="text" name="unit" id="addUnit" class="form-control" list="unitList" placeholder="หลอด, ไม้, คู่, ชิ้น" required value="หลอด" />
+                            <datalist id="unitList">
+                                <option value="หลอด"></option>
+                                <option value="ไม้"></option>
+                                <option value="คู่"></option>
+                                <option value="ขวด"></option>
+                                <option value="ชิ้น"></option>
+                                <option value="กระป๋อง"></option>
+                            </datalist>
+                        </div>
+
+                        <!-- จำนวนสต็อกเริ่มต้น -->
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold small">จำนวนสต็อกเริ่มต้น <span class="text-danger">*</span></label>
+                            <input type="number" min="0" name="stockQty" id="addStockQty" class="form-control" value="20" required />
+                        </div>
+
+                        <!-- Preview บทบาทที่เกี่ยวข้องแบบไดนามิก -->
+                        <div class="col-12">
+                            <div class="p-3 rounded-3 border" style="background:#f0fdf4; border-color:#bbf7d0 !important;">
+                                <div class="fw-bold text-success small mb-1">
+                                    <i class="bi bi-info-circle-fill me-1"></i> บทบาทในระบบที่จะเห็นและจัดการรายการนี้:
+                                </div>
+                                <div id="addRolePreviewBox" class="small text-dark">
+                                    <!-- Dynamic text from JS -->
+                                    • <strong>ฝ่ายซื้อ-เช่าอุปกรณ์ (SALES_STAFF):</strong> จัดการสต็อกหน้าร้าน และส่งมอบสินค้าให้ลูกค้า<br>
+                                    • <strong>ลูกค้า (CUSTOMER):</strong> สั่งซื้อสินค้าลงตะกร้าพร้อมจองสนาม (ระบบคำนวณโปรโมชั่นอัตโนมัติ)
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div class="modal-footer bg-light" style="border-bottom-left-radius:18px; border-bottom-right-radius:18px;">
-                    <button type="button" class="btn btn-secondary px-3" data-bs-dismiss="modal">ยกเลิก</button>
-                    <button type="submit" class="btn btn-success px-4 fw-semibold">
-                        <i class="bi bi-check-circle me-1"></i>บันทึกการเปลี่ยนแปลง
+
+                <div class="modal-footer bg-light px-4 py-3" style="border-bottom-left-radius:18px; border-bottom-right-radius:18px;">
+                    <button type="button" class="btn btn-outline-secondary px-3" data-bs-dismiss="modal">ยกเลิก</button>
+                    <button type="submit" class="btn btn-success fw-bold px-4" style="background:linear-gradient(135deg,#1a472a,#2d6a4f); border:none;">
+                        <i class="bi bi-check-circle me-1"></i> บันทึกลงฐานข้อมูล
                     </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================
+     MODAL 2: แก้ไขสินค้าและอุปกรณ์ (Edit Product)
+     ============================================================ -->
+<div class="modal fade" id="editProductModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content" style="border-radius:18px; border:none; box-shadow:0 20px 60px rgba(0,0,0,0.2);">
+            <form asp-action="UpdateProduct" asp-controller="Admin" method="post" id="editProductForm">
+                @Html.AntiForgeryToken()
+                <input type="hidden" id="editProductId" name="productId" />
+
+                <div class="modal-header bg-primary text-white" style="border-top-left-radius:18px; border-top-right-radius:18px; padding:1.25rem 1.75rem;">
+                    <div>
+                        <h5 class="modal-title fw-bold">
+                            <i class="bi bi-pencil-square me-2"></i>แก้ไขข้อมูลสินค้า / อุปกรณ์
+                        </h5>
+                        <small class="text-white-50">รหัส ID: #<span id="displayEditId"></span></small>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+
+                <div class="modal-body p-4">
+                    <div class="row g-3">
+                        <div class="col-md-8">
+                            <label class="form-label fw-semibold small">ชื่อสินค้า / อุปกรณ์ <span class="text-danger">*</span></label>
+                            <input type="text" name="productName" id="editProductName" class="form-control" required />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold small">หมวดหมู่ <span class="text-danger">*</span></label>
+                            <select name="categoryId" id="editCategoryId" class="form-select" required>
+                                @foreach (var cat in categories)
+                                {
+                                    <option value="@cat.CategoryId">@cat.CategoryName</option>
+                                }
+                            </select>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold small">ประเภทรายการ <span class="text-danger">*</span></label>
+                            <select name="productType" id="editProductType" class="form-select fw-bold" required onchange="onEditProductTypeChanged(this.value)">
+                                <option value="SALE">🛒 สินค้าสำหรับขาย (SALE)</option>
+                                <option value="RENT">🏸 อุปกรณ์สำหรับเช่า (RENT)</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-6 d-flex align-items-center">
+                            <div class="p-2 bg-light rounded-3 w-100 border mt-3">
+                                <div class="form-check form-switch mb-0">
+                                    <input class="form-check-input" type="checkbox" role="switch" name="isActive" id="editIsActive" value="true" style="width:2.2rem; height:1.2rem; cursor:pointer;" />
+                                    <label class="form-check-label fw-bold ms-2 small" for="editIsActive">
+                                        เปิดใช้งานสินค้าในระบบ
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold small" id="lblEditPrice">ราคา (บาท) <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <span class="input-group-text">฿</span>
+                                <input type="number" step="1" min="0" name="price" id="editPrice" class="form-control fw-bold text-success fs-5" required />
+                            </div>
+                        </div>
+
+                        <div class="col-md-4" id="grpEditDeposit">
+                            <label class="form-label fw-semibold small">ค่ามัดจำ (สำหรับเช่า)</label>
+                            <div class="input-group">
+                                <span class="input-group-text">฿</span>
+                                <input type="number" step="1" min="0" name="deposit" id="editDeposit" class="form-control fw-bold text-warning" />
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold small">หน่วยนับ <span class="text-danger">*</span></label>
+                            <input type="text" name="unit" id="editUnit" class="form-control" required />
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold small">จำนวนสต็อกคงเหลือ <span class="text-danger">*</span></label>
+                            <input type="number" min="0" name="stockQty" id="editStockQty" class="form-control" required />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer bg-light px-4 py-3" style="border-bottom-left-radius:18px; border-bottom-right-radius:18px;">
+                    <button type="button" class="btn btn-outline-secondary px-3" data-bs-dismiss="modal">ยกเลิก</button>
+                    <button type="submit" class="btn btn-primary fw-bold px-4">
+                        <i class="bi bi-save me-1"></i> บันทึกการเปลี่ยนแปลง
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================
+     MODAL 3: ยืนยันการลบสินค้า (Delete Product Modal)
+     ============================================================ -->
+<div class="modal fade" id="deleteProductModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content" style="border-radius:18px; border:none; box-shadow:0 20px 50px rgba(0,0,0,0.2);">
+            <form asp-action="DeleteProduct" asp-controller="Admin" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="id" id="deleteProductId" />
+                <div class="modal-body text-center p-4">
+                    <div class="text-danger mb-3" style="font-size:3rem;">
+                        <i class="bi bi-exclamation-circle"></i>
+                    </div>
+                    <h5 class="fw-bold mb-2">ยืนยันการลบสินค้า?</h5>
+                    <p class="text-muted small mb-3">
+                        คุณต้องการลบ "<strong id="deleteProductNameText" class="text-dark"></strong>" ออกจากระบบหรือไม่?
+                    </p>
+                    <div class="d-flex justify-content-center gap-2">
+                        <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">ยกเลิก</button>
+                        <button type="submit" class="btn btn-danger btn-sm px-3 fw-bold">
+                            <i class="bi bi-trash me-1"></i> ลบสินค้า
+                        </button>
+                    </div>
                 </div>
             </form>
         </div>
@@ -267,14 +741,204 @@
 
 @section Scripts {
     <script>
-        function openEditProductModal(id, name, price, deposit, unit) {
-            document.getElementById('editProductId').value = id;
-            document.getElementById('modalProductName').innerText = name;
-            document.getElementById('modalProductUnit').innerText = unit || 'ชิ้น';
-            document.getElementById('editPrice').value = price;
-            document.getElementById('editDeposit').value = deposit || 0;
+        // Pagination state variables
+        let currentPage = 1;
+        let pageSize = 5;
+        let currentFilter = 'ALL';
+        let searchKeyword = '';
+
+        // Open Add Modal
+        function openAddProductModal() {
+            document.getElementById('addProductForm').reset();
+            onProductTypeChanged('SALE');
+            new bootstrap.Modal(document.getElementById('addProductModal')).show();
+        }
+
+        // Category changed in Add Modal
+        function onCategoryChanged(sel) {
+            const opt = sel.options[sel.selectedIndex];
+            const type = opt.getAttribute('data-type');
+            if (type) {
+                document.getElementById('addProductType').value = type;
+                onProductTypeChanged(type);
+            }
+        }
+
+        // Product type changed (SALE vs RENT)
+        function onProductTypeChanged(type) {
+            const grpDeposit = document.getElementById('grpAddDeposit');
+            const lblPrice = document.getElementById('lblAddPrice');
+            const unitInput = document.getElementById('addUnit');
+            const rolePreview = document.getElementById('addRolePreviewBox');
+
+            if (type === 'RENT') {
+                grpDeposit.style.display = 'block';
+                lblPrice.innerText = 'ราคาค่าเช่า (บาท/ครั้ง) *';
+                if (!unitInput.value || unitInput.value === 'หลอด') unitInput.value = 'ไม้';
+                rolePreview.innerHTML = `
+                    • <strong class="text-primary">ฝ่ายซื้อ-เช่าอุปกรณ์ (SALES_STAFF):</strong> ตรวจสอบสภาพ ส่งมอบและตรวจรับคืนอุปกรณ์<br>
+                    • <strong class="text-purple" style="color:#7c3aed;">ฝ่ายบัญชีและการเงิน (ACCOUNTING):</strong> ดูแลค่ามัดจำ และคิดค่าปรับกรณีเสียหาย<br>
+                    • <strong class="text-success">ลูกค้า (CUSTOMER):</strong> เช่าอุปกรณ์ลงตะกร้าพร้อมสนาม (คิดโปรโมชั่นลด 20%)
+                `;
+            } else {
+                grpDeposit.style.display = 'none';
+                lblPrice.innerText = 'ราคาขาย (บาท) *';
+                if (!unitInput.value || unitInput.value === 'ไม้') unitInput.value = 'หลอด';
+                rolePreview.innerHTML = `
+                    • <strong class="text-primary">ฝ่ายซื้อ-เช่าอุปกรณ์ (SALES_STAFF):</strong> อัปเดตสต็อกหน้าร้าน และส่งมอบสินค้าให้ลูกค้า<br>
+                    • <strong class="text-success">ลูกค้า (CUSTOMER):</strong> สั่งซื้อสินค้าลงตะกร้า (ระบบคำนวณโปรโมชั่นซื้อ 2 หลอดลด 50%)
+                `;
+            }
+        }
+
+        // Open Edit Modal
+        function openEditProductModal(data) {
+            document.getElementById('editProductId').value = data.id;
+            document.getElementById('displayEditId').innerText = data.id;
+            document.getElementById('editProductName').value = data.name;
+            document.getElementById('editCategoryId').value = data.catId;
+            document.getElementById('editProductType').value = data.type;
+            document.getElementById('editPrice').value = data.price;
+            document.getElementById('editDeposit').value = data.deposit || 0;
+            document.getElementById('editUnit').value = data.unit;
+            document.getElementById('editStockQty').value = data.stock;
+            document.getElementById('editIsActive').checked = data.isActive;
+
+            onEditProductTypeChanged(data.type);
             new bootstrap.Modal(document.getElementById('editProductModal')).show();
         }
+
+        function onEditProductTypeChanged(type) {
+            const grp = document.getElementById('grpEditDeposit');
+            const lbl = document.getElementById('lblEditPrice');
+            if (type === 'RENT') {
+                grp.style.display = 'block';
+                lbl.innerText = 'ราคาค่าเช่า (บาท) *';
+            } else {
+                grp.style.display = 'none';
+                lbl.innerText = 'ราคาขาย (บาท) *';
+            }
+        }
+
+        // Open Delete Modal
+        function openDeleteProductModal(id, name) {
+            document.getElementById('deleteProductId').value = id;
+            document.getElementById('deleteProductNameText').innerText = name;
+            new bootstrap.Modal(document.getElementById('deleteProductModal')).show();
+        }
+
+        // ============================================================
+        // PAGINATION & FILTER LOGIC (ระบบแบ่งหน้าและปุ่มถัดไป)
+        // ============================================================
+        function getFilteredRows() {
+            const allRows = Array.from(document.querySelectorAll('.product-row'));
+            return allRows.filter(row => {
+                const rowType = row.getAttribute('data-type');
+                const matchFilter = (currentFilter === 'ALL' || rowType === currentFilter);
+                
+                let matchSearch = true;
+                if (searchKeyword) {
+                    const text = row.innerText.toLowerCase();
+                    matchSearch = text.includes(searchKeyword.toLowerCase());
+                }
+                return matchFilter && matchSearch;
+            });
+        }
+
+        function updatePagination() {
+            const filteredRows = getFilteredRows();
+            const totalItems = filteredRows.length;
+            const totalPages = Math.ceil(totalItems / pageSize) || 1;
+
+            if (currentPage > totalPages) currentPage = totalPages;
+            if (currentPage < 1) currentPage = 1;
+
+            const startIndex = (currentPage - 1) * pageSize;
+            const endIndex = Math.min(startIndex + pageSize, totalItems);
+
+            // ซ่อนแถวทั้งหมดก่อน
+            const allRows = document.querySelectorAll('.product-row');
+            allRows.forEach(r => r.style.display = 'none');
+
+            // แสดงเฉพาะแถวในหน้าที่เลือก
+            for (let i = startIndex; i < endIndex; i++) {
+                if (filteredRows[i]) {
+                    filteredRows[i].style.display = '';
+                }
+            }
+
+            // จัดการกรณีไม่มีข้อมูลตรงเงื่อนไขค้นหา
+            const emptyRow = document.getElementById('emptyRow');
+            if (emptyRow) {
+                emptyRow.style.display = totalItems === 0 ? '' : 'none';
+            }
+
+            // อัปเดตข้อความสถิติหน้า
+            const startEl = document.getElementById('pageStart');
+            const endEl = document.getElementById('pageEnd');
+            const totalEl = document.getElementById('pageTotal');
+            if (startEl) startEl.innerText = totalItems === 0 ? 0 : (startIndex + 1);
+            if (endEl) endEl.innerText = endIndex;
+            if (totalEl) totalEl.innerText = totalItems;
+
+            // สร้างปุ่ม Pagination
+            const paginationEl = document.getElementById('paginationControls');
+            if (!paginationEl) return;
+            paginationEl.innerHTML = '';
+
+            // 1. ปุ่ม "« ก่อนหน้า"
+            const prevLi = document.createElement('li');
+            prevLi.className = `page-item ${currentPage === 1 ? 'disabled' : ''}`;
+            prevLi.innerHTML = `<button type="button" class="page-link" onclick="goToPage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}><i class="bi bi-chevron-left me-1"></i>ก่อนหน้า</button>`;
+            paginationEl.appendChild(prevLi);
+
+            // 2. ปุ่มหมายเลขหน้า
+            for (let p = 1; p <= totalPages; p++) {
+                const pageLi = document.createElement('li');
+                pageLi.className = `page-item ${p === currentPage ? 'active' : ''}`;
+                pageLi.innerHTML = `<button type="button" class="page-link" onclick="goToPage(${p})">${p}</button>`;
+                paginationEl.appendChild(pageLi);
+            }
+
+            // 3. ปุ่ม "ถัดไป »"
+            const nextLi = document.createElement('li');
+            nextLi.className = `page-item ${currentPage === totalPages || totalItems === 0 ? 'disabled' : ''}`;
+            nextLi.innerHTML = `<button type="button" class="page-link" onclick="goToPage(${currentPage + 1})" ${currentPage === totalPages || totalItems === 0 ? 'disabled' : ''}>ถัดไป <i class="bi bi-chevron-right ms-1"></i></button>`;
+            paginationEl.appendChild(nextLi);
+        }
+
+        // เปลี่ยนหน้า
+        function goToPage(page) {
+            currentPage = page;
+            updatePagination();
+        }
+
+        // เปลี่ยนจำนวนรายการต่อหน้า
+        function changePageSize(size) {
+            pageSize = parseInt(size, 10);
+            currentPage = 1;
+            updatePagination();
+        }
+
+        // กรองประเภทสินค้า (ทั้งหมด / ขาย / เช่า)
+        function filterProducts(type, btn) {
+            document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            currentFilter = type;
+            currentPage = 1;
+            updatePagination();
+        }
+
+        // ค้นหาชื่อสินค้า / SKU
+        function onSearchProduct(keyword) {
+            searchKeyword = keyword.trim();
+            currentPage = 1;
+            updatePagination();
+        }
+
+        // เริ่มต้นทำงานทันทีเมื่อโหลดหน้าเว็บเสร็จ
+        document.addEventListener('DOMContentLoaded', function () {
+            updatePagination();
+        });
     </script>
 }
-

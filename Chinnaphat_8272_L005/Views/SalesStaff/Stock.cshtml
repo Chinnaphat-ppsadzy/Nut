@@ -1,0 +1,534 @@
+@model List<Chinnaphat_8272_L005.Models.Product>
+
+@{
+    ViewData["Title"] = "จัดการสต็อกและอุปกรณ์ (ฝ่ายซื้อ-เช่า)";
+    Layout = "_SalesStaffLayout";
+    var categories = ViewBag.Categories as List<Chinnaphat_8272_L005.Models.ProductCategory> ?? new();
+}
+
+<style>
+    .stock-header-card {
+        background: linear-gradient(135deg, #0f766e 0%, #0d9488 55%, #14b8a6 100%);
+        border-radius: 16px;
+        padding: 1.6rem 2rem;
+        color: white;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 4px 20px rgba(15, 118, 110, 0.1);
+        position: relative;
+        overflow: hidden;
+    }
+    .stock-header-card::after {
+        content: '\F1B9';
+        font-family: 'bootstrap-icons';
+        position: absolute;
+        right: 1.5rem;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 5rem;
+        opacity: 0.12;
+    }
+    .stock-table-wrapper {
+        background: #fff;
+        border-radius: 16px;
+        border: 1px solid #e2e8f0;
+        overflow: hidden;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+    }
+    .table th {
+        background: #f8fafc;
+        border-bottom: 2px solid #e2e8f0;
+        color: #334155;
+        font-weight: 700;
+        font-size: 0.85rem;
+        padding: 0.9rem 0.75rem;
+        white-space: nowrap;
+    }
+    .table td {
+        padding: 0.85rem 0.75rem;
+        vertical-align: middle;
+        border-color: #f1f5f9;
+        font-size: 0.9rem;
+    }
+    .badge-sale {
+        background: #dbeafe;
+        color: #1e40af;
+        font-weight: 600;
+        font-size: 0.75rem;
+        padding: 0.3rem 0.65rem;
+        border-radius: 12px;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+    }
+    .badge-rent {
+        background: #fef3c7;
+        color: #b45309;
+        font-weight: 600;
+        font-size: 0.75rem;
+        padding: 0.3rem 0.65rem;
+        border-radius: 12px;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+    }
+    .filter-btn.active {
+        background-color: #0d9488 !important;
+        color: white !important;
+        border-color: #0d9488 !important;
+    }
+    .pagination .page-link {
+        color: #0f766e;
+        border-radius: 8px;
+        margin: 0 2px;
+        border: 1px solid #e2e8f0;
+        font-weight: 500;
+        padding: 0.35rem 0.75rem;
+        transition: all 0.2s;
+    }
+    .pagination .page-item.active .page-link {
+        background-color: #0d9488;
+        border-color: #0d9488;
+        color: #fff;
+        font-weight: 700;
+    }
+    .pagination .page-link:hover {
+        background-color: #f0fdfa;
+        color: #0f766e;
+    }
+    .pagination .page-item.disabled .page-link {
+        color: #94a3b8;
+        background-color: #f8fafc;
+        border-color: #e2e8f0;
+    }
+</style>
+
+<!-- Alert messages -->
+@if (TempData["SuccessMessage"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show rounded-3 shadow-sm mb-4" role="alert">
+        <i class="bi bi-check-circle-fill me-2 fs-5"></i>
+        <strong>สำเร็จ:</strong> @TempData["SuccessMessage"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+<!-- Header -->
+<div class="stock-header-card">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+        <div>
+            <div class="d-flex align-items-center gap-2 mb-1">
+                <span class="badge bg-warning text-dark font-monospace fw-bold">SALES & RENTAL STAFF</span>
+                <span class="badge" style="background:rgba(255,255,255,0.2); color:#fff;">
+                    ระบบตรวจนับสต็อกสินค้าหน้าร้าน
+                </span>
+            </div>
+            <h3 class="fw-bold mb-1">
+                <i class="bi bi-boxes me-2"></i>จัดการสต็อกและอุปกรณ์กีฬา
+            </h3>
+            <p class="mb-0 opacity-75 small">
+                ฝ่ายซื้อ-เช่าอุปกรณ์สามารถตรวจนับ อัปเดตสต็อกสินค้า และตรวจสอบรายการอุปกรณ์เช่าได้โดยตรง
+            </p>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+            <a asp-action="Sales" class="btn btn-warning fw-bold text-dark px-3 py-2 shadow-sm" style="border-radius:10px;">
+                <i class="bi bi-cart3 me-1"></i> ไปหน้าขายสินค้า
+            </a>
+            <a asp-action="Rentals" class="btn btn-light fw-semibold px-3 py-2" style="border-radius:10px;">
+                <i class="bi bi-arrow-repeat me-1"></i> ตรวจรับคืนอุปกรณ์
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Stats -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm p-3 rounded-4 bg-white">
+            <div class="d-flex align-items-center gap-3">
+                <div style="width:48px; height:48px; border-radius:12px; background:#f0fdfa; color:#0d9488; display:flex; align-items:center; justify-content:center; font-size:1.4rem;">
+                    <i class="bi bi-box-seam"></i>
+                </div>
+                <div>
+                    <h4 class="fw-bold mb-0">@Model.Count</h4>
+                    <small class="text-muted">รายการสินค้าทั้งหมด</small>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm p-3 rounded-4 bg-white">
+            <div class="d-flex align-items-center gap-3">
+                <div style="width:48px; height:48px; border-radius:12px; background:#eff6ff; color:#2563eb; display:flex; align-items:center; justify-content:center; font-size:1.4rem;">
+                    <i class="bi bi-cart-check"></i>
+                </div>
+                <div>
+                    <h4 class="fw-bold mb-0 text-primary">@Model.Count(p => p.ProductType == "SALE")</h4>
+                    <small class="text-muted">สินค้าขาย (SALE)</small>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm p-3 rounded-4 bg-white">
+            <div class="d-flex align-items-center gap-3">
+                <div style="width:48px; height:48px; border-radius:12px; background:#fef3c7; color:#d97706; display:flex; align-items:center; justify-content:center; font-size:1.4rem;">
+                    <i class="bi bi-arrow-repeat"></i>
+                </div>
+                <div>
+                    <h4 class="fw-bold mb-0 text-warning">@Model.Count(p => p.ProductType == "RENT")</h4>
+                    <small class="text-muted">อุปกรณ์เช่า (RENT)</small>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm p-3 rounded-4 bg-white">
+            <div class="d-flex align-items-center gap-3">
+                <div style="width:48px; height:48px; border-radius:12px; background:#fef2f2; color:#ef4444; display:flex; align-items:center; justify-content:center; font-size:1.4rem;">
+                    <i class="bi bi-exclamation-triangle"></i>
+                </div>
+                <div>
+                    <h4 class="fw-bold mb-0 text-danger">@Model.Count(p => p.StockQty <= 5)</h4>
+                    <small class="text-muted">สต็อกเหลือน้อย (&le; 5)</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Stock Table Card -->
+<div class="stock-table-wrapper">
+    <!-- Top toolbar & Filter buttons -->
+    <div class="p-3 border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <h5 class="fw-bold mb-0 text-dark me-2">
+                <i class="bi bi-list-check me-2" style="color:#0d9488;"></i>ตารางสต็อกสินค้าและอุปกรณ์
+            </h5>
+            <!-- Filter buttons -->
+            <button type="button" class="btn btn-sm btn-outline-secondary filter-btn active" onclick="filterStock('ALL', this)">
+                ทั้งหมด (@Model.Count)
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-primary filter-btn" onclick="filterStock('SALE', this)">
+                <i class="bi bi-cart me-1"></i>ขาย (@Model.Count(p => p.ProductType == "SALE"))
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-warning filter-btn" onclick="filterStock('RENT', this)">
+                <i class="bi bi-arrow-repeat me-1"></i>เช่า (@Model.Count(p => p.ProductType == "RENT"))
+            </button>
+        </div>
+
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <!-- Search box -->
+            <div class="input-group input-group-sm" style="width: 220px;">
+                <span class="input-group-text bg-white text-muted border-end-0"><i class="bi bi-search"></i></span>
+                <input type="text" id="stockSearchInput" class="form-control border-start-0" placeholder="ค้นหาชื่อสินค้า / SKU..." onkeyup="onSearchStock(this.value)" />
+            </div>
+
+            <a asp-action="Sales" class="btn btn-teal text-white btn-sm px-3 py-1 fw-bold shadow-sm" style="background:#0d9488; border-radius:8px;">
+                <i class="bi bi-cart-plus me-1"></i> ขายสินค้า
+            </a>
+        </div>
+    </div>
+
+    <!-- Table -->
+    <div class="table-responsive">
+        <table class="table align-middle mb-0" id="stockTable">
+            <thead>
+                <tr>
+                    <th style="width: 100px;">SKU</th>
+                    <th>ชื่อสินค้า / อุปกรณ์</th>
+                    <th>หมวดหมู่</th>
+                    <th>ประเภท</th>
+                    <th class="text-end">ราคา</th>
+                    <th class="text-end">มัดจำ</th>
+                    <th class="text-center">สต็อกคงเหลือ</th>
+                    <th class="text-center">สถานะ</th>
+                    <th class="text-center" style="width: 130px;">จัดการสต็อก</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (!Model.Any())
+                {
+                    <tr id="emptyStockRow">
+                        <td colspan="9" class="text-center py-5 text-muted">
+                            <i class="bi bi-box mb-2" style="font-size:2.5rem; color:#cbd5e1;"></i>
+                            <div class="fw-bold">ยังไม่มีข้อมูลสินค้าหรืออุปกรณ์</div>
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var prod in Model)
+                    {
+                        bool isSale = prod.ProductType == "SALE";
+                        bool isActive = prod.IsActive == true;
+
+                        <tr class="stock-row" data-type="@prod.ProductType" data-cat="@prod.CategoryId">
+                            <td>
+                                <span class="badge bg-light text-dark border font-monospace fw-bold" style="font-size:0.75rem;">
+                                    @prod.Sku
+                                </span>
+                            </td>
+                            <td>
+                                <div class="fw-bold text-dark">@prod.ProductName</div>
+                                <small class="text-muted">หน่วย: @prod.Unit</small>
+                            </td>
+                            <td>
+                                <span class="badge bg-white text-secondary border">
+                                    @(prod.Category?.CategoryName ?? "-")
+                                </span>
+                            </td>
+                            <td>
+                                @if (isSale)
+                                {
+                                    <span class="badge-sale">
+                                        <i class="bi bi-cart"></i> ขาย
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="badge-rent">
+                                        <i class="bi bi-arrow-repeat"></i> เช่า
+                                    </span>
+                                }
+                            </td>
+                            <td class="text-end">
+                                <span class="fw-bold text-success">@prod.Price.ToString("N0") ฿</span>
+                                <div class="text-muted" style="font-size:0.72rem;">ต่อ @prod.Unit</div>
+                            </td>
+                            <td class="text-end">
+                                @if (prod.Deposit > 0)
+                                {
+                                    <span class="fw-semibold text-warning">@prod.Deposit.ToString("N0") ฿</span>
+                                }
+                                else
+                                {
+                                    <span class="text-muted">-</span>
+                                }
+                            </td>
+                            <td class="text-center">
+                                @if (prod.StockQty <= 0)
+                                {
+                                    <span class="badge bg-danger text-white fw-bold px-2 py-1">
+                                        หมดสต็อก (0 @prod.Unit)
+                                    </span>
+                                }
+                                else if (prod.StockQty <= 5)
+                                {
+                                    <span class="badge bg-danger bg-opacity-10 text-danger border border-danger fw-bold px-2 py-1">
+                                        @prod.StockQty @prod.Unit (เหลือน้อย)
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-light text-dark border fw-bold px-2 py-1">
+                                        @prod.StockQty @prod.Unit
+                                    </span>
+                                }
+                            </td>
+                            <td class="text-center">
+                                <span class="badge @(isActive ? "bg-success-subtle text-success" : "bg-secondary-subtle text-secondary")" style="border-radius:12px;">
+                                    @(isActive ? "พร้อมขาย/เช่า" : "ปิดใช้งาน")
+                                </span>
+                            </td>
+                            <td class="text-center">
+                                <button type="button" class="btn btn-outline-teal btn-sm px-2 py-1" style="color:#0f766e; border-color:#0d9488; border-radius:8px;"
+                                        onclick="openUpdateStockModal(@prod.ProductId, '@Html.Raw(prod.ProductName.Replace("'", "\\'"))', @prod.StockQty, '@Html.Raw(prod.Unit)')"
+                                        title="ปรับปรุงจำนวนสต็อก">
+                                    <i class="bi bi-pencil-square me-1"></i>ปรับสต็อก
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination Footer -->
+    <div class="p-3 border-top bg-light d-flex justify-content-between align-items-center flex-wrap gap-3">
+        <div class="d-flex align-items-center gap-2 small text-muted">
+            <span>แสดง</span>
+            <select class="form-select form-select-sm d-inline-block bg-white" id="stockPageSizeSelect" style="width: 80px;" onchange="changeStockPageSize(this.value)">
+                <option value="5" selected>5</option>
+                <option value="10">10</option>
+                <option value="20">20</option>
+                <option value="50">50</option>
+            </select>
+            <span>รายการต่อหน้า &bull; แสดงรายการที่ <strong id="stockPageStart" class="text-dark">1</strong> ถึง <strong id="stockPageEnd" class="text-dark">5</strong> จากทั้งหมด <strong id="stockPageTotal" class="text-dark">@Model.Count</strong> รายการ</span>
+        </div>
+
+        <nav aria-label="Stock table pagination">
+            <ul class="pagination pagination-sm mb-0 justify-content-end" id="stockPaginationControls">
+                <!-- Injected dynamically by JavaScript -->
+            </ul>
+        </nav>
+    </div>
+</div>
+
+<!-- ============================================================
+     MODAL: ปรับปรุงจำนวนสต็อกสินค้า (Update Stock Modal)
+     ============================================================ -->
+<div class="modal fade" id="updateStockModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius:18px; border:none; box-shadow:0 20px 50px rgba(0,0,0,0.2);">
+            <form asp-action="UpdateStock" asp-controller="SalesStaff" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="productId" id="modalStockProductId" />
+
+                <div class="modal-header text-white" style="background:#0d9488; border-top-left-radius:18px; border-top-right-radius:18px;">
+                    <h5 class="modal-title fw-bold">
+                        <i class="bi bi-boxes me-2"></i>ปรับปรุงจำนวนสต็อก
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label text-muted small mb-1">ชื่อสินค้า / อุปกรณ์:</label>
+                        <h6 class="fw-bold text-dark" id="modalStockProductName">-</h6>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold small">จำนวนสต็อกใหม่ (<span id="modalStockUnit">ชิ้น</span>): <span class="text-danger">*</span></label>
+                        <input type="number" min="0" name="newStockQty" id="modalNewStockQty" class="form-control fw-bold fs-5 text-teal" style="color:#0f766e;" required />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold small">สาเหตุการปรับปรุงสต็อก:</label>
+                        <select name="reason" class="form-select">
+                            <option value="ตรวจนับสต็อกประจำวัน">ตรวจนับสต็อกประจำวัน (Audit)</option>
+                            <option value="รับของเข้าสต็อกเพิ่ม (Purchase In)">รับของเข้าสต็อกเพิ่ม (Purchase In)</option>
+                            <option value="ตัดยอดสินค้าชำรุด/สูญหาย">ตัดยอดสินค้าชำรุด / สูญหาย</option>
+                            <option value="แก้ไขยอดผิดพลาด">แก้ไขยอดผิดพลาด</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="modal-footer bg-light" style="border-bottom-left-radius:18px; border-bottom-right-radius:18px;">
+                    <button type="button" class="btn btn-secondary px-3" data-bs-dismiss="modal">ยกเลิก</button>
+                    <button type="submit" class="btn btn-teal text-white fw-bold px-4" style="background:#0d9488;">
+                        <i class="bi bi-check-circle me-1"></i> บันทึกสต็อก
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        let stockCurrentPage = 1;
+        let stockPageSize = 5;
+        let stockCurrentFilter = 'ALL';
+        let stockSearchKeyword = '';
+
+        function openUpdateStockModal(id, name, qty, unit) {
+            document.getElementById('modalStockProductId').value = id;
+            document.getElementById('modalStockProductName').innerText = name;
+            document.getElementById('modalNewStockQty').value = qty;
+            document.getElementById('modalStockUnit').innerText = unit;
+            new bootstrap.Modal(document.getElementById('updateStockModal')).show();
+        }
+
+        function getFilteredStockRows() {
+            const allRows = Array.from(document.querySelectorAll('.stock-row'));
+            return allRows.filter(row => {
+                const rowType = row.getAttribute('data-type');
+                const matchFilter = (stockCurrentFilter === 'ALL' || rowType === stockCurrentFilter);
+                
+                let matchSearch = true;
+                if (stockSearchKeyword) {
+                    const text = row.innerText.toLowerCase();
+                    matchSearch = text.includes(stockSearchKeyword.toLowerCase());
+                }
+                return matchFilter && matchSearch;
+            });
+        }
+
+        function updateStockPagination() {
+            const filteredRows = getFilteredStockRows();
+            const totalItems = filteredRows.length;
+            const totalPages = Math.ceil(totalItems / stockPageSize) || 1;
+
+            if (stockCurrentPage > totalPages) stockCurrentPage = totalPages;
+            if (stockCurrentPage < 1) stockCurrentPage = 1;
+
+            const startIndex = (stockCurrentPage - 1) * stockPageSize;
+            const endIndex = Math.min(startIndex + stockPageSize, totalItems);
+
+            const allRows = document.querySelectorAll('.stock-row');
+            allRows.forEach(r => r.style.display = 'none');
+
+            for (let i = startIndex; i < endIndex; i++) {
+                if (filteredRows[i]) {
+                    filteredRows[i].style.display = '';
+                }
+            }
+
+            const emptyRow = document.getElementById('emptyStockRow');
+            if (emptyRow) {
+                emptyRow.style.display = totalItems === 0 ? '' : 'none';
+            }
+
+            const startEl = document.getElementById('stockPageStart');
+            const endEl = document.getElementById('stockPageEnd');
+            const totalEl = document.getElementById('stockPageTotal');
+            if (startEl) startEl.innerText = totalItems === 0 ? 0 : (startIndex + 1);
+            if (endEl) endEl.innerText = endIndex;
+            if (totalEl) totalEl.innerText = totalItems;
+
+            const paginationEl = document.getElementById('stockPaginationControls');
+            if (!paginationEl) return;
+            paginationEl.innerHTML = '';
+
+            // ปุ่มก่อนหน้า
+            const prevLi = document.createElement('li');
+            prevLi.className = `page-item ${stockCurrentPage === 1 ? 'disabled' : ''}`;
+            prevLi.innerHTML = `<button type="button" class="page-link" onclick="goToStockPage(${stockCurrentPage - 1})" ${stockCurrentPage === 1 ? 'disabled' : ''}><i class="bi bi-chevron-left me-1"></i>ก่อนหน้า</button>`;
+            paginationEl.appendChild(prevLi);
+
+            // หมายเลขหน้า
+            for (let p = 1; p <= totalPages; p++) {
+                const pageLi = document.createElement('li');
+                pageLi.className = `page-item ${p === stockCurrentPage ? 'active' : ''}`;
+                pageLi.innerHTML = `<button type="button" class="page-link" onclick="goToStockPage(${p})">${p}</button>`;
+                paginationEl.appendChild(pageLi);
+            }
+
+            // ปุ่มถัดไป
+            const nextLi = document.createElement('li');
+            nextLi.className = `page-item ${stockCurrentPage === totalPages || totalItems === 0 ? 'disabled' : ''}`;
+            nextLi.innerHTML = `<button type="button" class="page-link" onclick="goToStockPage(${stockCurrentPage + 1})" ${stockCurrentPage === totalPages || totalItems === 0 ? 'disabled' : ''}>ถัดไป <i class="bi bi-chevron-right ms-1"></i></button>`;
+            paginationEl.appendChild(nextLi);
+        }
+
+        function goToStockPage(page) {
+            stockCurrentPage = page;
+            updateStockPagination();
+        }
+
+        function changeStockPageSize(size) {
+            stockPageSize = parseInt(size, 10);
+            stockCurrentPage = 1;
+            updateStockPagination();
+        }
+
+        function filterStock(type, btn) {
+            document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            stockCurrentFilter = type;
+            stockCurrentPage = 1;
+            updateStockPagination();
+        }
+
+        function onSearchStock(keyword) {
+            stockSearchKeyword = keyword.trim();
+            stockCurrentPage = 1;
+            updateStockPagination();
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            updateStockPagination();
+        });
+    </script>
+}

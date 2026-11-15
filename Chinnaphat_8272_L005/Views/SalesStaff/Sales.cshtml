@@ -1,0 +1,683 @@
+@model List<Chinnaphat_8272_L005.Models.Product>
+
+@{
+    ViewData["Title"] = "หน้าขายสินค้าและอุปกรณ์ (POS หน้าร้าน)";
+    Layout = "_SalesStaffLayout";
+    var categories = ViewBag.Categories as List<Chinnaphat_8272_L005.Models.ProductCategory> ?? new();
+    var promotions = ViewBag.Promotions as List<Chinnaphat_8272_L005.Models.Promotion> ?? new();
+    string activeCat = ViewBag.ActiveCategory as string ?? "ALL";
+}
+
+<style>
+    .pos-card {
+        background: #fff;
+        border-radius: 16px;
+        border: 1px solid #e2e8f0;
+        transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+    .pos-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 24px rgba(15, 118, 110, 0.12);
+        border-color: #14b8a6;
+    }
+    .pos-card.out-of-stock {
+        opacity: 0.6;
+        background: #f8fafc;
+    }
+    .cat-pill-btn {
+        border-radius: 20px;
+        padding: 0.4rem 1rem;
+        font-size: 0.85rem;
+        font-weight: 600;
+        border: 1.5px solid #cbd5e1;
+        background: #fff;
+        color: #475569;
+        text-decoration: none;
+        transition: all 0.2s;
+        white-space: nowrap;
+    }
+    .cat-pill-btn:hover {
+        border-color: #0d9488;
+        color: #0f766e;
+        background: #f0fdfa;
+    }
+    .cat-pill-btn.active {
+        background: #0d9488;
+        border-color: #0d9488;
+        color: #fff;
+        box-shadow: 0 2px 8px rgba(13, 148, 136, 0.3);
+    }
+    .pos-cart-panel {
+        background: #fff;
+        border-radius: 18px;
+        border: 1px solid #cbd5e1;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+        position: sticky;
+        top: 85px;
+    }
+    .cart-item-row {
+        padding: 0.75rem;
+        border-radius: 12px;
+        background: #f8fafc;
+        border: 1px solid #f1f5f9;
+        margin-bottom: 0.5rem;
+        transition: all 0.2s;
+    }
+    .cart-item-row:hover {
+        background: #f1f5f9;
+    }
+    .qty-btn {
+        width: 28px;
+        height: 28px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 6px;
+    }
+</style>
+
+<!-- Alert messages -->
+@if (TempData["SuccessMessage"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show rounded-4 shadow-sm mb-4" role="alert">
+        <div class="d-flex align-items-center">
+            <i class="bi bi-check-circle-fill fs-4 me-3 text-success"></i>
+            <div>
+                <h6 class="fw-bold mb-0 text-success">ทำรายการสำเร็จ!</h6>
+                <div class="small">@TempData["SuccessMessage"]</div>
+                @if (TempData["LastReceiptCode"] != null)
+                {
+                    <div class="mt-2">
+                        <button type="button" class="btn btn-sm btn-outline-success" onclick="openReceiptModal()">
+                            <i class="bi bi-receipt me-1"></i> ดูใบเสร็จรับเงิน (@TempData["LastReceiptCode"])
+                        </button>
+                    </div>
+                }
+            </div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+@if (TempData["ErrorMessage"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show rounded-4 shadow-sm mb-4" role="alert">
+        <i class="bi bi-exclamation-triangle-fill me-2 fs-5"></i>
+        <strong>ข้อผิดพลาด:</strong> @TempData["ErrorMessage"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+<div class="row g-4">
+    <!-- ================= LEFT AREA: PRODUCT CATALOG ================= -->
+    <div class="col-lg-8">
+        <!-- Top Toolbar & Search -->
+        <div class="card border-0 shadow-sm p-3 mb-3 rounded-4 bg-white">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                <div>
+                    <h5 class="fw-bold mb-0 text-dark">
+                        <i class="bi bi-shop me-2 text-teal" style="color:#0d9488;"></i>รายการสินค้าและอุปกรณ์สำหรับขาย/เช่า
+                    </h5>
+                    <small class="text-muted">คลิกเพื่อเลือกสินค้าลงบิล และคำนวณโปรโมชั่นอัตโนมัติ</small>
+                </div>
+                <div class="d-flex gap-2">
+                    <a asp-action="Stock" class="btn btn-outline-secondary btn-sm px-3 py-1" style="border-radius:8px;">
+                        <i class="bi bi-boxes me-1"></i> ดูตารางสต็อก
+                    </a>
+                </div>
+            </div>
+
+            <!-- Search input -->
+            <div class="input-group mb-3">
+                <span class="input-group-text bg-light border-end-0 text-muted"><i class="bi bi-search"></i></span>
+                <input type="text" id="posSearchInput" class="form-control border-start-0 bg-light"
+                       placeholder="ค้นหาชื่อสินค้า, ยี่ห้อ หรือ SKU..." onkeyup="filterCardsBySearch(this.value)" />
+            </div>
+
+            <!-- Category Pills -->
+            <div class="d-flex gap-2 overflow-auto pb-1">
+                <button type="button" class="cat-pill-btn @(activeCat == "ALL" ? "active" : "")" onclick="filterCardsByCategory('ALL', this)">
+                    ทั้งหมด (@Model.Count)
+                </button>
+                <button type="button" class="cat-pill-btn @(activeCat == "SALE" ? "active" : "")" onclick="filterCardsByCategory('SALE', this)">
+                    🛒 สินค้าขาย (@Model.Count(p => p.ProductType == "SALE"))
+                </button>
+                <button type="button" class="cat-pill-btn @(activeCat == "RENT" ? "active" : "")" onclick="filterCardsByCategory('RENT', this)">
+                    🏸 อุปกรณ์เช่า (@Model.Count(p => p.ProductType == "RENT"))
+                </button>
+                @foreach (var cat in categories)
+                {
+                    int cnt = Model.Count(p => p.CategoryId == cat.CategoryId);
+                    if (cnt > 0)
+                    {
+                        <button type="button" class="cat-pill-btn" onclick="filterCardsByCategory('@cat.CategoryId', this)">
+                            @cat.CategoryName (@cnt)
+                        </button>
+                    }
+                }
+            </div>
+        </div>
+
+        <!-- Product Cards Grid -->
+        <div class="row g-3" id="productCardsContainer">
+            @if (!Model.Any())
+            {
+                <div class="col-12 text-center py-5">
+                    <i class="bi bi-box mb-2" style="font-size:3rem; color:#cbd5e1;"></i>
+                    <h5 class="text-muted">ไม่พบรายการสินค้า</h5>
+                </div>
+            }
+            else
+            {
+                @foreach (var prod in Model)
+                {
+                    bool isSale = prod.ProductType == "SALE";
+                    bool isOutOfStock = prod.StockQty <= 0;
+
+                    <div class="col-sm-6 col-md-4 product-card-wrapper" data-type="@prod.ProductType" data-cat="@prod.CategoryId" data-title="@prod.ProductName.ToLower() @prod.Sku.ToLower()">
+                        <div class="pos-card p-3 @(isOutOfStock ? "out-of-stock" : "")">
+                            <div>
+                                <!-- Card Header: SKU & Type badge -->
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <span class="badge bg-light text-secondary border font-monospace" style="font-size:0.7rem;">
+                                        @prod.Sku
+                                    </span>
+                                    @if (isSale)
+                                    {
+                                        <span class="badge" style="background:#e0f2fe; color:#0369a1; font-size:0.72rem;">
+                                            <i class="bi bi-cart me-1"></i>ขาย
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge" style="background:#fef3c7; color:#b45309; font-size:0.72rem;">
+                                            <i class="bi bi-arrow-repeat me-1"></i>เช่า
+                                        </span>
+                                    }
+                                </div>
+
+                                <!-- Title & Category -->
+                                <h6 class="fw-bold text-dark mb-1" style="font-size:0.95rem; line-height:1.3;">
+                                    @prod.ProductName
+                                </h6>
+                                <small class="text-muted d-block mb-2" style="font-size:0.78rem;">
+                                    <i class="bi bi-tag me-1"></i>@(prod.Category?.CategoryName ?? "-")
+                                </small>
+                            </div>
+
+                            <div>
+                                <!-- Price & Deposit info -->
+                                <div class="d-flex justify-content-between align-items-baseline mb-2">
+                                    <div>
+                                        <span class="fw-bold fs-5 text-success">@prod.Price.ToString("N0") ฿</span>
+                                        <small class="text-muted" style="font-size:0.75rem;">/ @prod.Unit</small>
+                                    </div>
+                                    @if (!isSale && prod.Deposit > 0)
+                                    {
+                                        <small class="text-warning fw-semibold" style="font-size:0.75rem;">
+                                            (มัดจำ @prod.Deposit.ToString("N0") ฿)
+                                        </small>
+                                    }
+                                </div>
+
+                                <!-- Stock status & Add Button -->
+                                <div class="d-flex justify-content-between align-items-center pt-2 border-top">
+                                    <small class="@(isOutOfStock ? "text-danger fw-bold" : (prod.StockQty <= 5 ? "text-warning fw-bold" : "text-muted"))" style="font-size:0.75rem;">
+                                        <i class="bi bi-boxes me-1"></i>คงเหลือ @prod.StockQty @prod.Unit
+                                    </small>
+
+                                    @if (isOutOfStock)
+                                    {
+                                        <button type="button" class="btn btn-sm btn-secondary disabled" style="border-radius:8px; font-size:0.8rem;">
+                                            หมด
+                                        </button>
+                                    }
+                                    else
+                                    {
+                                        <button type="button" class="btn btn-sm btn-teal text-white fw-bold shadow-sm"
+                                                style="background:#0d9488; border-radius:8px; font-size:0.82rem; padding:0.25rem 0.75rem;"
+                                                onclick="addToCart({
+                                                    id: @prod.ProductId,
+                                                    name: '@Html.Raw(prod.ProductName.Replace("'", "\\'"))',
+                                                    type: '@prod.ProductType',
+                                                    price: @prod.Price,
+                                                    deposit: @prod.Deposit,
+                                                    unit: '@Html.Raw(prod.Unit)',
+                                                    stock: @prod.StockQty
+                                                })">
+                                            <i class="bi bi-plus-lg me-1"></i>เลือก
+                                        </button>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            }
+        </div>
+    </div>
+
+    <!-- ================= RIGHT AREA: POS BILL / CART ================= -->
+    <div class="col-lg-4">
+        <div class="pos-cart-panel p-3">
+            <!-- Header -->
+            <div class="d-flex justify-content-between align-items-center pb-2 mb-3 border-bottom">
+                <div>
+                    <h5 class="fw-bold mb-0 text-dark">
+                        <i class="bi bi-receipt-cutoff me-2 text-success"></i>บิลขายหน้าร้าน
+                    </h5>
+                    <small class="text-muted">รายการสินค้าและอุปกรณ์ที่เลือก</small>
+                </div>
+                <button type="button" class="btn btn-outline-danger btn-sm" onclick="clearCart()" title="ล้างบิล">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </div>
+
+            <!-- Form for Checkout -->
+            <form asp-action="Checkout" asp-controller="SalesStaff" method="post" id="posCheckoutForm">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="itemsJson" id="hiddenItemsJson" value="[]" />
+                <input type="hidden" name="subtotal" id="hiddenSubtotal" value="0" />
+                <input type="hidden" name="discount" id="hiddenDiscount" value="0" />
+                <input type="hidden" name="netTotal" id="hiddenNetTotal" value="0" />
+                <input type="hidden" name="appliedPromo" id="hiddenAppliedPromo" value="" />
+
+                <!-- Customer Details -->
+                <div class="mb-3">
+                    <label class="form-label fw-semibold small mb-1">ข้อมูลลูกค้า (ไม่บังคับ):</label>
+                    <div class="row g-2">
+                        <div class="col-7">
+                            <input type="text" name="customerName" id="posCustomerName" class="form-control form-control-sm" placeholder="ชื่อลูกค้า (Walk-in)" />
+                        </div>
+                        <div class="col-5">
+                            <input type="text" name="customerPhone" class="form-control form-control-sm" placeholder="เบอร์โทร" />
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Cart Items Container -->
+                <label class="form-label fw-semibold small mb-1">รายการในบิล (<span id="cartCountBadge">0</span>):</label>
+                <div id="cartItemsContainer" style="max-height: 280px; overflow-y: auto;" class="mb-3">
+                    <!-- Empty State -->
+                    <div class="text-center py-4 text-muted" id="emptyCartNotice">
+                        <i class="bi bi-basket3 mb-2" style="font-size:2.2rem; color:#cbd5e1;"></i>
+                        <div class="small">ยังไม่มีสินค้าในบิล</div>
+                        <small class="text-muted">คลิกปุ่ม "+ เลือก" บนการ์ดสินค้าเพื่อเพิ่มลงบิล</small>
+                    </div>
+                </div>
+
+                <!-- Promotions Alert Box -->
+                <div class="alert alert-info py-2 px-3 mb-3 small d-none" id="promoAppliedAlert" style="border-radius:10px;">
+                    <div class="d-flex align-items-center">
+                        <i class="bi bi-stars fs-5 me-2 text-primary"></i>
+                        <div>
+                            <strong class="d-block text-primary" id="promoNameText">โปรโมชั่นที่ได้รับ:</strong>
+                            <span id="promoDetailText">ลดทันที</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Subtotal / Summary -->
+                <div class="p-3 bg-light rounded-3 mb-3 border">
+                    <div class="d-flex justify-content-between mb-1 small">
+                        <span class="text-muted">ยอดรวมสินค้า:</span>
+                        <strong class="text-dark" id="posSubtotalText">0 ฿</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-1 small text-success" id="posDiscountRow" style="display:none !important;">
+                        <span>ส่วนลดโปรโมชั่น:</span>
+                        <strong id="posDiscountText">-0 ฿</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-1 small text-warning" id="posDepositRow" style="display:none !important;">
+                        <span>ค่ามัดจำอุปกรณ์เช่า:</span>
+                        <strong id="posDepositText">+0 ฿</strong>
+                    </div>
+                    <hr class="my-2">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="fw-bold fs-6">ยอดสุทธิ:</span>
+                        <span class="fw-bold fs-3 text-teal" style="color:#0d9488;" id="posNetTotalText">0 ฿</span>
+                    </div>
+                </div>
+
+                <!-- Payment Method -->
+                <div class="mb-3">
+                    <label class="form-label fw-semibold small mb-1">ช่องทางชำระเงิน:</label>
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <input type="radio" class="btn-check" name="paymentMethod" id="payCash" value="CASH" checked>
+                            <label class="btn btn-outline-success w-100 btn-sm py-2" for="payCash">
+                                <i class="bi bi-cash-coin me-1"></i> เงินสด (Cash)
+                            </label>
+                        </div>
+                        <div class="col-6">
+                            <input type="radio" class="btn-check" name="paymentMethod" id="payQr" value="QR">
+                            <label class="btn btn-outline-primary w-100 btn-sm py-2" for="payQr">
+                                <i class="bi bi-qr-code-scan me-1"></i> โอนเงิน QR
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Submit Button -->
+                <button type="submit" class="btn btn-success w-100 py-3 fw-bold shadow-sm" id="btnCheckout"
+                        style="border-radius:12px; background:linear-gradient(135deg, #0f766e, #0d9488); border:none;" disabled>
+                    <i class="bi bi-check2-circle me-1"></i> ยืนยันการขาย & ตัดสต็อก
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================
+     RECEIPT MODAL (แสดงใบเสร็จหลังชำระเงินสำเร็จ)
+     ============================================================ -->
+<div class="modal fade" id="receiptModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content" style="border-radius:18px; border:none; box-shadow:0 20px 60px rgba(0,0,0,0.2);">
+            <div class="modal-header bg-success text-white" style="border-top-left-radius:18px; border-top-right-radius:18px;">
+                <h6 class="modal-title fw-bold">
+                    <i class="bi bi-receipt me-1"></i> ใบเสร็จรับเงินหน้าร้าน
+                </h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4 text-center">
+                <div class="mb-2">
+                    <i class="bi bi-check-circle-fill text-success" style="font-size:3rem;"></i>
+                </div>
+                <h5 class="fw-bold mb-1">CourtBook Arena</h5>
+                <small class="text-muted d-block mb-3">สาขาพญาไท &bull; ฝ่ายซื้อ-เช่าอุปกรณ์</small>
+
+                <div class="p-3 bg-light rounded-3 text-start mb-3 small font-monospace">
+                    <div class="d-flex justify-content-between mb-1">
+                        <span>เลขที่บิล:</span>
+                        <strong>@TempData["LastReceiptCode"]</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-1">
+                        <span>ลูกค้า:</span>
+                        <span>@TempData["LastCustomerName"]</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-1">
+                        <span>ชำระโดย:</span>
+                        <span>@TempData["LastPaymentMethod"]</span>
+                    </div>
+                    <hr class="my-2">
+                    <div class="mb-1 text-muted" style="font-size:0.75rem;">
+                        @TempData["LastSummary"]
+                    </div>
+                    <hr class="my-2">
+                    <div class="d-flex justify-content-between fw-bold fs-6 text-dark">
+                        <span>ยอดชำระ:</span>
+                        <span class="text-success">@TempData["LastNetTotal"] ฿</span>
+                    </div>
+                </div>
+
+                <div class="d-flex gap-2 justify-content-center">
+                    <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">ปิด</button>
+                    <button type="button" class="btn btn-outline-success btn-sm px-3" onclick="window.print()">
+                        <i class="bi bi-printer me-1"></i> พิมพ์
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // In-memory POS Cart
+        let posCart = [];
+
+        // Active Promotions from DB
+        const systemPromotions = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+            promotions.Select(p => new {
+                code = p.PromoCode,
+                name = p.PromoName,
+                type = p.PromoType,
+                discount = p.DiscountValue,
+                discountType = p.DiscountType,
+                minBill = p.MinBillAmount ?? 0
+            })
+        ));
+
+        // Add to Cart
+        function addToCart(product) {
+            const existing = posCart.find(i => i.id === product.id);
+            if (existing) {
+                if (existing.qty < product.stock) {
+                    existing.qty += 1;
+                } else {
+                    alert(`ไม่สามารถเพิ่มได้ สินค้าคงเหลือในสต็อกมีเพียง ${product.stock} ${product.unit}`);
+                }
+            } else {
+                posCart.push({
+                    id: product.id,
+                    name: product.name,
+                    type: product.type,
+                    price: product.price,
+                    deposit: product.deposit || 0,
+                    unit: product.unit,
+                    stock: product.stock,
+                    qty: 1
+                });
+            }
+            renderCart();
+        }
+
+        // Adjust quantity
+        function changeQty(productId, delta) {
+            const item = posCart.find(i => i.id === productId);
+            if (!item) return;
+
+            item.qty += delta;
+            if (item.qty <= 0) {
+                posCart = posCart.filter(i => i.id !== productId);
+            } else if (item.qty > item.stock) {
+                item.qty = item.stock;
+                alert(`สินค้าคงเหลือสูงสุดคือ ${item.stock} ${item.unit}`);
+            }
+            renderCart();
+        }
+
+        // Remove from cart
+        function removeFromCart(productId) {
+            posCart = posCart.filter(i => i.id !== productId);
+            renderCart();
+        }
+
+        // Clear all
+        function clearCart() {
+            posCart = [];
+            renderCart();
+        }
+
+        // Render Cart & Calculate Promotions
+        function renderCart() {
+            const container = document.getElementById('cartItemsContainer');
+            const countBadge = document.getElementById('cartCountBadge');
+            const emptyNotice = document.getElementById('emptyCartNotice');
+            const btnCheckout = document.getElementById('btnCheckout');
+
+            const totalItemCount = posCart.reduce((sum, i) => sum + i.qty, 0);
+            countBadge.innerText = totalItemCount;
+
+            if (posCart.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-4 text-muted" id="emptyCartNotice">
+                        <i class="bi bi-basket3 mb-2" style="font-size:2.2rem; color:#cbd5e1;"></i>
+                        <div class="small">ยังไม่มีสินค้าในบิล</div>
+                        <small class="text-muted">คลิกปุ่ม "+ เลือก" บนการ์ดสินค้าเพื่อเพิ่มลงบิล</small>
+                    </div>
+                `;
+                btnCheckout.disabled = true;
+                updateSummary(0, 0, 0, null);
+                return;
+            }
+
+            btnCheckout.disabled = false;
+            let html = '';
+            let subtotal = 0;
+            let totalDeposit = 0;
+
+            posCart.forEach(item => {
+                const lineTotal = item.price * item.qty;
+                subtotal += lineTotal;
+                if (item.type === 'RENT') {
+                    totalDeposit += (item.deposit * item.qty);
+                }
+
+                html += `
+                    <div class="cart-item-row">
+                        <div class="d-flex justify-content-between align-items-start mb-1">
+                            <div>
+                                <span class="badge ${item.type === 'RENT' ? 'bg-warning text-dark' : 'bg-primary'} me-1" style="font-size:0.65rem;">
+                                    ${item.type === 'RENT' ? 'เช่า' : 'ขาย'}
+                                </span>
+                                <strong class="small text-dark">${item.name}</strong>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-link text-danger p-0" onclick="removeFromCart(${item.id})">
+                                <i class="bi bi-x"></i>
+                            </button>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="text-muted" style="font-size:0.8rem;">${item.price.toLocaleString()} ฿ x ${item.qty} ${item.unit}</span>
+                            <div class="d-flex align-items-center gap-1">
+                                <button type="button" class="btn btn-sm btn-outline-secondary qty-btn" onclick="changeQty(${item.id}, -1)">-</button>
+                                <span class="fw-bold px-2 small">${item.qty}</span>
+                                <button type="button" class="btn btn-sm btn-outline-secondary qty-btn" onclick="changeQty(${item.id}, 1)">+</button>
+                                <strong class="text-success ms-2 small">${lineTotal.toLocaleString()} ฿</strong>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+
+            // ================= PROMOTION CALCULATION =================
+            let calculatedDiscount = 0;
+            let appliedPromoInfo = null;
+
+            // 1. ตรวจสอบโปรฯ ลูกแบดหลอดที่ 2 ลด 50%
+            const shuttleItems = posCart.filter(i => i.type === 'SALE' && i.name.includes('ลูกแบด'));
+            const totalShuttles = shuttleItems.reduce((s, i) => s + i.qty, 0);
+            if (totalShuttles >= 2 && shuttleItems.length > 0) {
+                const unitPrice = shuttleItems[0].price;
+                const discountPairs = Math.floor(totalShuttles / 2);
+                calculatedDiscount += (unitPrice * 0.5 * discountPairs);
+                appliedPromoInfo = `โปรฯ ซื้อลูกแบด ${totalShuttles} หลอด ลดหลอดที่ 2 50% (-${calculatedDiscount.toLocaleString()} ฿)`;
+            }
+
+            // 2. ตรวจสอบโปรฯ เช่าเซ็ต ไม้ 2 + รองเท้า 2 ลด 20%
+            const racketItems = posCart.filter(i => i.type === 'RENT' && i.name.includes('ไม้แบด'));
+            const shoesItems = posCart.filter(i => i.type === 'RENT' && i.name.includes('รองเท้า'));
+            const totalRackets = racketItems.reduce((s, i) => s + i.qty, 0);
+            const totalShoes = shoesItems.reduce((s, i) => s + i.qty, 0);
+
+            if (totalRackets >= 2 && totalShoes >= 2) {
+                const setDiscount = ((totalRackets * 70) + (totalShoes * 50)) * 0.20;
+                calculatedDiscount += setDiscount;
+                appliedPromoInfo = (appliedPromoInfo ? appliedPromoInfo + " + " : "") + `โปรฯ เช่าเซ็ตไม้+รองเท้า ลด 20%`;
+            }
+
+            updateSummary(subtotal, calculatedDiscount, totalDeposit, appliedPromoInfo);
+        }
+
+        function updateSummary(subtotal, discount, deposit, promoInfo) {
+            const netTotal = Math.max(0, subtotal - discount + deposit);
+
+            document.getElementById('posSubtotalText').innerText = `${subtotal.toLocaleString()} ฿`;
+            document.getElementById('posNetTotalText').innerText = `${netTotal.toLocaleString()} ฿`;
+
+            // Hidden form fields
+            document.getElementById('hiddenSubtotal').value = subtotal;
+            document.getElementById('hiddenDiscount').value = discount;
+            document.getElementById('hiddenNetTotal').value = netTotal;
+            document.getElementById('hiddenAppliedPromo').value = promoInfo || '';
+
+            // Format items to JSON
+            const exportItems = posCart.map(i => ({
+                ProductId: i.id,
+                ProductName: i.name,
+                ProductType: i.type,
+                Price: i.price,
+                Deposit: i.deposit,
+                Qty: i.qty,
+                Unit: i.unit
+            }));
+            document.getElementById('hiddenItemsJson').value = JSON.stringify(exportItems);
+
+            // Discount Row
+            const discountRow = document.getElementById('posDiscountRow');
+            if (discount > 0) {
+                discountRow.style.setProperty('display', 'flex', 'important');
+                document.getElementById('posDiscountText').innerText = `-${discount.toLocaleString()} ฿`;
+            } else {
+                discountRow.style.setProperty('display', 'none', 'important');
+            }
+
+            // Deposit Row
+            const depositRow = document.getElementById('posDepositRow');
+            if (deposit > 0) {
+                depositRow.style.setProperty('display', 'flex', 'important');
+                document.getElementById('posDepositText').innerText = `+${deposit.toLocaleString()} ฿`;
+            } else {
+                depositRow.style.setProperty('display', 'none', 'important');
+            }
+
+            // Promo Banner
+            const promoBox = document.getElementById('promoAppliedAlert');
+            if (promoInfo) {
+                promoBox.classList.remove('d-none');
+                document.getElementById('promoDetailText').innerText = promoInfo;
+            } else {
+                promoBox.classList.add('d-none');
+            }
+        }
+
+        // Filter cards by category
+        function filterCardsByCategory(cat, btn) {
+            document.querySelectorAll('.cat-pill-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+
+            const cards = document.querySelectorAll('.product-card-wrapper');
+            cards.forEach(card => {
+                const type = card.getAttribute('data-type');
+                const cId = card.getAttribute('data-cat');
+                if (cat === 'ALL' || type === cat || cId === cat) {
+                    card.style.display = '';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        }
+
+        // Filter cards by search keyword
+        function filterCardsBySearch(query) {
+            const q = query.trim().toLowerCase();
+            const cards = document.querySelectorAll('.product-card-wrapper');
+            cards.forEach(card => {
+                const title = card.getAttribute('data-title');
+                if (!q || title.includes(q)) {
+                    card.style.display = '';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        }
+
+        function openReceiptModal() {
+            new bootstrap.Modal(document.getElementById('receiptModal')).show();
+        }
+
+        // Auto open receipt if just checked out
+        window.addEventListener('DOMContentLoaded', () => {
+            @if (TempData["LastReceiptCode"] != null)
+            {
+                <text>openReceiptModal();</text>
+            }
+        });
+    </script>
+}

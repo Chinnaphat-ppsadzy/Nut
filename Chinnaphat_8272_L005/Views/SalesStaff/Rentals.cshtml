@@ -1,0 +1,211 @@
+@model List<Chinnaphat_8272_L005.Models.Product>
+
+@{
+    ViewData["Title"] = "ตรวจรับคืนและจัดการอุปกรณ์เช่า";
+    Layout = "_SalesStaffLayout";
+    var damages = ViewBag.Damages as List<Chinnaphat_8272_L005.Models.EquipmentDamage> ?? new();
+}
+
+<style>
+    .rent-header-card {
+        background: linear-gradient(135deg, #0284c7 0%, #0369a1 55%, #075985 100%);
+        border-radius: 16px;
+        padding: 1.6rem 2rem;
+        color: white;
+        margin-bottom: 1.5rem;
+    }
+</style>
+
+<!-- Alert messages -->
+@if (TempData["SuccessMessage"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show rounded-3 shadow-sm mb-4" role="alert">
+        <i class="bi bi-check-circle-fill me-2 fs-5"></i>
+        <strong>สำเร็จ:</strong> @TempData["SuccessMessage"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+@if (TempData["ErrorMessage"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show rounded-3 shadow-sm mb-4" role="alert">
+        <i class="bi bi-exclamation-triangle-fill me-2 fs-5"></i>
+        <strong>ข้อผิดพลาด:</strong> @TempData["ErrorMessage"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+<div class="rent-header-card">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+        <div>
+            <div class="d-flex align-items-center gap-2 mb-1">
+                <span class="badge bg-warning text-dark font-monospace fw-bold">SALES & RENTAL STAFF</span>
+                <span class="badge" style="background:rgba(255,255,255,0.2); color:#fff;">
+                    ตรวจรับคืน & บันทึกชำรุด
+                </span>
+            </div>
+            <h3 class="fw-bold mb-1">
+                <i class="bi bi-arrow-repeat me-2"></i>ตรวจรับคืนอุปกรณ์เช่า และบันทึกความเสียหาย
+            </h3>
+            <p class="mb-0 opacity-75 small">
+                ฝ่ายซื้อ-เช่าอุปกรณ์มีหน้าที่ตรวจสอบสภาพอุปกรณ์เช่า (ไม้แบด, รองเท้า) เมื่อลูกค้าส่งคืน หากชำรุดสามารถกดบันทึกเพื่อส่งให้ฝ่ายบัญชีคิดค่าปรับ
+            </p>
+        </div>
+        <div class="d-flex gap-2">
+            <a asp-action="Sales" class="btn btn-warning fw-bold text-dark px-3 py-2 shadow-sm" style="border-radius:10px;">
+                <i class="bi bi-cart3 me-1"></i> ไปหน้าขายสินค้า
+            </a>
+            <a asp-action="Stock" class="btn btn-light fw-semibold px-3 py-2" style="border-radius:10px;">
+                <i class="bi bi-boxes me-1"></i> สต็อกสินค้า
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Rental Equipment List -->
+    <div class="col-lg-7">
+        <div class="card border-0 shadow-sm rounded-4 p-3 bg-white">
+            <h5 class="fw-bold text-dark mb-3">
+                <i class="bi bi-collection text-primary me-2"></i>รายการอุปกรณ์เช่าในระบบ (@Model.Count รายการ)
+            </h5>
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>SKU</th>
+                            <th>อุปกรณ์เช่า</th>
+                            <th>ค่าเช่า</th>
+                            <th>มัดจำ</th>
+                            <th>คงเหลือ</th>
+                            <th class="text-center">แจ้งชำรุด</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var prod in Model)
+                        {
+                            <tr>
+                                <td><span class="badge bg-light text-dark border font-monospace">@prod.Sku</span></td>
+                                <td>
+                                    <div class="fw-bold">@prod.ProductName</div>
+                                    <small class="text-muted">@(prod.Category?.CategoryName ?? "-")</small>
+                                </td>
+                                <td><span class="fw-bold text-success">@prod.Price.ToString("N0") ฿</span></td>
+                                <td><span class="fw-semibold text-warning">@prod.Deposit.ToString("N0") ฿</span></td>
+                                <td><span class="badge bg-light text-dark border">@prod.StockQty @prod.Unit</span></td>
+                                <td class="text-center">
+                                    <button type="button" class="btn btn-outline-danger btn-sm px-2 py-1" style="border-radius:8px;"
+                                            onclick="openDamageModal(@prod.ProductId, '@Html.Raw(prod.ProductName.Replace("'", "\\'"))')">
+                                        <i class="bi bi-exclamation-triangle me-1"></i>แจ้งชำรุด
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reported Damages History -->
+    <div class="col-lg-5">
+        <div class="card border-0 shadow-sm rounded-4 p-3 bg-white">
+            <h5 class="fw-bold text-dark mb-3">
+                <i class="bi bi-clipboard-x text-danger me-2"></i>ประวัติแจ้งอุปกรณ์ชำรุดล่าสุด
+            </h5>
+
+            @if (!damages.Any())
+            {
+                <div class="text-center py-5 text-muted">
+                    <i class="bi bi-shield-check mb-2" style="font-size:2.5rem; color:#86efac;"></i>
+                    <div class="small fw-semibold">ไม่มีรายการอุปกรณ์ชำรุดค้างอยู่ในระบบ</div>
+                    <small class="text-muted">อุปกรณ์ทั้งหมดอยู่ในสภาพสมบูรณ์</small>
+                </div>
+            }
+            else
+            {
+                <div class="d-flex flex-column gap-2" style="max-height: 480px; overflow-y: auto;">
+                    @foreach (var dmg in damages)
+                    {
+                        <div class="p-3 bg-light rounded-3 border">
+                            <div class="d-flex justify-content-between align-items-start mb-1">
+                                <span class="badge bg-danger bg-opacity-10 text-danger border border-danger small">
+                                    <i class="bi bi-exclamation-circle me-1"></i>แจ้งความเสียหาย
+                                </span>
+                                <small class="text-muted">@dmg.CreatedAt.ToString("dd/MM/yyyy HH:mm")</small>
+                            </div>
+                            <div class="fw-bold text-dark small mb-1">@dmg.Description</div>
+                            <div class="d-flex justify-content-between align-items-center mt-2 pt-1 border-top">
+                                <small class="text-muted">ส่งเรื่องให้ฝ่ายบัญชีคิดค่าปรับ</small>
+                                <strong class="text-danger">ค่าปรับ: @dmg.FineAmount.ToString("N0") ฿</strong>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<!-- Modal: แจ้งความเสียหายของอุปกรณ์ -->
+<div class="modal fade" id="damageModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius:18px; border:none; box-shadow:0 20px 50px rgba(0,0,0,0.2);">
+            <form asp-action="ReportDamage" asp-controller="SalesStaff" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="productId" id="dmgProductId" />
+                <input type="hidden" name="equipmentName" id="dmgEquipmentName" />
+
+                <div class="modal-header bg-danger text-white" style="border-top-left-radius:18px; border-top-right-radius:18px;">
+                    <h5 class="modal-title fw-bold">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>บันทึกความเสียหายอุปกรณ์เช่า
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label text-muted small mb-1">อุปกรณ์ที่ชำรุด:</label>
+                        <h6 class="fw-bold text-dark" id="displayDmgName">-</h6>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold small">ชื่อลูกค้าผู้เช่า: <span class="text-danger">*</span></label>
+                        <input type="text" name="customerName" class="form-control" placeholder="เช่น คุณสมศักดิ์ (คอร์ท 2)" required />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold small">ลักษณะความเสียหาย: <span class="text-danger">*</span></label>
+                        <textarea name="description" class="form-control" rows="3" placeholder="เช่น ก้านไม้แบดหัก, เอ็นขาด, พื้นรองเท้าฉีกขาด..." required></textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold small">ประมาณการค่าปรับ (บาท):</label>
+                        <div class="input-group">
+                            <span class="input-group-text">฿</span>
+                            <input type="number" step="50" min="0" name="estimatedFine" class="form-control fw-bold text-danger" placeholder="200" value="200" />
+                        </div>
+                        <small class="text-muted">ฝ่ายบัญชีจะนำยอดนี้ไปเรียกเก็บหรือหักจากเงินมัดจำของลูกค้า</small>
+                    </div>
+                </div>
+
+                <div class="modal-footer bg-light" style="border-bottom-left-radius:18px; border-bottom-right-radius:18px;">
+                    <button type="button" class="btn btn-secondary px-3" data-bs-dismiss="modal">ยกเลิก</button>
+                    <button type="submit" class="btn btn-danger fw-bold px-4">
+                        <i class="bi bi-check-circle me-1"></i> ยืนยันแจ้งชำรุด
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function openDamageModal(id, name) {
+            document.getElementById('dmgProductId').value = id;
+            document.getElementById('dmgEquipmentName').value = name;
+            document.getElementById('displayDmgName').innerText = name;
+            new bootstrap.Modal(document.getElementById('damageModal')).show();
+        }
+    </script>
+}

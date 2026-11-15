@@ -1,6 +1,17 @@
 <!DOCTYPE html>
 <html lang="th">
 
+@{
+    string? userId = Context.Session.GetString("UserId") ?? Context.Request.Cookies["cb_user_id"];
+    string? rawName = Context.Session.GetString("FullName") ?? Context.Request.Cookies["cb_user_name"];
+    string? fullName = !string.IsNullOrEmpty(rawName) ? System.Net.WebUtility.UrlDecode(rawName) : null;
+    string? userEmail = Context.Session.GetString("Email") ?? Context.Request.Cookies["cb_email"];
+    string? rawRole = Context.Session.GetString("RoleName") ?? Context.Request.Cookies["cb_role_name"] ?? "สมาชิก";
+    string? roleName = !string.IsNullOrEmpty(rawRole) ? System.Net.WebUtility.UrlDecode(rawRole) : "สมาชิก";
+    string? roleCode = Context.Session.GetString("RoleCode") ?? Context.Request.Cookies["cb_role_code"];
+    bool isLoggedIn = !string.IsNullOrEmpty(userId);
+}
+
 <head>
 
     <meta charset="utf-8" />
@@ -26,12 +37,14 @@
 
     <style>
         * { font-family: 'Sarabun', sans-serif; }
+        html { scroll-behavior: smooth; }
         body { font-size: 1rem; }
         h1, h2, h3, h4, h5, h6 { font-family: 'Sarabun', sans-serif; font-weight: 700; }
         .navbar, .btn, .form-control, .form-select, .badge, .alert, .table {
             font-family: 'Sarabun', sans-serif;
         }
         small, .small { font-size: 0.85rem; }
+        .scroll-mt-4 { scroll-margin-top: 2rem; }
     </style>
 
 </head>
@@ -74,30 +87,46 @@
                 <!-- Menu -->
 
                 <div class="text-secondary small fw-bold mb-3">
-                    <i class="bi bi-person me-1 text-success"></i>เมนูสำหรับลูกค้า (Customer)
+                    <i class="bi bi-person me-1 text-success"></i>เมนูสำหรับลูกค้า
                 </div>
 
                 @{
                     string curAct = ViewContext.RouteData.Values["action"]?.ToString() ?? "";
                     string curCtrl = ViewContext.RouteData.Values["controller"]?.ToString() ?? "";
+                    string curSection = ViewBag.Section as string ?? "";
                 }
 
-                <!-- Dashboard / Home -->
-                <a asp-action="Customer" asp-controller="Home"
-                   class="btn @(curCtrl == "Home" && curAct == "Customer" ? "btn-success" : "btn-light") w-100 text-start mb-2">
+                <!-- หน้าหลัก (แสดงทุกส่วน) -->
+                <a href="/Home/Customer"
+                   class="btn @(curCtrl == "Home" && curAct == "Customer" && curSection == "" ? "btn-success" : "btn-light") w-100 text-start mb-2">
                     <i class="bi bi-house-door me-2"></i>
                     หน้าหลัก
                 </a>
 
                 <!-- จองสนาม -->
-                <a href="/Home/Customer#bookingSection"
-                   class="btn btn-light w-100 text-start mb-2">
+                <a href="/Home/Customer?section=booking"
+                   class="btn @(curSection == "booking" ? "btn-success" : "btn-light") w-100 text-start mb-2">
                     <i class="bi bi-calendar-plus me-2 text-success"></i>
                     จองสนามแบดมินตัน
                 </a>
 
+                <!-- ซื้ออุปกรณ์ / บริการเช่า -->
+                <a href="/Home/Customer?section=product"
+                   class="btn @(curSection == "product" ? "btn-success" : "btn-light") w-100 text-start mb-2">
+                    <i class="bi bi-bag-check me-2" style="color:#0d9488;"></i>
+                    ซื้ออุปกรณ์ & เช่าอุปกรณ์
+                </a>
+
+                <!-- ติดตามสถานะการจอง -->
+                <a href="/Home/Customer?section=tracking"
+                   class="btn @(curSection == "tracking" ? "btn-primary" : "btn-light") w-100 text-start mb-2">
+                    <i class="bi bi-clock-history me-2 text-primary"></i>
+                    ดูสถานะการจอง
+                </a>
+
                 <!-- โปรโมชั่น -->
-                <a href="javascript:void(0)" onclick="if(window.showPromoInfo){showPromoInfo();}else{window.location.href='/Home/Customer';}"
+                <a href="javascript:void(0)"
+                   onclick="if(typeof showPromoInfo==='function'){showPromoInfo();}else{window.location.href='/Home/Customer?showpromo=1';}"
                    class="btn btn-light w-100 text-start mb-2">
                     <i class="bi bi-ticket-perforated me-2 text-warning"></i>
                     ดูโปรโมชั่นที่ใช้ได้
@@ -110,26 +139,46 @@
                     <i class="bi bi-person-circle me-1 text-primary"></i>บัญชีผู้ใช้งาน
                 </div>
 
-                <!-- Login -->
-                <a asp-action="Login" asp-controller="User"
-                   class="btn btn-outline-success w-100 mb-2 text-start">
-                    <i class="bi bi-box-arrow-in-right me-2"></i>
-                    เข้าสู่ระบบ
-                </a>
+                @if (isLoggedIn)
+                {
+                    <div class="p-2 mb-3 bg-light rounded-3 border">
+                        <small class="text-muted d-block" style="font-size:0.75rem;">ยินดีต้อนรับ</small>
+                        <strong class="text-dark d-block text-truncate small">@fullName</strong>
+                        <span class="badge bg-success bg-opacity-10 text-success border border-success mt-1" style="font-size:0.7rem;">
+                            <i class="bi bi-shield-check me-1"></i>@roleName
+                        </span>
+                    </div>
 
-                <!-- Register -->
-                <a asp-action="Register" asp-controller="User"
-                   class="btn btn-success w-100 mb-3 text-start">
-                    <i class="bi bi-person-plus me-2"></i>
-                    สมัครสมาชิก
-                </a>
+                    <!-- Profile -->
+                    <a asp-action="Profile" asp-controller="User"
+                       class="btn @(curCtrl == "User" && curAct == "Profile" ? "btn-success" : "btn-outline-success") w-100 mb-2 text-start">
+                        <i class="bi bi-person-badge me-2"></i>
+                        โปรไฟล์ & ประวัติ
+                    </a>
 
-                <!-- Logout -->
-                <a asp-action="Login" asp-controller="User"
-                   class="btn btn-outline-danger w-100 mb-2 text-start">
-                    <i class="bi bi-box-arrow-right me-2"></i>
-                    ออกจากระบบ
-                </a>
+                    <!-- Logout -->
+                    <a asp-action="Logout" asp-controller="User"
+                       class="btn btn-outline-danger w-100 mb-2 text-start">
+                        <i class="bi bi-box-arrow-right me-2"></i>
+                        ออกจากระบบ
+                    </a>
+                }
+                else
+                {
+                    <!-- Login -->
+                    <a asp-action="Login" asp-controller="User"
+                       class="btn btn-outline-success w-100 mb-2 text-start">
+                        <i class="bi bi-box-arrow-in-right me-2"></i>
+                        เข้าสู่ระบบ
+                    </a>
+
+                    <!-- Register -->
+                    <a asp-action="Register" asp-controller="User"
+                       class="btn btn-success w-100 mb-3 text-start">
+                        <i class="bi bi-person-plus me-2"></i>
+                        สมัครสมาชิก
+                    </a>
+                }
 
             </aside>
 
@@ -152,13 +201,40 @@
                     </div>
 
                     <div class="d-flex align-items-center gap-3">
-                        <div class="d-flex align-items-center ps-2">
-                            <i class="bi bi-person-circle fs-4 text-success me-2"></i>
-                            <div>
-                                <div class="fw-semibold lh-1">Customer</div>
-                                <small class="text-muted" style="font-size:0.75rem;">ผู้ใช้งาน</small>
+                        @if (isLoggedIn)
+                        {
+                            <a asp-action="Profile" asp-controller="User" class="d-flex align-items-center text-decoration-none text-dark p-1 rounded-3" title="คลิกดูโปรไฟล์และประวัติการใช้งาน">
+                                <div class="rounded-circle bg-success text-white d-flex align-items-center justify-content-center fw-bold me-2 shadow-sm" style="width:36px; height:36px; font-size:1.05rem;">
+                                    @(fullName?.Length > 0 ? fullName.Substring(0, 1).ToUpper() : "U")
+                                </div>
+                                <div class="text-start">
+                                    <div class="fw-bold text-dark lh-1" style="font-size:0.92rem;">@fullName</div>
+                                    <small class="text-success fw-semibold" style="font-size:0.75rem;">
+                                        <i class="bi bi-shield-check me-1"></i>@roleName
+                                    </small>
+                                </div>
+                            </a>
+
+                            <a asp-action="Logout" asp-controller="User" class="btn btn-sm btn-outline-danger px-2" title="ออกจากระบบ" style="border-radius:8px;">
+                                <i class="bi bi-box-arrow-right me-1"></i><span class="d-none d-md-inline">ออกจากระบบ</span>
+                            </a>
+                        }
+                        else
+                        {
+                            <div class="d-flex align-items-center text-muted me-2">
+                                <i class="bi bi-person-circle fs-4 text-secondary me-2"></i>
+                                <div>
+                                    <div class="fw-semibold lh-1 text-dark" style="font-size:0.85rem;">ผู้เยี่ยมชม (Guest)</div>
+                                    <small class="text-muted" style="font-size:0.75rem;">ยังไม่ได้เข้าสู่ระบบ</small>
+                                </div>
                             </div>
-                        </div>
+                            <a asp-action="Login" asp-controller="User" class="btn btn-sm btn-outline-success fw-semibold" style="border-radius:8px;">
+                                <i class="bi bi-box-arrow-in-right me-1"></i> เข้าสู่ระบบ
+                            </a>
+                            <a asp-action="Register" asp-controller="User" class="btn btn-sm btn-success fw-semibold" style="border-radius:8px;">
+                                สมัครสมาชิก
+                            </a>
+                        }
                     </div>
 
                 </nav>

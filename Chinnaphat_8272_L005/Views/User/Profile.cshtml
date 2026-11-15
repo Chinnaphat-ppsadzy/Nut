@@ -1,0 +1,489 @@
+@model Chinnaphat_8272_L005.ViewModels.ProfileViewModel
+
+@{
+    ViewData["Title"] = "โปรไฟล์ของฉัน & ประวัติการใช้งาน";
+    Layout = "_CustomerLayout";
+}
+
+<style>
+    .profile-hero-card {
+        background: linear-gradient(135deg, #1a472a 0%, #2d6a4f 55%, #52b788 100%);
+        border-radius: 20px;
+        padding: 2.2rem;
+        color: white;
+        margin-bottom: 2rem;
+        box-shadow: 0 8px 30px rgba(45, 106, 79, 0.15);
+        position: relative;
+        overflow: hidden;
+    }
+    .profile-avatar-circle {
+        width: 84px;
+        height: 84px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.2);
+        backdrop-filter: blur(8px);
+        border: 3px solid rgba(255, 255, 255, 0.4);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2.6rem;
+        font-weight: 700;
+        color: #fff;
+    }
+    .metric-card {
+        background: #fff;
+        border-radius: 16px;
+        border: 1px solid #e2e8f0;
+        padding: 1.4rem;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.03);
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .metric-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 6px 20px rgba(0,0,0,0.06);
+    }
+    .nav-pills .nav-link {
+        border-radius: 12px;
+        font-weight: 600;
+        padding: 0.75rem 1.4rem;
+        color: #475569;
+        transition: all 0.2s;
+    }
+    .nav-pills .nav-link.active {
+        background: linear-gradient(135deg, #1a472a, #2d6a4f);
+        color: #fff;
+        box-shadow: 0 4px 12px rgba(26, 71, 42, 0.2);
+    }
+    .history-card {
+        background: #fff;
+        border-radius: 18px;
+        border: 1px solid #e2e8f0;
+        overflow: hidden;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+    }
+</style>
+
+<!-- Alert messages -->
+@if (TempData["SuccessMessage"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show rounded-3 shadow-sm mb-4" role="alert">
+        <i class="bi bi-check-circle-fill me-2 fs-5"></i>
+        <strong>สำเร็จ:</strong> @TempData["SuccessMessage"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+@if (TempData["ErrorMessage"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show rounded-3 shadow-sm mb-4" role="alert">
+        <i class="bi bi-exclamation-triangle-fill me-2 fs-5"></i>
+        <strong>ข้อผิดพลาด:</strong> @TempData["ErrorMessage"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+<!-- Profile Hero Banner -->
+<div class="profile-hero-card">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-4">
+        <div class="d-flex align-items-center gap-3">
+            <div class="profile-avatar-circle shadow-sm">
+                @(Model.FullName.Length > 0 ? Model.FullName.Substring(0, 1).ToUpper() : "U")
+            </div>
+            <div>
+                <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
+                    <h3 class="fw-bold mb-0">@Model.FullName</h3>
+                    <span class="badge bg-warning text-dark font-monospace fw-bold">
+                        <i class="bi bi-shield-check me-1"></i>@Model.RoleName
+                    </span>
+                    <span class="badge bg-white bg-opacity-25 text-white">
+                        <i class="bi bi-patch-check-fill me-1"></i>บัญชีใช้งานปกติ
+                    </span>
+                </div>
+                <div class="small opacity-90 d-flex gap-3 flex-wrap">
+                    <span><i class="bi bi-envelope me-1"></i>@Model.Email</span>
+                    <span><i class="bi bi-telephone me-1"></i>@Model.Phone</span>
+                    <span><i class="bi bi-calendar-event me-1"></i>สมาชิกตั้งแต่: @Model.CreatedAt.ToString("dd/MM/yyyy")</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="d-flex gap-2">
+            <button type="button" class="btn btn-light fw-bold text-success px-3 py-2 shadow-sm" style="border-radius:10px;" data-bs-toggle="modal" data-bs-target="#editProfileModal">
+                <i class="bi bi-pencil-square me-1"></i> แก้ไขข้อมูลส่วนตัว
+            </button>
+            <a asp-action="Customer" asp-controller="Home" class="btn btn-outline-light fw-semibold px-3 py-2" style="border-radius:10px;">
+                <i class="bi bi-calendar-plus me-1"></i> ไปจองสนาม
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Summary Metric Cards -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-lg-3">
+        <div class="metric-card">
+            <div class="d-flex align-items-center gap-3">
+                <div style="width:50px; height:50px; border-radius:14px; background:#f0fdf4; color:#16a34a; display:flex; align-items:center; justify-content:center; font-size:1.5rem;">
+                    <i class="bi bi-calendar-check-fill"></i>
+                </div>
+                <div>
+                    <h3 class="fw-bold mb-0 text-dark">@Model.TotalBookingsCount</h3>
+                    <small class="text-muted">การจองคอร์ททั้งหมด</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-6 col-lg-3">
+        <div class="metric-card">
+            <div class="d-flex align-items-center gap-3">
+                <div style="width:50px; height:50px; border-radius:14px; background:#eff6ff; color:#2563eb; display:flex; align-items:center; justify-content:center; font-size:1.5rem;">
+                    <i class="bi bi-cash-stack"></i>
+                </div>
+                <div>
+                    <h3 class="fw-bold mb-0 text-primary">@Model.TotalSpending.ToString("N0") ฿</h3>
+                    <small class="text-muted">ยอดค่าบริการสะสม</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-6 col-lg-3">
+        <div class="metric-card">
+            <div class="d-flex align-items-center gap-3">
+                <div style="width:50px; height:50px; border-radius:14px; background:#fef3c7; color:#d97706; display:flex; align-items:center; justify-content:center; font-size:1.5rem;">
+                    <i class="bi bi-bag-check-fill"></i>
+                </div>
+                <div>
+                    <h3 class="fw-bold mb-0 text-warning">@Model.TotalSaleItemsCount</h3>
+                    <small class="text-muted">สินค้าที่ซื้อ (ลูกแบด/น้ำ)</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-6 col-lg-3">
+        <div class="metric-card">
+            <div class="d-flex align-items-center gap-3">
+                <div style="width:50px; height:50px; border-radius:14px; background:#f0fdfa; color:#0d9488; display:flex; align-items:center; justify-content:center; font-size:1.5rem;">
+                    <i class="bi bi-boxes"></i>
+                </div>
+                <div>
+                    <h3 class="fw-bold mb-0 text-teal" style="color:#0d9488;">@Model.TotalRentalItemsCount</h3>
+                    <small class="text-muted">อุปกรณ์ที่เคยเช่า</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- History Nav Tabs -->
+<div class="card border-0 shadow-sm rounded-4 p-3 mb-4 bg-white">
+    <ul class="nav nav-pills gap-2 flex-wrap" id="historyTab" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="court-tab" data-bs-toggle="pill" data-bs-target="#tabCourtBookings" type="button" role="tab">
+                <i class="bi bi-calendar3 me-2"></i>ประวัติการจองคอร์ท (@Model.CourtBookings.Count)
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="purchase-tab" data-bs-toggle="pill" data-bs-target="#tabPurchases" type="button" role="tab">
+                <i class="bi bi-bag-check me-2"></i>ประวัติสั่งซื้อสินค้า (@Model.PurchaseHistory.Count)
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="rental-tab" data-bs-toggle="pill" data-bs-target="#tabRentals" type="button" role="tab">
+                <i class="bi bi-arrow-repeat me-2"></i>ประวัติการเช่าอุปกรณ์ (@Model.RentalHistory.Count)
+            </button>
+        </li>
+    </ul>
+</div>
+
+<!-- Tab Contents -->
+<div class="tab-content" id="historyTabContent">
+
+    <!-- TAB 1: ประวัติการจองคอร์ท -->
+    <div class="tab-pane fade show active" id="tabCourtBookings" role="tabpanel">
+        <div class="history-card">
+            <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
+                <h6 class="fw-bold mb-0 text-dark">
+                    <i class="bi bi-calendar-check text-success me-2"></i>รายการจองสนามแบดมินตันทั้งหมด
+                </h6>
+                <a href="/Home/Customer#bookingSection" class="btn btn-sm btn-outline-success" style="border-radius:8px;">
+                    <i class="bi bi-plus-circle me-1"></i> จองสนามใหม่
+                </a>
+            </div>
+
+            @if (Model.CourtBookings.Any())
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr class="small text-secondary">
+                                <th>รหัสการจอง</th>
+                                <th>วันที่เล่น</th>
+                                <th>คอร์ทที่จอง</th>
+                                <th>ช่วงเวลา</th>
+                                <th>ค่าคอร์ท</th>
+                                <th>ยอดชำระสุทธิ</th>
+                                <th>สถานะ</th>
+                                <th>สลิปโอนเงิน</th>
+                                <th class="text-end">ติดตาม</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var b in Model.CourtBookings)
+                            {
+                                <tr>
+                                    <td>
+                                        <strong class="font-monospace text-primary">@b.BookingCode</strong>
+                                        <small class="text-muted d-block" style="font-size:0.75rem;">@b.CreatedAt.ToString("dd/MM/yyyy HH:mm")</small>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-light text-dark border">
+                                            <i class="bi bi-calendar3 me-1"></i>@b.PlayDate
+                                        </span>
+                                    </td>
+                                    <td><strong>@b.CourtNames</strong></td>
+                                    <td><small class="text-muted">@b.TimeSlots</small></td>
+                                    <td>@b.CourtAmount.ToString("N0") ฿</td>
+                                    <td>
+                                        <strong class="text-success fs-6">@b.NetAmount.ToString("N0") ฿</strong>
+                                        @if (b.DiscountAmount > 0)
+                                        {
+                                            <small class="text-muted d-block" style="font-size:0.75rem;">(ลด @b.DiscountAmount.ToString("N0") ฿)</small>
+                                        }
+                                    </td>
+                                    <td>
+                                        <span class="badge @b.StatusBadgeClass px-2 py-1">@b.StatusText</span>
+                                    </td>
+                                    <td>
+                                        @if (!string.IsNullOrEmpty(b.SlipImageUrl))
+                                        {
+                                            <button type="button" class="btn btn-sm btn-outline-success py-1 px-2" style="border-radius:8px;" onclick="viewSlipModal('@b.SlipImageUrl', '@b.BookingCode')">
+                                                <i class="bi bi-image me-1"></i> ดูสลิป
+                                            </button>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-secondary bg-opacity-10 text-secondary">ไม่มีสลิป</span>
+                                        }
+                                    </td>
+                                    <td class="text-end">
+                                        <a href="/Home/Customer#myBookingsSection" class="btn btn-sm btn-light border px-2 py-1" style="border-radius:8px;">
+                                            <i class="bi bi-search me-1"></i> ติดตาม
+                                        </a>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <div class="p-5 text-center text-muted">
+                    <i class="bi bi-calendar-x" style="font-size:3rem;"></i>
+                    <p class="mt-2 mb-0">ยังไม่มีประวัติการจองคอร์ทในระบบ</p>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- TAB 2: ประวัติสั่งซื้อสินค้า -->
+    <div class="tab-pane fade" id="tabPurchases" role="tabpanel">
+        <div class="history-card">
+            <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
+                <h6 class="fw-bold mb-0 text-dark">
+                    <i class="bi bi-bag-check text-warning me-2"></i>รายการสั่งซื้อสินค้า (ลูกแบดมินตัน, เครื่องดื่ม, กริป)
+                </h6>
+                <a href="/Home/Customer#productSection" class="btn btn-sm btn-outline-warning text-dark" style="border-radius:8px;">
+                    <i class="bi bi-cart-plus me-1"></i> สั่งซื้อเพิ่ม
+                </a>
+            </div>
+
+            @if (Model.PurchaseHistory.Any())
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr class="small text-secondary">
+                                <th>รหัสบิล</th>
+                                <th>วันที่สั่ง</th>
+                                <th>สินค้า</th>
+                                <th>หมวดหมู่</th>
+                                <th class="text-center">จำนวน</th>
+                                <th>ราคาต่อหน่วย</th>
+                                <th>ยอดรวม</th>
+                                <th class="text-end">สถานะสินค้า</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var p in Model.PurchaseHistory)
+                            {
+                                <tr>
+                                    <td><strong class="font-monospace text-primary">@p.BookingCode</strong></td>
+                                    <td><small class="text-muted">@p.OrderDate.ToString("dd/MM/yyyy HH:mm")</small></td>
+                                    <td>
+                                        <strong>@p.ProductName</strong>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-light text-secondary border">@p.CategoryName</span>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge bg-secondary px-2 py-1">x @p.Quantity</span>
+                                    </td>
+                                    <td>@p.UnitPrice.ToString("N0") ฿</td>
+                                    <td><strong class="text-dark">@p.LineTotal.ToString("N0") ฿</strong></td>
+                                    <td class="text-end">
+                                        <span class="badge bg-success bg-opacity-10 text-success border border-success">
+                                            <i class="bi bi-check-circle me-1"></i>ส่งมอบสำเร็จ
+                                        </span>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <div class="p-5 text-center text-muted">
+                    <i class="bi bi-cart-x" style="font-size:3rem;"></i>
+                    <p class="mt-2 mb-0">ยังไม่มีรายการสั่งซื้อสินค้า</p>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- TAB 3: ประวัติการเช่าอุปกรณ์ -->
+    <div class="tab-pane fade" id="tabRentals" role="tabpanel">
+        <div class="history-card">
+            <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
+                <h6 class="fw-bold mb-0 text-dark">
+                    <i class="bi bi-arrow-repeat text-info me-2"></i>รายการเช่าอุปกรณ์ (ไม้แบดมินตัน, รองเท้ากีฬา)
+                </h6>
+                <a href="/Home/Customer#productSection" class="btn btn-sm btn-outline-info" style="border-radius:8px;">
+                    <i class="bi bi-box-seam me-1"></i> เช่าอุปกรณ์เพิ่ม
+                </a>
+            </div>
+
+            @if (Model.RentalHistory.Any())
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr class="small text-secondary">
+                                <th>รหัสบิล</th>
+                                <th>วันที่เช่า</th>
+                                <th>อุปกรณ์ที่เช่า</th>
+                                <th>หมวดหมู่</th>
+                                <th class="text-center">จำนวน</th>
+                                <th>ค่าเช่า</th>
+                                <th>ค่ามัดจำ</th>
+                                <th>ยอดรวม</th>
+                                <th class="text-end">สถานะการเช่า</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var r in Model.RentalHistory)
+                            {
+                                <tr>
+                                    <td><strong class="font-monospace text-primary">@r.BookingCode</strong></td>
+                                    <td><small class="text-muted">@r.RentalDate.ToString("dd/MM/yyyy HH:mm")</small></td>
+                                    <td>
+                                        <strong>@r.ProductName</strong>
+                                    </td>
+                                    <td><span class="badge bg-light text-secondary border">@r.CategoryName</span></td>
+                                    <td class="text-center">
+                                        <span class="badge bg-secondary px-2 py-1">x @r.Quantity</span>
+                                    </td>
+                                    <td>@r.UnitPrice.ToString("N0") ฿</td>
+                                    <td>
+                                        @if (r.Deposit > 0)
+                                        {
+                                            <span class="text-warning fw-semibold">@r.Deposit.ToString("N0") ฿</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">-</span>
+                                        }
+                                    </td>
+                                    <td><strong class="text-dark">@r.LineTotal.ToString("N0") ฿</strong></td>
+                                    <td class="text-end">
+                                        <span class="badge @r.ItemStatusBadgeClass px-2 py-1">@r.ItemStatusText</span>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <div class="p-5 text-center text-muted">
+                    <i class="bi bi-box" style="font-size:3rem;"></i>
+                    <p class="mt-2 mb-0">ยังไม่มีประวัติการเช่าอุปกรณ์</p>
+                </div>
+            }
+        </div>
+    </div>
+
+</div>
+
+<!-- Modal: แก้ไขข้อมูลส่วนตัว -->
+<div class="modal fade" id="editProfileModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius:18px;">
+            <form asp-action="UpdateProfile" asp-controller="User" method="post">
+                @Html.AntiForgeryToken()
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold"><i class="bi bi-pencil-square me-2 text-success"></i>แก้ไขข้อมูลส่วนตัว</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-muted">อีเมล (ใช้เป็นบัญชีผู้ใช้):</label>
+                        <input type="email" class="form-control bg-light" value="@Model.Email" readonly disabled />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-muted">ชื่อ-นามสกุล <span class="text-danger">*</span>:</label>
+                        <input type="text" name="fullName" class="form-control" value="@Model.FullName" required />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-muted">เบอร์โทรศัพท์ <span class="text-danger">*</span>:</label>
+                        <input type="tel" name="phone" class="form-control" value="@Model.Phone" required />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">ยกเลิก</button>
+                    <button type="submit" class="btn btn-success px-4" style="background:linear-gradient(135deg,#1a472a,#2d6a4f); border:none;">
+                        <i class="bi bi-check2-circle me-1"></i> บันทึกข้อมูล
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: ดูสลิปโอนเงินขนาดเต็ม -->
+<div class="modal fade" id="slipModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content text-center p-3" style="border-radius:18px;">
+            <div class="d-flex justify-content-between align-items-center mb-2 px-2">
+                <h6 class="fw-bold mb-0 text-dark"><i class="bi bi-image me-1 text-success"></i>สลิปโอนเงิน (<span id="modalSlipCode">-</span>)</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="p-2 bg-light rounded text-center">
+                <img id="modalSlipImg" src="" alt="Payment Slip" class="img-fluid rounded shadow-sm" style="max-height: 480px; object-fit: contain;" />
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function viewSlipModal(url, code) {
+        document.getElementById('modalSlipImg').src = url;
+        document.getElementById('modalSlipCode').innerText = code;
+        const modal = new bootstrap.Modal(document.getElementById('slipModal'));
+        modal.show();
+    }
+</script>

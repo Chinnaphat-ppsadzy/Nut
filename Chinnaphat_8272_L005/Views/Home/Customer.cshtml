@@ -47,6 +47,13 @@
     }
 
     var products = ViewBag.Products as List<Chinnaphat_8272_L005.Models.Product> ?? new();
+    var myBookings = ViewBag.MyBookings as List<Chinnaphat_8272_L005.ViewModels.BookingTrackItem> ?? new();
+
+    string? userId = Context.Session.GetString("UserId") ?? Context.Request.Cookies["cb_user_id"];
+    string? rawUserName = Context.Session.GetString("FullName") ?? Context.Request.Cookies["cb_user_name"];
+    string? currentUserName = !string.IsNullOrEmpty(rawUserName) ? System.Net.WebUtility.UrlDecode(rawUserName) : null;
+    string? currentUserPhone = Context.Request.Cookies["cb_phone"];
+    bool isLoggedIn = !string.IsNullOrEmpty(userId);
 }
 
 <style>
@@ -341,6 +348,14 @@
     }
 </style>
 
+@{
+    string sec = ViewBag.Section as string ?? "";
+    bool showAll = sec == "";
+}
+
+@* ===== หน้าหลัก: แสดงเฉพาะเมื่อ showAll ===== *@
+@if (showAll)
+{
 <!-- ============================================================
      TOP SECTION: Welcome & Stats
      ============================================================ -->
@@ -378,8 +393,8 @@
         <div class="card border-0 shadow-sm h-100" style="border-radius:14px;">
             <div class="card-body p-4 text-center">
                 <div class="mb-2" style="font-size:2.5rem; color:#3b82f6;"><i class="bi bi-calendar-check"></i></div>
-                <h3 class="fw-bold mb-0" id="statMyBookings">3</h3>
-                <p class="text-muted mb-0">การจองของฉัน</p>
+                <h3 class="fw-bold mb-0" id="statMyBookings">@myBookings.Count</h3>
+                <p class="text-muted mb-0">การจองของฉัน (ในระบบ)</p>
             </div>
         </div>
     </div>
@@ -406,9 +421,9 @@
                 </a>
             </div>
             <div class="col-6 col-md">
-                <a href="#bookingSection" class="btn btn-outline-primary w-100 py-3" style="border-radius:12px;" onclick="scrollToBooking(event)">
-                    <i class="bi bi-calendar-check d-block mb-1" style="font-size:1.5rem;"></i>
-                    <span>การจองของฉัน</span>
+                <a href="#myBookingsSection" class="btn btn-outline-primary w-100 py-3" style="border-radius:12px;">
+                    <i class="bi bi-clock-history d-block mb-1" style="font-size:1.5rem;"></i>
+                    <span class="fw-bold">ติดตามสถานะการจอง</span>
                 </a>
             </div>
             <div class="col-6 col-md">
@@ -433,6 +448,11 @@
     </div>
 </div>
 
+} @* end showAll - welcome & quick actions *@
+
+@* ===== จองสนาม: แสดงเมื่อ showAll หรือ section=booking ===== *@
+@if (showAll || sec == "booking")
+{
 <!-- ============================================================
      MAIN MATCHDAY-STYLE COURT BOOKING SECTION
      ============================================================ -->
@@ -678,7 +698,8 @@
         <div>
             <div class="small text-muted" id="summarySelectedDate">วันที่เลือก: @selectedDate.ToString("dd/MM/yyyy")</div>
             <div class="fw-bold" style="font-size:1.05rem;">
-                เลือกแล้ว <span class="text-success" id="summaryCount">0</span> ช่อง (<span id="summaryHours">0</span> ชม.)
+                คอร์ท: <span class="text-success" id="summaryCount">0</span> ช่อง (<span id="summaryHours">0</span> ชม.)
+                <span class="badge ms-1 text-white" id="summaryCartBadge" style="background:#0d9488; display:none;">+ อุปกรณ์ 0 ชิ้น</span>
             </div>
             <small class="text-secondary d-none d-md-inline" id="summaryCourtList">-</small>
         </div>
@@ -692,12 +713,26 @@
         <button type="button" class="btn btn-outline-secondary btn-sm px-3 py-2" style="border-radius:10px;" onclick="clearAllSelected()">
             <i class="bi bi-x-circle me-1"></i>ล้าง
         </button>
-        <button type="button" class="btn btn-success fw-bold px-4 py-2" style="border-radius:10px; background:linear-gradient(135deg,#1a472a,#2d6a4f); border:none;" onclick="openBookingModal()">
-            ดำเนินการจอง <i class="bi bi-arrow-right ms-1"></i>
-        </button>
+        @if (!isLoggedIn)
+        {
+            <button type="button" class="btn btn-warning fw-bold px-4 py-2" style="border-radius:10px;" onclick="showGuestAuthPrompt('จองสนามและชำระเงิน')">
+                <i class="bi bi-lock-fill me-1"></i> เข้าสู่ระบบเพื่อจอง <i class="bi bi-arrow-right ms-1"></i>
+            </button>
+        }
+        else
+        {
+            <button type="button" class="btn btn-success fw-bold px-4 py-2" style="border-radius:10px; background:linear-gradient(135deg,#1a472a,#2d6a4f); border:none;" onclick="openBookingModal()">
+                ดำเนินการจอง <i class="bi bi-arrow-right ms-1"></i>
+            </button>
+        }
     </div>
 </div>
 
+} @* end booking section *@
+
+@* ===== ซื้ออุปกรณ์: แสดงเมื่อ showAll หรือ section=product ===== *@
+@if (showAll || sec == "product")
+{
 <!-- ============================================================
      PRODUCT & EQUIPMENT RENTAL SHOWCASE
      ============================================================ -->
@@ -717,8 +752,20 @@
                     </p>
                 </div>
                 <div class="d-flex gap-2">
+                    @if (!isLoggedIn)
+                    {
+                        <button class="btn btn-warning fw-bold text-dark px-3 py-2 shadow-sm" style="border-radius:10px;" onclick="showGuestAuthPrompt('สั่งซื้อหรือเช่าอุปกรณ์')">
+                            <i class="bi bi-lock-fill me-1"></i> เข้าสู่ระบบเพื่อสั่งซื้อ/เช่า
+                        </button>
+                    }
+                    else
+                    {
+                        <button class="btn btn-warning fw-bold text-dark px-3 py-2 shadow-sm" style="border-radius:10px;" onclick="openBookingModal()">
+                            <i class="bi bi-cart3 me-1"></i> ตะกร้าสินค้า & คอร์ท (<span id="cartCountBadge">0</span>)
+                        </button>
+                    }
                     <button class="btn btn-light fw-bold text-dark px-3 py-2 shadow-sm" style="border-radius:10px;" onclick="showPromoInfo()">
-                        <i class="bi bi-ticket-perforated-fill text-warning me-1"></i> ดูโปรโมชั่นอุปกรณ์
+                        <i class="bi bi-ticket-perforated-fill text-warning me-1"></i> โปรโมชั่นอุปกรณ์
                     </button>
                 </div>
             </div>
@@ -811,10 +858,24 @@
                                                 </span>
                                             </div>
                                         }
-                                        <div class="mt-2 text-center">
-                                            <small class="text-muted d-block">
-                                                <i class="bi bi-info-circle me-1"></i>ติดต่อรับของหน้าร้านกับ Sales Staff
-                                            </small>
+                                        <div class="mt-2 pt-2 border-top">
+                                            @if (item.StockQty <= 0 && !isRent)
+                                            {
+                                                <button type="button" class="btn btn-sm btn-secondary w-100 disabled" style="border-radius:8px;">
+                                                    สินค้าหมดชั่วคราว
+                                                </button>
+                                            }
+                                            else
+                                            {
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <button type="button" class="btn btn-sm @(isRent ? "btn-outline-primary" : "btn-outline-success") flex-grow-1 fw-bold py-1 px-2"
+                                                            style="border-radius:8px;"
+                                                            onclick="addToCustomerCart(@item.ProductId, '@Html.Raw(item.ProductName.Replace("'", "\\'"))', '@item.ProductType', '@catCode', @item.Price, '@item.Unit', @item.StockQty)">
+                                                        <i class="bi bi-cart-plus me-1"></i> @(isRent ? "+ เลือกเช่า" : "+ ซื้อลงตะกร้า")
+                                                    </button>
+                                                    <span class="badge bg-success rounded-pill cust-cart-badge" id="cardQty_@item.ProductId" style="display:none; font-size:0.8rem;">0</span>
+                                                </div>
+                                            }
                                         </div>
                                     </div>
                                 </div>
@@ -854,111 +915,389 @@
     }
 </script>
 
+} @* end product section *@
+
+@* ===== ดูสถานะการจอง: แสดงเมื่อ showAll หรือ section=tracking ===== *@
+@if (showAll || sec == "tracking")
+{
+<!-- ============================================================
+     MY BOOKINGS & TRACKING SECTION (ติดตามสถานะการจอง)
+     ============================================================ -->
+<div id="myBookingsSection" class="mt-5 mb-5 scroll-mt-4">
+    <div class="card border-0 shadow-sm" style="border-radius:18px; overflow:hidden;">
+        <!-- Header -->
+        <div class="p-4 text-white" style="background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 50%, #3b82f6 100%);">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+                <div>
+                    <span class="badge bg-white text-primary fw-bold mb-2">
+                        <i class="bi bi-clock-history me-1"></i> Real-time Booking Tracking
+                    </span>
+                    <h3 class="fw-bold mb-1">
+                        <i class="bi bi-search me-2"></i>ติดตามสถานะการจอง & การจองของฉัน
+                    </h3>
+                    <p class="mb-0 opacity-90 small">
+                        ตรวจสอบสถานะการอนุมัติสลิปโอนเงิน การยืนยันคิว และเวลาเข้าใช้สนามได้แบบเรียลไทม์ 24 ชม.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="card-body p-4 bg-light">
+            <!-- Search Bar -->
+            <div class="card border-0 shadow-sm rounded-4 p-3 mb-4 bg-white">
+                <label class="form-label fw-bold text-dark mb-2">
+                    <i class="bi bi-upc-scan me-1 text-primary"></i> ค้นหารายการจองด่วน (กรอกรหัสการจอง หรือเบอร์โทรศัพท์):
+                </label>
+                <div class="input-group">
+                    <span class="input-group-text bg-light border-end-0"><i class="bi bi-search text-muted"></i></span>
+                    <input type="text" id="trackSearchInput" class="form-control border-start-0" placeholder="เช่น BK-20261116-8842 หรือ 0812345678" />
+                    <button class="btn btn-primary px-4 fw-bold" type="button" onclick="trackBookingLive()">
+                        <i class="bi bi-arrow-right-circle me-1"></i> ตรวจสอบสถานะ
+                    </button>
+                </div>
+            </div>
+
+            <!-- Dynamic Search Result Box -->
+            <div id="trackResultBox" style="display:none;" class="mb-4">
+                <!-- Rendered dynamically by JavaScript -->
+            </div>
+
+            <!-- Table of Recent Bookings -->
+            <div class="card border-0 shadow-sm rounded-4 overflow-hidden bg-white">
+                <div class="p-3 border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <h6 class="fw-bold mb-0 text-dark">
+                        <i class="bi bi-list-check me-2 text-primary"></i>รายการจองล่าสุดในระบบ (@myBookings.Count รายการ)
+                    </h6>
+                    <small class="text-muted">อัปเดตสถานะตรงจากฝ่ายบัญชีและการเงิน</small>
+                </div>
+
+                @if (myBookings.Any())
+                {
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr class="small text-secondary">
+                                    <th>รหัสการจอง</th>
+                                    <th>วันที่เล่น</th>
+                                    <th>คอร์ท & เวลา</th>
+                                    <th>สินค้า/เช่า</th>
+                                    <th>ยอดชำระสุทธิ</th>
+                                    <th>สถานะการจอง</th>
+                                    <th>สลิปโอนเงิน</th>
+                                    <th class="text-end">รายละเอียด</th>
+                                </tr>
+                            </thead>
+                            <tbody id="myBookingsTableBody">
+                                @foreach (var b in myBookings)
+                                {
+                                    <tr id="row_@b.BookingCode">
+                                        <td>
+                                            <strong class="font-monospace text-primary">@b.BookingCode</strong>
+                                            <small class="text-muted d-block" style="font-size:0.75rem;">@b.CreatedAt.ToString("dd/MM HH:mm")</small>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-light text-dark border">
+                                                <i class="bi bi-calendar3 me-1"></i>@b.PlayDate
+                                            </span>
+                                        </td>
+                                        <td>
+                                            @if (b.CourtSlots.Any())
+                                            {
+                                                <div class="small">
+                                                    @foreach (var cs in b.CourtSlots)
+                                                    {
+                                                        <div><i class="bi bi-circle-fill text-success" style="font-size:0.5rem;"></i> @cs</div>
+                                                    }
+                                                </div>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted small">-</span>
+                                            }
+                                        </td>
+                                        <td>
+                                            @if (b.ItemsSummary.Any())
+                                            {
+                                                <div class="small text-truncate" style="max-width:180px;" title="@string.Join(", ", b.ItemsSummary)">
+                                                    @string.Join(", ", b.ItemsSummary)
+                                                </div>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted small">-</span>
+                                            }
+                                        </td>
+                                        <td>
+                                            <strong class="text-dark">@b.NetAmount.ToString("N0") ฿</strong>
+                                            @if (b.DiscountAmount > 0)
+                                            {
+                                                <small class="text-success d-block" style="font-size:0.75rem;">ลด @b.DiscountAmount.ToString("N0") ฿</small>
+                                            }
+                                        </td>
+                                        <td>
+                                            <span class="badge @b.StatusBadgeClass px-2 py-1">
+                                                @b.StatusText
+                                            </span>
+                                        </td>
+                                        <td>
+                                            @if (!string.IsNullOrEmpty(b.SlipImageUrl))
+                                            {
+                                                <button type="button" class="btn btn-sm btn-outline-success py-1 px-2" style="border-radius:8px;" onclick="viewSlipFull('@b.SlipImageUrl', '@b.BookingCode')">
+                                                    <i class="bi bi-image me-1"></i> ดูสลิป
+                                                </button>
+                                            }
+                                            else
+                                            {
+                                                <button type="button" class="btn btn-sm btn-outline-warning text-dark py-1 px-2" style="border-radius:8px;" onclick="openUploadSlipModal('@b.BookingCode')">
+                                                    <i class="bi bi-upload me-1"></i> แนบสลิป
+                                                </button>
+                                            }
+                                        </td>
+                                        <td class="text-end">
+                                            <button type="button" class="btn btn-sm btn-light border px-2 py-1" style="border-radius:8px;" onclick="quickTrack('@b.BookingCode')">
+                                                <i class="bi bi-eye me-1"></i> ติดตาม
+                                            </button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+                else
+                {
+                    <div class="p-5 text-center text-muted" id="emptyBookingsMsg">
+                        <i class="bi bi-inbox" style="font-size:3rem;"></i>
+                        <p class="mt-2 mb-0">ยังไม่มีประวัติการจองในระบบ คุณสามารถเลือกคอร์ทและกดจองสนามได้เลยทันที</p>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+} @* end tracking section *@
+
+<!-- ============================================================
+     GUEST AUTH REQUIRED MODAL
+     ============================================================ -->
+<div class="modal fade" id="guestAuthModal" tabindex="-1" aria-labelledby="guestAuthModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius:20px; border:none; box-shadow:0 25px 60px rgba(0,0,0,0.25); overflow:hidden;">
+            <div class="modal-header border-0 bg-warning bg-opacity-10 p-4 pb-2">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="rounded-circle bg-warning text-dark d-flex align-items-center justify-content-center fw-bold shadow-sm" style="width:50px; height:50px; font-size:1.6rem;">
+                        <i class="bi bi-shield-lock"></i>
+                    </div>
+                    <div>
+                        <h5 class="modal-title fw-bold text-dark mb-0" id="guestAuthModalLabel">
+                            กรุณาเข้าสู่ระบบสมาชิก
+                        </h5>
+                        <small class="text-muted">Guest ดูข้อมูลได้อย่างเดียว ไม่สามารถจองหรือชำระเงินได้</small>
+                    </div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4 pt-3">
+                <p class="text-secondary mb-3">
+                    ขณะนี้ท่านกำลังเข้าชมในฐานะ <strong class="text-dark">ผู้เยี่ยมชม (Guest)</strong> ระบบเปิดให้ดูตารางสนามและสินค้าเท่านั้น หากต้องการ<strong class="text-success" id="guestActionLabel">จองคอร์ทหรือสั่งซื้อสินค้า</strong> กรุณาเข้าสู่ระบบด้วยบัญชีสมาชิกก่อนครับ
+                </p>
+                <div class="p-3 bg-light rounded-3 border mb-3 small">
+                    <div class="fw-bold text-dark mb-1"><i class="bi bi-stars text-warning me-1"></i> สิทธิพิเศษเมื่อเป็นสมาชิก CourtBook:</div>
+                    <ul class="mb-0 ps-3 text-muted">
+                        <li>จองคอร์ทแบดมินตันมาตรฐานสากลล่วงหน้า</li>
+                        <li>สั่งซื้อและเช่าอุปกรณ์พร้อมส่วนลดโปรโมชั่นอัตโนมัติ 5 รายการ</li>
+                        <li>ชำระเงินผ่าน PromptPay QR และแนบสลิปสะดวกรวดเร็ว</li>
+                        <li>บันทึกประวัติการจองและเช็คสถานะได้แบบเรียลไทม์ 24 ชม.</li>
+                    </ul>
+                </div>
+                <div class="d-grid gap-2">
+                    <a asp-action="Login" asp-controller="User" class="btn btn-success fw-bold py-2 shadow-sm" style="border-radius:10px;">
+                        <i class="bi bi-box-arrow-in-right me-1"></i> เข้าสู่ระบบ (Login)
+                    </a>
+                    <a asp-action="Register" asp-controller="User" class="btn btn-outline-success fw-bold py-2" style="border-radius:10px;">
+                        <i class="bi bi-person-plus me-1"></i> สมัครสมาชิกใหม่ (Register)
+                    </a>
+                </div>
+            </div>
+            <div class="modal-footer border-0 bg-light py-2 px-4 justify-content-center">
+                <button type="button" class="btn btn-link text-muted text-decoration-none btn-sm" data-bs-dismiss="modal">
+                    ดูข้อมูลต่อในฐานะ Guest
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- ============================================================
      BOOKING CONFIRMATION & PAYMENT MODAL
      ============================================================ -->
 <div class="modal fade" id="bookingConfirmModal" tabindex="-1" aria-labelledby="bookingConfirmModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-lg">
-        <div class="modal-content">
-            <div class="modal-header-gradient">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+        <div class="modal-content" style="border-radius:20px; overflow:hidden; border:none; box-shadow:0 25px 60px rgba(0,0,0,0.25);">
+            <div class="modal-header-gradient" style="background: linear-gradient(135deg, #1a472a 0%, #2d6a4f 60%, #52b788 100%); color:white; padding:1.25rem 1.75rem;">
                 <div class="d-flex justify-content-between align-items-center w-100">
                     <div>
                         <h5 class="modal-title fw-bold text-white mb-0" id="bookingConfirmModalLabel">
-                            <i class="bi bi-shield-check me-2"></i>ยืนยันการจองสนาม - CourtBook
+                            <i class="bi bi-shield-check me-2"></i>ยืนยันการจองสนาม & สรุปรายการสินค้า (CourtBook)
                         </h5>
-                        <small class="text-white-50">กรุณาตรวจสอบข้อมูลและดำเนินการชำระเงิน</small>
+                        <small class="text-white-50">ตรวจสอบรายการคอร์ท สินค้า/อุปกรณ์ คำนวณโปรโมชั่นอัตโนมัติ และแนบสลิปโอนเงิน</small>
                     </div>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
             </div>
 
-            <div class="modal-body p-4">
+            <div class="modal-body p-4 bg-light">
                 <div class="row g-4">
-                    <!-- รายการจอง -->
-                    <div class="col-lg-6">
-                        <div class="p-3 bg-light rounded-3 mb-3">
-                            <div class="d-flex align-items-center gap-2 mb-2 text-success fw-bold">
-                                <i class="bi bi-geo-alt-fill"></i> CourtBook Arena (สาขาพญาไท)
+                    <!-- รายการคอร์ท & สินค้าที่เลือก -->
+                    <div class="col-lg-7">
+                        <!-- Court Slots -->
+                        <div class="p-3 bg-white rounded-4 border mb-3 shadow-sm">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <div class="d-flex align-items-center gap-2 text-success fw-bold">
+                                    <i class="bi bi-geo-alt-fill"></i> CourtBook Arena (สาขาพญาไท)
+                                </div>
+                                <span class="badge bg-light text-dark border">
+                                    <i class="bi bi-calendar3 me-1"></i> <span id="modalBookingDate">10 พ.ย. 2026</span>
+                                </span>
                             </div>
-                            <div class="small text-muted mb-1">
-                                <i class="bi bi-calendar3 me-1"></i> วันที่เล่น: <strong class="text-dark" id="modalBookingDate">10 พ.ย. 2026</strong>
-                            </div>
-                            <hr class="my-2">
-                            <label class="small text-muted fw-bold mb-2">รายการช่วงเวลาที่เลือก:</label>
-                            <div id="modalSelectedSlotsList" class="d-flex flex-column gap-2" style="max-height: 180px; overflow-y: auto;">
+                            <label class="small text-muted fw-bold mb-2">
+                                <i class="bi bi-calendar2-range me-1 text-success"></i> ช่วงเวลาคอร์ทที่เลือก:
+                            </label>
+                            <div id="modalSelectedSlotsList" class="d-flex flex-column gap-2" style="max-height: 150px; overflow-y: auto;">
                                 <!-- Dynamic List -->
                             </div>
                         </div>
 
-                        <!-- สรุปยอดเงิน & ส่วนลด -->
-                        <div class="border rounded-3 p-3">
-                            <div class="d-flex justify-content-between mb-2">
-                                <span class="text-muted">จำนวนชั่วโมงรวม</span>
-                                <span class="fw-bold" id="modalTotalHours">0 ชม.</span>
+                        <!-- Cart Products / Equipment -->
+                        <div class="p-3 bg-white rounded-4 border mb-3 shadow-sm">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <label class="small text-muted fw-bold mb-0">
+                                    <i class="bi bi-box-seam me-1 text-teal"></i> สินค้าและอุปกรณ์เช่าในบิลนี้:
+                                </label>
+                                <a href="#productSection" data-bs-dismiss="modal" class="small fw-semibold text-teal" style="color:#0d9488; text-decoration:none;">
+                                    + เลือกสินค้าเพิ่ม
+                                </a>
                             </div>
-                            <div class="d-flex justify-content-between mb-2">
-                                <span class="text-muted">ราคารวม</span>
-                                <span class="fw-bold" id="modalSubtotal">0 ฿</span>
+                            <div id="modalCartItemsList" class="d-flex flex-column gap-2" style="max-height: 180px; overflow-y: auto;">
+                                <!-- Dynamic Cart Items -->
                             </div>
-                            <div class="d-flex justify-content-between mb-2 text-success" id="promoDiscountRow" style="display:none !important;">
-                                <span>ส่วนลดโปรโมชั่น</span>
-                                <span class="fw-bold" id="modalDiscount">-0 ฿</span>
+                        </div>
+
+                        <!-- สรุปยอดเงิน & ส่วนลดโปรโมชั่นอัตโนมัติ -->
+                        <div class="bg-white rounded-4 border p-3 shadow-sm">
+                            <h6 class="fw-bold text-dark mb-2"><i class="bi bi-receipt me-1 text-success"></i>สรุปยอดเงินและส่วนลด</h6>
+                            <div class="d-flex justify-content-between mb-1 small">
+                                <span class="text-muted">รวมค่าเช่าคอร์ท</span>
+                                <span class="fw-bold" id="modalCourtTotal">0 ฿</span>
                             </div>
+                            <div class="d-flex justify-content-between mb-1 small">
+                                <span class="text-muted">รวมค่าซื้อสินค้า</span>
+                                <span class="fw-bold" id="modalSaleTotal">0 ฿</span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-1 small">
+                                <span class="text-muted">รวมค่าเช่าอุปกรณ์</span>
+                                <span class="fw-bold" id="modalRentalTotal">0 ฿</span>
+                            </div>
+
+                            <!-- Auto Promotion Badges List -->
+                            <div id="appliedPromoList" class="mt-2 mb-2 pt-2 border-top" style="display:none;">
+                                <small class="text-muted fw-bold d-block mb-1">🎁 โปรโมชั่นที่ระบบคำนวณให้อัตโนมัติ:</small>
+                                <div id="promoTagsContainer" class="d-flex flex-column gap-1"></div>
+                            </div>
+
+                            <div class="d-flex justify-content-between mb-2 text-success fw-bold pt-2 border-top" id="promoDiscountRow" style="display:none !important;">
+                                <span>ส่วนลดรวมทั้งหมด</span>
+                                <span id="modalDiscount">-0 ฿</span>
+                            </div>
+
                             <hr class="my-2">
                             <div class="d-flex justify-content-between align-items-center">
-                                <span class="fw-bold fs-6">ยอดชำระสุทธิ</span>
-                                <span class="fw-bold text-success fs-4" id="modalFinalPrice">0 ฿</span>
+                                <div>
+                                    <span class="fw-bold fs-6">ยอดชำระสุทธิ</span>
+                                    <small class="text-muted d-block" style="font-size:0.75rem;">(รวมภาษีมูลค่าเพิ่มแล้ว)</small>
+                                </div>
+                                <span class="fw-bold text-success fs-3" id="modalFinalPrice">0 ฿</span>
                             </div>
 
                             <!-- โค้ดส่วนลด -->
                             <div class="input-group input-group-sm mt-3">
-                                <input type="text" id="promoCodeInput" class="form-control" placeholder="โค้ดส่วนลด (เช่น COURT10)" style="border-radius:8px 0 0 8px;">
+                                <input type="text" id="promoCodeInput" class="form-control" placeholder="โค้ดส่วนลด (เช่น NEW_MEMBER_100)" style="border-radius:8px 0 0 8px;">
                                 <button class="btn btn-outline-success" type="button" onclick="applyPromoCode()">ใช้โค้ด</button>
                             </div>
                             <div id="promoMsg" class="small mt-1"></div>
                         </div>
                     </div>
 
-                    <!-- ข้อมูลผู้จอง & ชำระเงิน -->
-                    <div class="col-lg-6">
-                        <div class="border rounded-3 p-3 mb-3">
+                    <!-- ข้อมูลผู้จอง & ชำระเงิน & แนบสลิป -->
+                    <div class="col-lg-5">
+                        <div class="bg-white rounded-4 border p-3 mb-3 shadow-sm">
                             <h6 class="fw-bold text-success mb-3"><i class="bi bi-person me-1"></i>ข้อมูลผู้จอง</h6>
                             <div class="mb-2">
                                 <label class="small text-muted">ชื่อ-นามสกุล <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control form-control-sm" id="custName" value="คุณลูกค้า CourtBook" required>
+                                <input type="text" class="form-control form-control-sm" id="custName" value="@(string.IsNullOrEmpty(currentUserName) ? "คุณลูกค้า CourtBook" : currentUserName)" required>
                             </div>
                             <div class="mb-2">
                                 <label class="small text-muted">เบอร์โทรศัพท์ <span class="text-danger">*</span></label>
-                                <input type="tel" class="form-control form-control-sm" id="custPhone" value="081-234-5678" required>
+                                <input type="tel" class="form-control form-control-sm" id="custPhone" value="@(string.IsNullOrEmpty(currentUserPhone) ? "081-234-5678" : currentUserPhone)" required>
                             </div>
                         </div>
 
-                        <!-- การชำระเงินแบบ PromptPay QR -->
-                        <div class="border rounded-3 p-3 text-center bg-light">
-                            <h6 class="fw-bold text-dark mb-2"><i class="bi bi-qr-code-scan me-1 text-success"></i>สแกนชำระผ่าน PromptPay QR</h6>
-                            <div class="p-2 bg-white rounded border d-inline-block my-2 shadow-sm">
+                        <!-- การชำระเงินแบบ PromptPay QR & อัปโหลดสลิป -->
+                        <div class="bg-white rounded-4 border p-3 text-center shadow-sm">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h6 class="fw-bold text-dark mb-0"><i class="bi bi-qr-code-scan me-1 text-success"></i>สแกนชำระผ่าน PromptPay QR</h6>
+                                <span class="badge bg-success bg-opacity-10 text-success border border-success small">พร้อมเพย์</span>
+                            </div>
+
+                            <div class="p-2 bg-light rounded border d-inline-block my-2 shadow-sm text-center">
                                 <img src="https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=PROMPTPAY-COURTBOOK-PHAYATHAI"
-                                     alt="PromptPay QR Code" class="img-fluid" style="width:140px; height:140px;" />
+                                     alt="PromptPay QR Code" class="img-fluid" style="width:130px; height:130px;" />
+                                <div class="mt-1 small fw-bold text-dark" id="qrPromptPayAmount">ยอดชำระ: 0 ฿</div>
                             </div>
-                            <div class="small text-muted">
-                                สแกนจ่ายได้ทุกธนาคาร • ยืนยันการจองอัตโนมัติ
+                            <div class="small text-muted mb-3" style="font-size:0.8rem;">
+                                ธนาคารกสิกรไทย • บัญชี CourtBook Arena • สาขาพญาไท
                             </div>
-                            <div class="mt-2 text-start small">
-                                <label class="text-muted mb-1"><i class="bi bi-image me-1"></i>แนบสลิปการชำระเงิน (ถ้ามี):</label>
-                                <input type="file" class="form-control form-control-sm" id="slipUpload" accept="image/*">
+
+                            <!-- ส่วนอัปโหลดสลิปโอนเงิน (พร้อม Live Image Preview) -->
+                            <div class="text-start p-3 rounded-3 border" style="background:#f8fafc;">
+                                <label class="fw-bold text-dark small mb-1">
+                                    <i class="bi bi-upload me-1 text-primary"></i> แนบสลิปการโอนเงิน (Slip Upload) <span class="text-danger">*</span>
+                                </label>
+                                <small class="text-muted d-block mb-2" style="font-size:0.75rem;">
+                                    รองรับไฟล์รูปภาพ .JPG, .PNG เพื่อส่งให้ฝ่ายบัญชีตรวจสอบและอนุมัติคิว
+                                </small>
+                                <input type="file" class="form-control form-control-sm mb-2" id="slipUploadInput" accept="image/*" onchange="previewSlipImage(this)">
+
+                                <!-- Image Preview Box -->
+                                <div id="slipPreviewContainer" style="display:none;" class="text-center position-relative mt-2 p-2 bg-white rounded border">
+                                    <img id="slipPreviewImg" src="" alt="Slip Preview" style="max-height:150px; max-width:100%; border-radius:8px;" />
+                                    <button type="button" class="btn btn-sm btn-danger position-absolute top-0 end-0 m-1 rounded-circle py-0 px-1" onclick="clearSlipPreview()" title="ลบรูป">
+                                        <i class="bi bi-x"></i>
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div class="modal-footer bg-light px-4 py-3">
-                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal" style="border-radius:10px;">
+            <div class="modal-footer bg-light px-4 py-3 border-top">
+                <button type="button" class="btn btn-outline-secondary px-3" data-bs-dismiss="modal" style="border-radius:10px;">
                     ยกเลิก
                 </button>
-                <button type="button" class="btn btn-success px-4" style="border-radius:10px; background:linear-gradient(135deg,#1a472a,#2d6a4f); border:none;" onclick="confirmBookingSuccess()">
-                    <i class="bi bi-check2-circle me-1"></i> ยืนยันและจองสนาม
-                </button>
+                @if (!isLoggedIn)
+                {
+                    <a asp-action="Login" asp-controller="User" class="btn btn-warning px-4 py-2 fw-bold shadow-sm" style="border-radius:10px;">
+                        <i class="bi bi-box-arrow-in-right me-1"></i> เข้าสู่ระบบเพื่อชำระเงิน
+                    </a>
+                }
+                else
+                {
+                    <button type="button" class="btn btn-success px-4 py-2 fw-bold shadow-sm" id="btnSubmitBooking" style="border-radius:10px; background:linear-gradient(135deg,#1a472a,#2d6a4f); border:none;" onclick="submitBookingWithSlip()">
+                        <i class="bi bi-check2-circle me-1"></i> ยืนยันการจองและส่งสลิป
+                    </button>
+                }
             </div>
         </div>
     </div>
@@ -969,44 +1308,98 @@
      ============================================================ -->
 <div class="modal fade" id="bookingSuccessModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content text-center p-4">
+        <div class="modal-content text-center p-4" style="border-radius:20px; border:none; box-shadow:0 25px 60px rgba(0,0,0,0.25);">
             <div class="my-3">
                 <div style="width:76px; height:76px; background:#dcfce7; color:#16a34a; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:2.8rem; margin:0 auto;">
                     <i class="bi bi-check-circle-fill"></i>
                 </div>
             </div>
-            <h4 class="fw-bold text-success mb-1">จองสนามสำเร็จ!</h4>
-            <p class="text-muted small mb-3">ระบบได้บันทึกการจองของคุณเรียบร้อยแล้ว</p>
+            <h4 class="fw-bold text-success mb-1">จองสนามและส่งข้อมูลสำเร็จ!</h4>
+            <p class="text-muted small mb-3">ระบบได้บันทึกการจองและส่งสลิปให้ฝ่ายบัญชีตรวจสอบเรียบร้อยแล้ว</p>
 
             <div class="p-3 bg-light rounded-3 text-start mb-3 small">
                 <div class="d-flex justify-content-between mb-1">
                     <span class="text-muted">รหัสการจอง:</span>
-                    <strong class="text-success" id="successBookingCode">CB-20261110-8842</strong>
+                    <strong class="text-success fs-6 font-monospace" id="successBookingCode">BK-20261116-8842</strong>
                 </div>
                 <div class="d-flex justify-content-between mb-1">
-                    <span class="text-muted">สนาม:</span>
-                    <span>CourtBook Arena พญาไท</span>
+                    <span class="text-muted">สถานะ:</span>
+                    <span class="badge bg-warning text-dark" id="successBookingStatus">รอฝ่ายบัญชีตรวจสอบสลิป</span>
                 </div>
                 <div class="d-flex justify-content-between mb-1">
-                    <span class="text-muted">วันที่:</span>
-                    <span id="successBookingDate">10 พ.ย. 2026</span>
+                    <span class="text-muted">วันที่เล่น:</span>
+                    <span id="successBookingDate">16 พ.ย. 2026</span>
                 </div>
                 <div class="d-flex justify-content-between mb-1">
                     <span class="text-muted">คอร์ท/เวลา:</span>
                     <span id="successBookingSlots">-</span>
                 </div>
-                <div class="d-flex justify-content-between">
-                    <span class="text-muted">ยอดชำระ:</span>
-                    <strong class="text-dark" id="successBookingAmount">0 ฿</strong>
+                <div class="d-flex justify-content-between mb-1" id="successBookingItemsRow" style="display:none;">
+                    <span class="text-muted">สินค้า/เช่า:</span>
+                    <span id="successBookingItems">-</span>
+                </div>
+                <div class="d-flex justify-content-between pt-1 border-top mt-1">
+                    <span class="text-muted fw-bold">ยอดชำระสุทธิ:</span>
+                    <strong class="text-dark fs-5" id="successBookingAmount">0 ฿</strong>
                 </div>
             </div>
 
             <div class="d-flex gap-2 justify-content-center">
-                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal" style="border-radius:10px;">
-                    ปิดหน้าต่าง
+                <button type="button" class="btn btn-outline-primary" data-bs-dismiss="modal" style="border-radius:10px;" onclick="scrollToTracking()">
+                    <i class="bi bi-clock-history me-1"></i> ดูสถานะการจองของฉัน
                 </button>
                 <button type="button" class="btn btn-success" data-bs-dismiss="modal" style="border-radius:10px; background:linear-gradient(135deg,#1a472a,#2d6a4f); border:none;" onclick="scrollToBooking()">
                     <i class="bi bi-calendar-plus me-1"></i> จองเวลาอื่นเพิ่ม
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================
+     MODAL: ดูรูปสลิปขนาดเต็ม (Slip Viewer Modal)
+     ============================================================ -->
+<div class="modal fade" id="slipViewerModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content text-center p-3" style="border-radius:18px;">
+            <div class="d-flex justify-content-between align-items-center mb-2 px-2">
+                <h6 class="fw-bold mb-0 text-dark"><i class="bi bi-image me-1 text-success"></i>สลิปโอนเงิน (<span id="slipViewerCode">-</span>)</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="p-2 bg-light rounded text-center">
+                <img id="slipViewerImg" src="" alt="Payment Slip" class="img-fluid rounded shadow-sm" style="max-height: 480px; object-fit: contain;" />
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================
+     MODAL: อัปโหลดสลิปเพิ่มเติมสำหรับรายการจองเดิม (Upload Slip Modal)
+     ============================================================ -->
+<div class="modal fade" id="uploadSlipModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius:18px;">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold"><i class="bi bi-upload me-2 text-primary"></i>แนบสลิปโอนเงิน</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="mb-3">
+                    <label class="small text-muted fw-bold">รหัสการจอง:</label>
+                    <input type="text" id="uploadSlipBookingCode" class="form-control fw-bold font-monospace bg-light" readonly />
+                </div>
+                <div class="mb-3">
+                    <label class="small text-muted fw-bold">เลือกไฟล์สลิปโอนเงิน (JPG / PNG):</label>
+                    <input type="file" id="uploadSlipFileInput" class="form-control" accept="image/*" />
+                </div>
+                <div class="alert alert-info small mb-0">
+                    <i class="bi bi-info-circle me-1"></i> หลังจากอัปโหลดสลิปแล้ว ระบบจะเปลี่ยนสถานะเป็น <strong>"รอฝ่ายบัญชีตรวจสอบสลิป"</strong> ทันที
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">ยกเลิก</button>
+                <button type="button" class="btn btn-primary" id="btnSubmitExistingSlip" onclick="submitExistingSlip()">
+                    <i class="bi bi-cloud-arrow-up-fill me-1"></i> บันทึกและส่งสลิป
                 </button>
             </div>
         </div>
@@ -1066,51 +1459,168 @@
      ============================================================ -->
 @section Scripts {
     <script>
+        const isUserLoggedIn = @(isLoggedIn ? "true" : "false");
+
         // State Management
         let selectedSlots = new Map(); // key: courtId_slotId, value: { courtId, courtName, slotId, timeRange, price }
+        let customerCart = new Map();  // key: productId, value: { productId, productName, type, categoryCode, price, unit, qty, stockQty }
         let currentActiveDate = '@selectedDate.ToString("yyyy-MM-dd")';
-        let appliedDiscount = 0;
+        let appliedManualPromoCode = '';
+        let appliedPromoDiscount = 0;
+        let lastCalculatedPromos = [];
 
-        // Smooth scroll to booking section
-        function scrollToBooking(e) {
-            if (e) e.preventDefault();
-            const el = document.getElementById('bookingSection');
-            if (el) {
-                el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        // Guest Auth Prompt Modal
+        function showGuestAuthPrompt(actionName) {
+            if (actionName) {
+                const actionLabel = document.getElementById('guestActionLabel');
+                if (actionLabel) actionLabel.innerText = actionName;
+            }
+            const modalEl = document.getElementById('guestAuthModal');
+            if (modalEl) {
+                const modal = new bootstrap.Modal(modalEl);
+                modal.show();
+            } else {
+                if (confirm('ผู้เยี่ยมชม (Guest) ดูข้อมูลได้อย่างเดียว ไม่สามารถจองหรือชำระเงินได้\nต้องการเข้าสู่ระบบสมาชิกเพื่อดำเนินการหรือไม่?')) {
+                    window.location.href = '/User/Login';
+                }
             }
         }
 
-        // Handle Date Pill Click
+        // Scroll helpers & Hash handling
+        function scrollToBooking(e) {
+            if (e) e.preventDefault();
+            const el = document.getElementById('bookingSection');
+            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        function scrollToTracking() {
+            const el = document.getElementById('myBookingsSection');
+            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        function scrollToShop() {
+            const el = document.getElementById('productSection');
+            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            if (window.location.hash) {
+                const target = document.querySelector(window.location.hash);
+                if (target) {
+                    setTimeout(() => {
+                        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }, 150);
+                }
+            }
+        });
+
+        // ================= CART MANAGEMENT =================
+        function addToCustomerCart(id, name, type, catCode, price, unit, stockQty) {
+            if (!isUserLoggedIn) {
+                showGuestAuthPrompt('สั่งซื้อหรือเช่าอุปกรณ์');
+                return;
+            }
+            if (customerCart.has(id)) {
+                const item = customerCart.get(id);
+                if (type === 'SALE' && item.qty >= stockQty) {
+                    alert(`สินค้า '${name}' มีในสต็อกเพียง ${stockQty} ${unit}`);
+                    return;
+                }
+                item.qty += 1;
+            } else {
+                customerCart.set(id, {
+                    productId: id,
+                    productName: name,
+                    type: type,
+                    categoryCode: catCode,
+                    price: parseFloat(price) || 0,
+                    unit: unit,
+                    qty: 1,
+                    stockQty: parseInt(stockQty) || 999
+                });
+            }
+            updateCartBadges();
+            updateSummaryBar();
+        }
+
+        function removeFromCustomerCart(id) {
+            customerCart.delete(id);
+            updateCartBadges();
+            updateSummaryBar();
+            renderModalCartItems();
+        }
+
+        function changeCartQty(id, delta) {
+            if (!customerCart.has(id)) return;
+            const item = customerCart.get(id);
+            const newQty = item.qty + delta;
+            if (newQty <= 0) {
+                removeFromCustomerCart(id);
+            } else {
+                if (item.type === 'SALE' && newQty > item.stockQty) {
+                    alert(`สินค้า '${item.productName}' มีในสต็อกเพียง ${item.stockQty} ${item.unit}`);
+                    return;
+                }
+                item.qty = newQty;
+                updateCartBadges();
+                updateSummaryBar();
+                renderModalCartItems();
+            }
+        }
+
+        function updateCartBadges() {
+            let totalItems = 0;
+            customerCart.forEach((item, id) => {
+                totalItems += item.qty;
+                const badge = document.getElementById(`cardQty_${id}`);
+                if (badge) {
+                    badge.innerText = item.qty;
+                    badge.style.display = item.qty > 0 ? 'inline-block' : 'none';
+                }
+            });
+
+            // Reset badges for items not in cart
+            document.querySelectorAll('.cust-cart-badge').forEach(b => {
+                const pid = parseInt(b.id.replace('cardQty_', ''));
+                if (!customerCart.has(pid)) {
+                    b.innerText = '0';
+                    b.style.display = 'none';
+                }
+            });
+
+            const topBadge = document.getElementById('cartCountBadge');
+            if (topBadge) topBadge.innerText = totalItems;
+
+            const summaryCartBadge = document.getElementById('summaryCartBadge');
+            if (summaryCartBadge) {
+                if (totalItems > 0) {
+                    summaryCartBadge.innerText = `+ สินค้า/เช่า ${totalItems} ชิ้น`;
+                    summaryCartBadge.style.display = 'inline-block';
+                } else {
+                    summaryCartBadge.style.display = 'none';
+                }
+            }
+        }
+
+        // ================= DATE & CALENDAR SELECTION =================
         function selectDatePill(dateIso, pillEl) {
             document.querySelectorAll('.date-pill').forEach(p => p.classList.remove('active'));
             pillEl.classList.add('active');
             currentActiveDate = dateIso;
             document.getElementById('datePickerInput').value = dateIso;
-
-            // Clear previously selected slots when date changes
             clearAllSelected();
-
-            // Update date text
             updateDateLabels(dateIso);
         }
 
-        // Handle Native Date Input change
         function onDateInputChange(dateIso) {
             if (!dateIso) return;
             currentActiveDate = dateIso;
-
-            // Find matching pill or clear active
-            let matched = false;
             document.querySelectorAll('.date-pill').forEach(p => {
                 if (p.getAttribute('data-date') === dateIso) {
                     p.classList.add('active');
                     p.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
-                    matched = true;
                 } else {
                     p.classList.remove('active');
                 }
             });
-
             clearAllSelected();
             updateDateLabels(dateIso);
         }
@@ -1124,19 +1634,14 @@
             if (modalDateEl) modalDateEl.innerText = formatted;
         }
 
-        // Filter Court columns
         function filterCourt(courtId) {
-            const buttons = document.querySelectorAll('.btn-group button');
-            buttons.forEach(btn => btn.classList.remove('active'));
-
+            document.querySelectorAll('.btn-group button').forEach(btn => btn.classList.remove('active'));
             if (courtId === 'ALL') {
                 document.getElementById('btnFilterAll').classList.add('active');
                 document.querySelectorAll('[class*="court-col"], [class*="court-cell-"]').forEach(el => el.style.display = '');
             } else {
                 const activeBtn = document.getElementById('btnFilter_' + courtId);
                 if (activeBtn) activeBtn.classList.add('active');
-
-                // Hide all court headers and cells except the target one
                 document.querySelectorAll('[class*="court-col"]').forEach(th => {
                     th.style.display = th.classList.contains('court-header-' + courtId) ? '' : 'none';
                 });
@@ -1146,14 +1651,12 @@
             }
         }
 
-        // Toggle Slot Selection
         function toggleSlot(cellEl) {
             const courtId = cellEl.getAttribute('data-court-id');
             const courtName = cellEl.getAttribute('data-court-name');
             const slotId = cellEl.getAttribute('data-slot-id');
             const timeRange = cellEl.getAttribute('data-time-range');
             const price = parseFloat(cellEl.getAttribute('data-price')) || 200;
-
             const key = `${courtId}_${slotId}`;
 
             if (selectedSlots.has(key)) {
@@ -1165,11 +1668,9 @@
                 cellEl.classList.add('selected');
                 cellEl.querySelector('.slot-status-text').innerHTML = '<i class="bi bi-check2"></i> เลือกแล้ว';
             }
-
             updateSummaryBar();
         }
 
-        // Clear all selected slots
         function clearAllSelected() {
             selectedSlots.clear();
             document.querySelectorAll('.slot-cell.selected').forEach(el => {
@@ -1179,12 +1680,105 @@
             updateSummaryBar();
         }
 
-        // Update Floating Summary Bar
+        // ================= AUTOMATIC PROMOTIONS CALCULATION =================
+        function calculateAllPromotions() {
+            let courtSubtotal = 0;
+            selectedSlots.forEach(s => courtSubtotal += s.price);
+
+            let saleSubtotal = 0;
+            let rentalSubtotal = 0;
+            let totalShuttles = 0;
+            let shuttlePrice = 0;
+            let racketRentalCount = 0;
+            let shoesRentalCount = 0;
+            let shoesUnitPrice = 50;
+
+            customerCart.forEach(item => {
+                const lineTotal = item.price * item.qty;
+                if (item.type === 'RENT') {
+                    rentalSubtotal += lineTotal;
+                    if (item.categoryCode === 'RACKET' || item.productName.includes('ไม้แบด')) racketRentalCount += item.qty;
+                    if (item.categoryCode === 'SHOES' || item.productName.includes('รองเท้า')) {
+                        shoesRentalCount += item.qty;
+                        shoesUnitPrice = item.price;
+                    }
+                } else {
+                    saleSubtotal += lineTotal;
+                    if (item.categoryCode === 'SHUTTLECOCK' || item.productName.includes('ลูกแบด')) {
+                        totalShuttles += item.qty;
+                        shuttlePrice = item.price;
+                    }
+                }
+            });
+
+            let promoDiscounts = 0;
+            let promoBadges = [];
+
+            // 1. Off-peak court 20%
+            const playDateObj = new Date(currentActiveDate);
+            const dayOfWeek = playDateObj.getDay(); // 0=Sun, 1=Mon... 5=Fri
+            const isWeekday = dayOfWeek >= 1 && dayOfWeek <= 5;
+            let offPeakDiscount = 0;
+            if (isWeekday) {
+                selectedSlots.forEach(s => {
+                    const sid = parseInt(s.slotId);
+                    if (sid >= 2 && sid <= 7) { // 09:00 - 15:00
+                        offPeakDiscount += (s.price * 0.20);
+                    }
+                });
+                if (offPeakDiscount > 0) {
+                    promoDiscounts += offPeakDiscount;
+                    promoBadges.push(`🏸 โปรฯ Off-Peak (09:00-15:00) ลด 20% ค่าคอร์ท (-${Math.round(offPeakDiscount)} ฿)`);
+                }
+            }
+
+            // 2. Volume-based Shuttlecock (2nd tube 50% off)
+            if (totalShuttles >= 2) {
+                const shuttleDiscount = Math.round(shuttlePrice * 0.50);
+                promoDiscounts += shuttleDiscount;
+                promoBadges.push(`🏷️ โปรฯ ลูกแบดหลอดที่ 2 ลด 50% (-${shuttleDiscount} ฿)`);
+            }
+
+            // 3. Bundle rental (2 rackets + 2 shoes -> 20% off rental)
+            if (racketRentalCount >= 2 && shoesRentalCount >= 2) {
+                const equipRentalTotal = (racketRentalCount * 50) + (shoesRentalCount * shoesUnitPrice);
+                const bundleDiscount = Math.round(equipRentalTotal * 0.20);
+                promoDiscounts += bundleDiscount;
+                promoBadges.push(`⚡ โปรฯ เซ็ตเช่าไม้ 2 ไม้ + รองเท้า 2 คู่ ลด 20% (-${bundleDiscount} ฿)`);
+            }
+            // 4. Cross-selling (1 shuttle + 2 rackets -> free 1 shoes)
+            else if (totalShuttles >= 1 && racketRentalCount >= 2 && shoesRentalCount >= 1) {
+                promoDiscounts += shoesUnitPrice;
+                promoBadges.push(`🎁 โปรฯ ซื้อลูกแบด+เช่าไม้ 2 ไม้ รับสิทธิ์เช่ารองเท้าฟรี 1 คู่ (-${shoesUnitPrice} ฿)`);
+            }
+
+            // 5. Total bill discount (>= 600 THB)
+            const currentTotal = (courtSubtotal + saleSubtotal + rentalSubtotal) - promoDiscounts;
+            if (currentTotal >= 600 && appliedManualPromoCode === 'NEW_MEMBER_100') {
+                promoDiscounts += 100;
+                promoBadges.push(`🎉 โปรฯ ยอดรวมบิล 600 บาทขึ้นไป ลด 100 บาท`);
+            }
+
+            const netTotal = Math.max(0, (courtSubtotal + saleSubtotal + rentalSubtotal) - promoDiscounts);
+
+            lastCalculatedPromos = promoBadges;
+
+            return {
+                courtSubtotal,
+                saleSubtotal,
+                rentalSubtotal,
+                promoDiscounts,
+                promoBadges,
+                netTotal
+            };
+        }
+
         function updateSummaryBar() {
             const count = selectedSlots.size;
             const bar = document.getElementById('floatingSummaryBar');
+            const cartItemsCount = customerCart.size;
 
-            if (count > 0) {
+            if (count > 0 || cartItemsCount > 0) {
                 bar.classList.add('show');
             } else {
                 bar.classList.remove('show');
@@ -1193,159 +1787,523 @@
             document.getElementById('summaryCount').innerText = count;
             document.getElementById('summaryHours').innerText = count;
 
-            let total = 0;
             const courtSet = new Set();
-            selectedSlots.forEach(s => {
-                total += s.price;
-                courtSet.add(s.courtName);
-            });
+            selectedSlots.forEach(s => courtSet.add(s.courtName));
+            document.getElementById('summaryCourtList').innerText = courtSet.size > 0 ? Array.from(courtSet).join(', ') : '-';
 
-            document.getElementById('summaryTotalPrice').innerText = total.toLocaleString() + ' ฿';
-            document.getElementById('summaryCourtList').innerText = Array.from(courtSet).join(', ');
+            const calc = calculateAllPromotions();
+            document.getElementById('summaryTotalPrice').innerText = Math.round(calc.netTotal).toLocaleString() + ' ฿';
         }
 
-        // Open Confirmation Modal
+        // ================= OPEN CHECKOUT MODAL =================
         function openBookingModal() {
-            if (selectedSlots.size === 0) return;
+            if (!isUserLoggedIn) {
+                showGuestAuthPrompt('จองสนามและชำระเงิน');
+                return;
+            }
 
-            const listContainer = document.getElementById('modalSelectedSlotsList');
-            listContainer.innerHTML = '';
+            if (selectedSlots.size === 0 && customerCart.size === 0) {
+                alert('กรุณาเลือกช่วงเวลาคอร์ท หรือเลือกสินค้า/อุปกรณ์อย่างน้อย 1 รายการ');
+                return;
+            }
 
-            let total = 0;
-            selectedSlots.forEach((slot, key) => {
-                total += slot.price;
-                const row = document.createElement('div');
-                row.className = 'd-flex justify-content-between align-items-center bg-white p-2 rounded border small';
-                row.innerHTML = `
-                    <div>
-                        <strong class="text-success">${slot.courtName}</strong>: ${slot.timeRange}
-                    </div>
-                    <span class="fw-bold">${slot.price.toLocaleString()} ฿</span>
-                `;
-                listContainer.appendChild(row);
-            });
+            // Render Court Slots in Modal
+            const slotsContainer = document.getElementById('modalSelectedSlotsList');
+            slotsContainer.innerHTML = '';
+            if (selectedSlots.size === 0) {
+                slotsContainer.innerHTML = '<div class="text-muted small p-2">ไม่ได้เลือกคอร์ท (สั่งซื้อเฉพาะสินค้า/อุปกรณ์)</div>';
+            } else {
+                selectedSlots.forEach((slot, key) => {
+                    const row = document.createElement('div');
+                    row.className = 'd-flex justify-content-between align-items-center bg-light p-2 rounded border small';
+                    row.innerHTML = `
+                        <div>
+                            <strong class="text-success"><i class="bi bi-circle-fill me-1" style="font-size:0.5rem;"></i>${slot.courtName}</strong>: ${slot.timeRange}
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="fw-bold text-dark">${slot.price.toLocaleString()} ฿</span>
+                        </div>
+                    `;
+                    slotsContainer.appendChild(row);
+                });
+            }
 
-            const hours = selectedSlots.size;
-            document.getElementById('modalTotalHours').innerText = `${hours} ชม.`;
-            document.getElementById('modalSubtotal').innerText = `${total.toLocaleString()} ฿`;
-
-            appliedDiscount = 0;
-            document.getElementById('promoDiscountRow').style.setProperty('display', 'none', 'important');
-            document.getElementById('modalFinalPrice').innerText = `${total.toLocaleString()} ฿`;
-            document.getElementById('promoMsg').innerText = '';
-            document.getElementById('promoCodeInput').value = '';
+            renderModalCartItems();
 
             const modal = new bootstrap.Modal(document.getElementById('bookingConfirmModal'));
             modal.show();
         }
 
-        // Active promotions loaded dynamically from database
-        const activePromotions = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
-            promotions.Where(p => p.IsActive == true).Select(p => new {
-                code = p.PromoCode,
-                name = p.PromoName,
-                type = p.PromoType,
-                discount = p.DiscountValue,
-                discountType = p.DiscountType,
-                minBill = p.MinBillAmount ?? 0
-            })
-        ));
+        function renderModalCartItems() {
+            const container = document.getElementById('modalCartItemsList');
+            container.innerHTML = '';
 
-        // Apply Promo Code
+            if (customerCart.size === 0) {
+                container.innerHTML = '<div class="text-muted small p-2">ยังไม่มีสินค้า/อุปกรณ์ในตะกร้า (<a href="#productSection" data-bs-dismiss="modal" class="text-teal">เลือกซื้อ/เช่าเพิ่ม</a>)</div>';
+            } else {
+                customerCart.forEach((item, id) => {
+                    const isRent = item.type === 'RENT';
+                    const lineTotal = item.price * item.qty;
+                    const row = document.createElement('div');
+                    row.className = 'd-flex justify-content-between align-items-center bg-light p-2 rounded border small';
+                    row.innerHTML = `
+                        <div style="flex:1;">
+                            <span class="badge ${isRent ? 'bg-primary' : 'bg-success'} me-1" style="font-size:0.7rem;">${isRent ? 'เช่า' : 'ซื้อ'}</span>
+                            <strong class="text-dark">${item.productName}</strong>
+                            <small class="text-muted d-block">${item.price.toLocaleString()} ฿/${item.unit}</small>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="input-group input-group-sm" style="width:90px;">
+                                <button class="btn btn-outline-secondary px-2 py-0" type="button" onclick="changeCartQty(${id}, -1)">-</button>
+                                <span class="input-group-text bg-white px-2 py-0 fw-bold small">${item.qty}</span>
+                                <button class="btn btn-outline-secondary px-2 py-0" type="button" onclick="changeCartQty(${id}, 1)">+</button>
+                            </div>
+                            <span class="fw-bold text-dark" style="min-width:60px; text-align:right;">${lineTotal.toLocaleString()} ฿</span>
+                            <button class="btn btn-sm btn-link text-danger p-0 ms-1" type="button" onclick="removeFromCustomerCart(${id})"><i class="bi bi-trash"></i></button>
+                        </div>
+                    `;
+                    container.appendChild(row);
+                });
+            }
+
+            // Recalculate summary in modal
+            const calc = calculateAllPromotions();
+            document.getElementById('modalCourtTotal').innerText = calc.courtSubtotal.toLocaleString() + ' ฿';
+            document.getElementById('modalSaleTotal').innerText = calc.saleSubtotal.toLocaleString() + ' ฿';
+            document.getElementById('modalRentalTotal').innerText = calc.rentalSubtotal.toLocaleString() + ' ฿';
+            document.getElementById('modalFinalPrice').innerText = Math.round(calc.netTotal).toLocaleString() + ' ฿';
+            document.getElementById('qrPromptPayAmount').innerText = 'ยอดชำระ: ' + Math.round(calc.netTotal).toLocaleString() + ' ฿';
+
+            // Auto promotion badges display
+            const promoRow = document.getElementById('promoDiscountRow');
+            const promoTagsBox = document.getElementById('appliedPromoList');
+            const promoTagsContainer = document.getElementById('promoTagsContainer');
+
+            if (calc.promoDiscounts > 0) {
+                promoRow.style.setProperty('display', 'flex', 'important');
+                document.getElementById('modalDiscount').innerText = `-${Math.round(calc.promoDiscounts).toLocaleString()} ฿`;
+
+                promoTagsContainer.innerHTML = '';
+                calc.promoBadges.forEach(b => {
+                    const tag = document.createElement('div');
+                    tag.className = 'badge bg-success bg-opacity-10 text-success border border-success text-start py-1 px-2';
+                    tag.style.whiteSpace = 'normal';
+                    tag.innerText = b;
+                    promoTagsContainer.appendChild(tag);
+                });
+                promoTagsBox.style.display = 'block';
+            } else {
+                promoRow.style.setProperty('display', 'none', 'important');
+                promoTagsBox.style.display = 'none';
+            }
+        }
+
+        // Promo code application
         function applyPromoCode() {
             const code = document.getElementById('promoCodeInput').value.trim().toUpperCase();
             const promoMsg = document.getElementById('promoMsg');
 
-            let total = 0;
-            selectedSlots.forEach(s => total += s.price);
-
-            const matchedPromo = activePromotions.find(p => p.code && p.code.toUpperCase() === code);
-
-            if (matchedPromo) {
-                if (matchedPromo.type === 'TOTAL_BILL' && total < matchedPromo.minBill) {
-                    promoMsg.className = 'small mt-1 text-warning fw-bold';
-                    promoMsg.innerText = `โค้ดนี้ต้องมียอดบิลขั้นต่ำ ${matchedPromo.minBill.toLocaleString()} บาท (ปัจจุบัน ${total.toLocaleString()} ฿)`;
-                    return;
-                }
-
-                if (matchedPromo.discountType === 'PERCENT') {
-                    appliedDiscount = Math.round((total * matchedPromo.discount) / 100);
-                } else if (matchedPromo.discountType === 'FIXED_AMOUNT') {
-                    appliedDiscount = matchedPromo.discount;
-                } else if (matchedPromo.discountType === 'FREE_ITEM') {
-                    appliedDiscount = 50; // มูลค่าของแถมฟรี เช่น เช่ารองเท้า 1 คู่
-                }
-
-                document.getElementById('promoDiscountRow').style.setProperty('display', 'flex', 'important');
-                document.getElementById('modalDiscount').innerText = `-${appliedDiscount.toLocaleString()} ฿`;
-                const finalTotal = Math.max(0, total - appliedDiscount);
-                document.getElementById('modalFinalPrice').innerText = `${finalTotal.toLocaleString()} ฿`;
+            if (code === 'NEW_MEMBER_100') {
+                appliedManualPromoCode = code;
+                renderModalCartItems();
                 promoMsg.className = 'small mt-1 text-success fw-bold';
-                promoMsg.innerHTML = `<i class="bi bi-check-circle me-1"></i>ใช้โค้ด ${matchedPromo.name} สำเร็จ! ลด ${appliedDiscount.toLocaleString()} บาท`;
-            } else if (code === 'COURT10' || code === 'WELCOME50' || code === 'MATCHDAY') {
-                appliedDiscount = 50;
-                document.getElementById('promoDiscountRow').style.setProperty('display', 'flex', 'important');
-                document.getElementById('modalDiscount').innerText = `-${appliedDiscount} ฿`;
-                const finalTotal = Math.max(0, total - appliedDiscount);
-                document.getElementById('modalFinalPrice').innerText = `${finalTotal.toLocaleString()} ฿`;
-                promoMsg.className = 'small mt-1 text-success fw-bold';
-                promoMsg.innerHTML = '<i class="bi bi-check-circle me-1"></i>ใช้โค้ดส่วนลด 50 บาท สำเร็จ!';
-            } else {
-                appliedDiscount = 0;
-                document.getElementById('promoDiscountRow').style.setProperty('display', 'none', 'important');
-                document.getElementById('modalFinalPrice').innerText = `${total.toLocaleString()} ฿`;
+                promoMsg.innerHTML = '<i class="bi bi-check-circle me-1"></i>ใช้โค้ดส่วนลด 100 บาท สำเร็จ!';
+            } else if (code) {
+                appliedManualPromoCode = '';
+                renderModalCartItems();
                 promoMsg.className = 'small mt-1 text-danger';
-                promoMsg.innerText = 'โค้ดส่วนลดไม่ถูกต้อง หรือหมดอายุ';
+                promoMsg.innerText = 'โค้ดส่วนลดไม่ถูกต้อง หรือเงื่อนไขไม่ตรงตามที่กำหนด';
             }
         }
 
-        // Confirm Booking Success
-        function confirmBookingSuccess() {
-            // Close Confirm modal
-            const confirmModalEl = document.getElementById('bookingConfirmModal');
-            const confirmModal = bootstrap.Modal.getInstance(confirmModalEl);
-            if (confirmModal) confirmModal.hide();
+        // ================= SLIP IMAGE PREVIEW =================
+        function previewSlipImage(input) {
+            const container = document.getElementById('slipPreviewContainer');
+            const img = document.getElementById('slipPreviewImg');
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    img.src = e.target.result;
+                    img.style.display = 'inline-block';
+                    container.style.display = 'block';
+                };
+                reader.readAsDataURL(input.files[0]);
+            } else {
+                clearSlipPreview();
+            }
+        }
 
-            // Populate Success modal
-            const randomCode = 'CB-' + currentActiveDate.replace(/-/g, '') + '-' + Math.floor(1000 + Math.random() * 9000);
-            document.getElementById('successBookingCode').innerText = randomCode;
-            document.getElementById('successBookingDate').innerText = document.getElementById('modalBookingDate').innerText;
+        function clearSlipPreview() {
+            const input = document.getElementById('slipUploadInput');
+            if (input) input.value = '';
+            const container = document.getElementById('slipPreviewContainer');
+            if (container) container.style.display = 'none';
+            const img = document.getElementById('slipPreviewImg');
+            if (img) img.src = '';
+        }
 
-            let slotSummary = [];
-            let total = 0;
-            selectedSlots.forEach(s => {
-                slotSummary.push(`${s.courtName} (${s.timeRange})`);
-                total += s.price;
-            });
-            total = Math.max(0, total - appliedDiscount);
-
-            document.getElementById('successBookingSlots').innerText = slotSummary.join(', ');
-            document.getElementById('successBookingAmount').innerText = total.toLocaleString() + ' ฿';
-
-            // Increase Stat counter
-            const myBookingsEl = document.getElementById('statMyBookings');
-            if (myBookingsEl) {
-                myBookingsEl.innerText = parseInt(myBookingsEl.innerText || '0') + 1;
+        // ================= SUBMIT BOOKING (AJAX WITH SLIP) =================
+        async function submitBookingWithSlip() {
+            if (!isUserLoggedIn) {
+                showGuestAuthPrompt('ดำเนินการชำระเงิน');
+                return;
             }
 
-            // Mark slots as booked visually
-            selectedSlots.forEach((slot, key) => {
-                const el = document.querySelector(`.slot-cell[data-court-id="${slot.courtId}"][data-slot-id="${slot.slotId}"]`);
-                if (el) {
-                    el.classList.remove('selected');
-                    el.classList.add('booked');
-                    el.removeAttribute('onclick');
-                    el.querySelector('.slot-status-text').innerHTML = '<i class="bi bi-lock-fill me-1"></i>จองแล้ว';
+            const custName = document.getElementById('custName').value.trim();
+            const custPhone = document.getElementById('custPhone').value.trim();
+            const slipInput = document.getElementById('slipUploadInput');
+
+            if (!custName || !custPhone) {
+                alert('กรุณากรอกชื่อ-นามสกุล และเบอร์โทรศัพท์');
+                return;
+            }
+
+            if (!slipInput.files || slipInput.files.length === 0) {
+                if (!confirm('คุณยังไม่ได้แนบสลิปโอนเงิน ต้องการดำเนินการต่อและแนบสลิปภายหลังหรือไม่?')) {
+                    return;
                 }
-            });
+            }
 
-            clearAllSelected();
+            const btnSubmit = document.getElementById('btnSubmitBooking');
+            btnSubmit.disabled = true;
+            btnSubmit.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> กำลังบันทึกการจอง...';
 
-            // Show Success modal
-            setTimeout(() => {
-                const successModal = new bootstrap.Modal(document.getElementById('bookingSuccessModal'));
-                successModal.show();
-            }, 300);
+            try {
+                const formData = new FormData();
+                formData.append('customerName', custName);
+                formData.append('customerPhone', custPhone);
+                formData.append('playDate', currentActiveDate);
+
+                // Serialize slots
+                const slotsArray = [];
+                selectedSlots.forEach(s => {
+                    slotsArray.push({
+                        courtId: parseInt(s.courtId),
+                        courtName: s.courtName,
+                        slotId: parseInt(s.slotId),
+                        timeRange: s.timeRange,
+                        price: s.price
+                    });
+                });
+                formData.append('selectedSlotsJson', JSON.stringify(slotsArray));
+
+                // Serialize cart items
+                const cartArray = [];
+                customerCart.forEach(item => {
+                    cartArray.push({
+                        productId: item.productId,
+                        productName: item.productName,
+                        type: item.type,
+                        categoryCode: item.categoryCode,
+                        qty: item.qty,
+                        price: item.price
+                    });
+                });
+                formData.append('cartItemsJson', JSON.stringify(cartArray));
+                formData.append('promoCode', appliedManualPromoCode);
+
+                if (slipInput.files && slipInput.files.length > 0) {
+                    formData.append('slipFile', slipInput.files[0]);
+                }
+
+                const response = await fetch('/Home/SubmitBooking', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const res = await response.json();
+
+                btnSubmit.disabled = false;
+                btnSubmit.innerHTML = '<i class="bi bi-check2-circle me-1"></i> ยืนยันการจองและส่งสลิป';
+
+                if (res.success) {
+                    // Close Confirm Modal
+                    const confirmModalEl = document.getElementById('bookingConfirmModal');
+                    const confirmModal = bootstrap.Modal.getInstance(confirmModalEl);
+                    if (confirmModal) confirmModal.hide();
+
+                    // Fill Success Modal
+                    document.getElementById('successBookingCode').innerText = res.bookingCode;
+                    document.getElementById('successBookingDate').innerText = res.playDate;
+                    document.getElementById('successBookingStatus').innerText = res.statusText;
+                    document.getElementById('successBookingAmount').innerText = res.netAmount.toLocaleString() + ' ฿';
+
+                    const slotNames = slotsArray.map(s => `${s.courtName} (${s.timeRange})`).join(', ');
+                    document.getElementById('successBookingSlots').innerText = slotNames || '-';
+
+                    if (cartArray.length > 0) {
+                        const itemsSummary = cartArray.map(i => `${i.productName} x ${i.qty}`).join(', ');
+                        document.getElementById('successBookingItems').innerText = itemsSummary;
+                        document.getElementById('successBookingItemsRow').style.display = 'flex';
+                    } else {
+                        document.getElementById('successBookingItemsRow').style.display = 'none';
+                    }
+
+                    // Update Stat counter
+                    const statEl = document.getElementById('statMyBookings');
+                    if (statEl) statEl.innerText = parseInt(statEl.innerText || '0') + 1;
+
+                    // Mark slots as booked visually
+                    selectedSlots.forEach((slot, key) => {
+                        const el = document.querySelector(`.slot-cell[data-court-id="${slot.courtId}"][data-slot-id="${slot.slotId}"]`);
+                        if (el) {
+                            el.classList.remove('selected');
+                            el.classList.add('booked');
+                            el.removeAttribute('onclick');
+                            el.querySelector('.slot-status-text').innerHTML = '<i class="bi bi-lock-fill me-1"></i>จองแล้ว';
+                        }
+                    });
+
+                    // Clear state
+                    customerCart.clear();
+                    clearAllSelected();
+                    updateCartBadges();
+                    clearSlipPreview();
+
+                    // Add new row to recent bookings table
+                    prependNewBookingRow(res.bookingCode, res.playDate, slotNames, cartArray, res.netAmount, res.statusText, res.slipUrl);
+
+                    // Show Success Modal
+                    const successModal = new bootstrap.Modal(document.getElementById('bookingSuccessModal'));
+                    successModal.show();
+                } else {
+                    if (res.requireLogin) {
+                        showGuestAuthPrompt('ดำเนินการชำระเงิน');
+                        return;
+                    }
+                    alert(res.message || 'เกิดข้อผิดพลาดในการบันทึกการจอง');
+                }
+            } catch (err) {
+                btnSubmit.disabled = false;
+                btnSubmit.innerHTML = '<i class="bi bi-check2-circle me-1"></i> ยืนยันการจองและส่งสลิป';
+                alert('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์: ' + err.message);
+            }
+        }
+
+        function prependNewBookingRow(code, date, slots, cart, netAmount, statusText, slipUrl) {
+            const tableBody = document.getElementById('myBookingsTableBody');
+            const emptyMsg = document.getElementById('emptyBookingsMsg');
+            if (emptyMsg) emptyMsg.style.display = 'none';
+            if (!tableBody) return;
+
+            const tr = document.createElement('tr');
+            tr.id = `row_${code}`;
+            const cartText = cart.map(c => `${c.productName} x ${c.qty}`).join(', ') || '-';
+            const slipBtn = slipUrl ?
+                `<button type="button" class="btn btn-sm btn-outline-success py-1 px-2" style="border-radius:8px;" onclick="viewSlipFull('${slipUrl}', '${code}')"><i class="bi bi-image me-1"></i> ดูสลิป</button>` :
+                `<button type="button" class="btn btn-sm btn-outline-warning text-dark py-1 px-2" style="border-radius:8px;" onclick="openUploadSlipModal('${code}')"><i class="bi bi-upload me-1"></i> แนบสลิป</button>`;
+
+            tr.innerHTML = `
+                <td>
+                    <strong class="font-monospace text-primary">${code}</strong>
+                    <small class="text-muted d-block" style="font-size:0.75rem;">เมื่อสักครู่</small>
+                </td>
+                <td><span class="badge bg-light text-dark border"><i class="bi bi-calendar3 me-1"></i>${date}</span></td>
+                <td><div class="small">${slots}</div></td>
+                <td><div class="small text-truncate" style="max-width:180px;">${cartText}</div></td>
+                <td><strong class="text-dark">${netAmount.toLocaleString()} ฿</strong></td>
+                <td><span class="badge bg-warning text-dark px-2 py-1">${statusText}</span></td>
+                <td>${slipBtn}</td>
+                <td class="text-end">
+                    <button type="button" class="btn btn-sm btn-light border px-2 py-1" style="border-radius:8px;" onclick="quickTrack('${code}')"><i class="bi bi-eye me-1"></i> ติดตาม</button>
+                </td>
+            `;
+            tableBody.prepend(tr);
+        }
+
+        // ================= TRACK BOOKING LIVE =================
+        async function trackBookingLive() {
+            const query = document.getElementById('trackSearchInput').value.trim();
+            if (!query) {
+                alert('กรุณากรอกรหัสการจอง หรือเบอร์โทรศัพท์');
+                return;
+            }
+
+            const resultBox = document.getElementById('trackResultBox');
+            resultBox.style.display = 'block';
+            resultBox.innerHTML = '<div class="text-center py-4 text-muted"><span class="spinner-border spinner-border-sm me-2"></span> กำลังดึงข้อมูลสถานะ...</div>';
+
+            try {
+                const response = await fetch(`/Home/TrackBooking?code=${encodeURIComponent(query)}`);
+                const res = await response.json();
+
+                if (!res.success) {
+                    resultBox.innerHTML = `
+                        <div class="alert alert-warning border-0 rounded-4 p-3 d-flex align-items-center gap-3">
+                            <i class="bi bi-exclamation-triangle-fill fs-3 text-warning"></i>
+                            <div>
+                                <h6 class="fw-bold mb-0">${res.message}</h6>
+                                <small class="text-muted">กรุณาตรวจสอบรหัสการจอง เช่น BK-20261116-8842 หรือตรวจสอบเบอร์โทรศัพท์ที่ใช้จอง</small>
+                            </div>
+                        </div>
+                    `;
+                    return;
+                }
+
+                // Render Progress Stepper
+                const step = res.step;
+                const step1Class = step >= 1 ? 'step-completed' : 'step-pending';
+                const step2Class = step >= 2 ? 'step-completed' : (step === 1 ? 'step-active' : 'step-pending');
+                const step3Class = step >= 3 ? 'step-completed' : (step === 2 ? 'step-active' : 'step-pending');
+                const step4Class = step >= 4 ? 'step-completed' : (step === 3 ? 'step-active' : 'step-pending');
+
+                const courtListHtml = res.courts && res.courts.length > 0 ?
+                    res.courts.map(c => `<li><i class="bi bi-check2 text-success me-1"></i><strong>${c.courtName}</strong> (${c.timeRange}) - ${c.price.toLocaleString()} ฿</li>`).join('') :
+                    '<li class="text-muted">ไม่มีการจองคอร์ท</li>';
+
+                const itemsListHtml = res.items && res.items.length > 0 ?
+                    res.items.map(i => `<li><i class="bi bi-box-seam me-1"></i>[${i.type === 'RENT' ? 'เช่า' : 'ซื้อ'}] ${i.name} x ${i.qty} (${i.lineTotal.toLocaleString()} ฿)</li>`).join('') :
+                    '<li class="text-muted">ไม่มีสินค้า/อุปกรณ์</li>';
+
+                const slipBtnHtml = res.slipUrl ?
+                    `<button class="btn btn-sm btn-outline-success mt-2" onclick="viewSlipFull('${res.slipUrl}', '${res.bookingCode}')"><i class="bi bi-image me-1"></i> ดูสลิปที่แนบไว้</button>` :
+                    `<button class="btn btn-sm btn-warning mt-2 fw-bold" onclick="openUploadSlipModal('${res.bookingCode}')"><i class="bi bi-upload me-1"></i> แนบสลิปโอนเงินตอนนี้</button>`;
+
+                resultBox.innerHTML = `
+                    <div class="card border-0 shadow-sm rounded-4 overflow-hidden bg-white">
+                        <div class="p-3 border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2" style="background:#f8fafc;">
+                            <div>
+                                <span class="badge ${res.badgeClass} me-2 px-3 py-2 fs-6">${res.statusText}</span>
+                                <strong class="font-monospace fs-5 text-primary">${res.bookingCode}</strong>
+                            </div>
+                            <div class="small text-muted">
+                                <i class="bi bi-calendar3 me-1"></i>วันที่เล่น: <strong>${res.playDate}</strong> • วันที่ทำรายการ: ${res.createdAt}
+                            </div>
+                        </div>
+
+                        <!-- 4-Step Visual Progress Stepper -->
+                        <div class="p-4 bg-light border-bottom">
+                            <div class="d-flex justify-content-between align-items-center position-relative flex-wrap gap-2 text-center" style="max-width:700px; margin:0 auto;">
+                                <div class="flex-fill">
+                                    <div class="rounded-circle d-inline-flex align-items-center justify-content-center text-white mb-1" style="width:40px; height:40px; background:${step >= 1 ? '#16a34a' : '#94a3b8'};">
+                                        <i class="bi bi-clipboard-check"></i>
+                                    </div>
+                                    <div class="small fw-bold">1. ยื่นคำขอจอง</div>
+                                </div>
+                                <div class="text-muted"><i class="bi bi-arrow-right"></i></div>
+                                <div class="flex-fill">
+                                    <div class="rounded-circle d-inline-flex align-items-center justify-content-center text-white mb-1" style="width:40px; height:40px; background:${step >= 2 ? '#16a34a' : (step === 1 ? '#f59e0b' : '#94a3b8')};">
+                                        <i class="bi bi-upload"></i>
+                                    </div>
+                                    <div class="small fw-bold">2. แนบสลิปโอนเงิน</div>
+                                </div>
+                                <div class="text-muted"><i class="bi bi-arrow-right"></i></div>
+                                <div class="flex-fill">
+                                    <div class="rounded-circle d-inline-flex align-items-center justify-content-center text-white mb-1" style="width:40px; height:40px; background:${step >= 3 ? '#16a34a' : (step === 2 ? '#f59e0b' : '#94a3b8')};">
+                                        <i class="bi bi-shield-check"></i>
+                                    </div>
+                                    <div class="small fw-bold">3. บัญชีอนุมัติคิว</div>
+                                </div>
+                                <div class="text-muted"><i class="bi bi-arrow-right"></i></div>
+                                <div class="flex-fill">
+                                    <div class="rounded-circle d-inline-flex align-items-center justify-content-center text-white mb-1" style="width:40px; height:40px; background:${step >= 4 ? '#2563eb' : '#94a3b8'};">
+                                        <i class="bi bi-door-open"></i>
+                                    </div>
+                                    <div class="small fw-bold">4. เช็คอินเข้าเล่น</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card-body p-4">
+                            <div class="row g-3">
+                                <div class="col-md-6 border-end">
+                                    <h6 class="fw-bold text-dark mb-2"><i class="bi bi-info-circle me-1 text-primary"></i>ข้อมูลการจอง</h6>
+                                    <ul class="list-unstyled small mb-3">
+                                        <li><strong>ผู้จอง:</strong> ${res.customerName} (${res.customerPhone})</li>
+                                        <li><strong>วันที่เล่น:</strong> ${res.playDate}</li>
+                                    </ul>
+                                    <h6 class="fw-bold text-dark mb-1"><i class="bi bi-geo-alt me-1 text-success"></i>คอร์ทที่จอง:</h6>
+                                    <ul class="list-unstyled small mb-2">${courtListHtml}</ul>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6 class="fw-bold text-dark mb-2"><i class="bi bi-cart me-1 text-teal"></i>สินค้าและอุปกรณ์เช่า:</h6>
+                                    <ul class="list-unstyled small mb-3">${itemsListHtml}</ul>
+                                    <div class="p-3 bg-light rounded-3 small">
+                                        <div class="d-flex justify-content-between mb-1">
+                                            <span>ค่าคอร์ท:</span> <strong>${res.courtAmount.toLocaleString()} ฿</strong>
+                                        </div>
+                                        <div class="d-flex justify-content-between mb-1">
+                                            <span>ค่าสินค้า/เช่า:</span> <strong>${(res.saleAmount + res.rentalAmount).toLocaleString()} ฿</strong>
+                                        </div>
+                                        ${res.discountAmount > 0 ? `<div class="d-flex justify-content-between text-success mb-1"><span>ส่วนลดโปรโมชั่น:</span> <strong>-${res.discountAmount.toLocaleString()} ฿</strong></div>` : ''}
+                                        <div class="d-flex justify-content-between pt-1 border-top mt-1">
+                                            <span class="fw-bold">ยอดชำระสุทธิ:</span>
+                                            <strong class="text-success fs-5">${res.netAmount.toLocaleString()} ฿</strong>
+                                        </div>
+                                        ${slipBtnHtml}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } catch (err) {
+                resultBox.innerHTML = `<div class="alert alert-danger">เกิดข้อผิดพลาดในการดึงข้อมูล: ${err.message}</div>`;
+            }
+        }
+
+        function quickTrack(code) {
+            document.getElementById('trackSearchInput').value = code;
+            scrollToTracking();
+            setTimeout(trackBookingLive, 200);
+        }
+
+        // ================= SLIP VIEWER & UPLOAD FOR EXISTING BOOKING =================
+        function viewSlipFull(url, code) {
+            document.getElementById('slipViewerImg').src = url;
+            document.getElementById('slipViewerCode').innerText = code;
+            const modal = new bootstrap.Modal(document.getElementById('slipViewerModal'));
+            modal.show();
+        }
+
+        function openUploadSlipModal(code) {
+            document.getElementById('uploadSlipBookingCode').value = code;
+            document.getElementById('uploadSlipFileInput').value = '';
+            const modal = new bootstrap.Modal(document.getElementById('uploadSlipModal'));
+            modal.show();
+        }
+
+        async function submitExistingSlip() {
+            const code = document.getElementById('uploadSlipBookingCode').value;
+            const fileInput = document.getElementById('uploadSlipFileInput');
+            if (!fileInput.files || fileInput.files.length === 0) {
+                alert('กรุณาเลือกไฟล์สลิปโอนเงิน');
+                return;
+            }
+
+            const btn = document.getElementById('btnSubmitExistingSlip');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> กำลังอัปโหลด...';
+
+            try {
+                const fd = new FormData();
+                fd.append('bookingCode', code);
+                fd.append('slipFile', fileInput.files[0]);
+
+                const response = await fetch('/Home/UploadBookingSlip', {
+                    method: 'POST',
+                    body: fd
+                });
+                const res = await response.json();
+
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-cloud-arrow-up-fill me-1"></i> บันทึกและส่งสลิป';
+
+                if (res.success) {
+                    const modalEl = document.getElementById('uploadSlipModal');
+                    const modal = bootstrap.Modal.getInstance(modalEl);
+                    if (modal) modal.hide();
+
+                    alert(res.message);
+                    quickTrack(code);
+                } else {
+                    alert(res.message || 'เกิดข้อผิดพลาดในการอัปโหลดสลิป');
+                }
+            } catch (err) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-cloud-arrow-up-fill me-1"></i> บันทึกและส่งสลิป';
+                alert('ข้อผิดพลาด: ' + err.message);
+            }
         }
 
         function showPromoInfo() {
@@ -1353,10 +2311,11 @@
             modal.show();
         }
 
-        // Check hash or date query on load
         window.addEventListener('DOMContentLoaded', () => {
             if (window.location.hash === '#bookingSection' || window.location.search.includes('date=')) {
                 setTimeout(scrollToBooking, 250);
+            } else if (window.location.hash === '#myBookingsSection') {
+                setTimeout(scrollToTracking, 250);
             }
         });
     </script>

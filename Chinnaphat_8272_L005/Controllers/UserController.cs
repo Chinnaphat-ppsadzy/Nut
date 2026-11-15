@@ -1,6 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using Chinnaphat_8272_L005.Models;
 using Chinnaphat_8272_L005.ViewModels;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Http;
+using System.Net;
 
 namespace Chinnaphat_8272_L005.Controllers
 {
@@ -63,6 +66,30 @@ namespace Chinnaphat_8272_L005.Controllers
                 // UPDATE — บันทึกเวลาล็อกอินล่าสุดลงฐานข้อมูล
                 user.LastLoginAt = DateTime.Now;
                 _db.SaveChanges();
+
+                // เก็บข้อมูลผู้ใช้ที่ล็อกอินผ่าน Session และ Cookies
+                try
+                {
+                    HttpContext.Session.SetString("UserId", user.UserId.ToString());
+                    HttpContext.Session.SetString("FullName", user.FullName);
+                    HttpContext.Session.SetString("Email", user.Email);
+                    HttpContext.Session.SetString("RoleCode", roleCode);
+                    HttpContext.Session.SetString("RoleName", userRole?.RoleName ?? roleCode);
+                }
+                catch {}
+
+                var cookieOptions = new CookieOptions
+                {
+                    Expires = model.RememberMe ? DateTimeOffset.Now.AddDays(30) : DateTimeOffset.Now.AddHours(24),
+                    HttpOnly = false,
+                    IsEssential = true,
+                    SameSite = SameSiteMode.Lax
+                };
+                Response.Cookies.Append("cb_user_id", user.UserId.ToString(), cookieOptions);
+                Response.Cookies.Append("cb_user_name", WebUtility.UrlEncode(user.FullName), cookieOptions);
+                Response.Cookies.Append("cb_email", user.Email, cookieOptions);
+                Response.Cookies.Append("cb_role_code", roleCode, cookieOptions);
+                Response.Cookies.Append("cb_role_name", WebUtility.UrlEncode(userRole?.RoleName ?? roleCode), cookieOptions);
 
                 // เก็บข้อมูลผู้ใช้ที่ล็อกอินผ่าน TempData
                 TempData["IsLoggedIn"]  = true;
@@ -383,6 +410,250 @@ namespace Chinnaphat_8272_L005.Controllers
             model.UserId  = id;
             ViewData["Title"] = "แก้ไขผู้ใช้งาน";
             return View("EditUser", model);
+        }
+
+        // ============================================================
+        // LOGOUT — ออกจากระบบ ล้าง Session และ Cookies
+        // ============================================================
+        [HttpGet]
+        public IActionResult Logout()
+        {
+            try
+            {
+                HttpContext.Session.Clear();
+            }
+            catch {}
+
+            // ล้างข้อมูล TempData ทั้งหมด
+            TempData.Remove("IsLoggedIn");
+            TempData.Remove("UserId");
+            TempData.Remove("Username");
+            TempData.Remove("FullName");
+            TempData.Remove("Email");
+            TempData.Remove("RoleCode");
+            TempData.Remove("RoleName");
+            TempData.Clear();
+
+            // ล้างคุกกี้ทั้งหมดพร้อมระบุ Path = "/"
+            var deleteOptions = new CookieOptions
+            {
+                Expires = DateTimeOffset.Now.AddDays(-1),
+                Path = "/"
+            };
+
+            Response.Cookies.Delete("cb_user_id", deleteOptions);
+            Response.Cookies.Delete("cb_user_name", deleteOptions);
+            Response.Cookies.Delete("cb_email", deleteOptions);
+            Response.Cookies.Delete("cb_role_code", deleteOptions);
+            Response.Cookies.Delete("cb_role_name", deleteOptions);
+            Response.Cookies.Delete("cb_phone", deleteOptions);
+
+            Response.Cookies.Delete("cb_user_id");
+            Response.Cookies.Delete("cb_user_name");
+            Response.Cookies.Delete("cb_email");
+            Response.Cookies.Delete("cb_role_code");
+            Response.Cookies.Delete("cb_role_name");
+            Response.Cookies.Delete("cb_phone");
+
+            TempData["SuccessMessage"] = "ออกจากระบบเรียบร้อยแล้ว เข้าสู่โหมดผู้เยี่ยมชม (Guest)";
+            return RedirectToAction("Customer", "Home");
+        }
+
+        // ============================================================
+        // PROFILE — แสดงข้อมูลสมาชิก ประวัติการจอง และประวัติซื้อ/เช่า
+        // ============================================================
+        [HttpGet]
+        public async Task<IActionResult> Profile()
+        {
+            ViewData["Title"] = "โปรไฟล์ของฉัน & ประวัติการใช้งาน";
+
+            // 1. ตรวจสอบ User ID จาก Session หรือ Cookies
+            string? uidStr = HttpContext.Session.GetString("UserId") ?? Request.Cookies["cb_user_id"];
+            uint targetUid = 0;
+            if (!string.IsNullOrEmpty(uidStr))
+            {
+                uint.TryParse(uidStr, out targetUid);
+            }
+
+            User? user = null;
+            if (targetUid > 0)
+            {
+                user = await _db.Users.Include(u => u.Role).FirstOrDefaultAsync(u => u.UserId == targetUid);
+            }
+
+            if (user == null)
+            {
+                var cookieEmail = Request.Cookies["cb_email"];
+                if (!string.IsNullOrEmpty(cookieEmail))
+                {
+                    user = await _db.Users.Include(u => u.Role).FirstOrDefaultAsync(u => u.Email == cookieEmail);
+                }
+            }
+
+            if (user == null)
+            {
+                TempData["ErrorMessage"] = "กรุณาเข้าสู่ระบบเพื่อดูหน้าโปรไฟล์และประวัติการจอง";
+                return RedirectToAction("Login");
+            }
+
+            var model = new ProfileViewModel
+            {
+                UserId = user.UserId,
+                FullName = user.FullName,
+                Email = user.Email,
+                Phone = user.Phone ?? "-",
+                RoleName = user.Role?.RoleName ?? "ลูกค้าทั่วไป",
+                RoleCode = user.Role?.RoleCode ?? "CUSTOMER",
+                Status = user.Status ?? "active",
+                CreatedAt = user.CreatedAt
+            };
+
+            // 2. ดึงประวัติการจองของผู้ใช้นี้
+            var bookings = await _db.Bookings
+                .Where(b => b.UserId == user.UserId)
+                .Include(b => b.BookingSlots).ThenInclude(bs => bs.Court)
+                .Include(b => b.BookingSlots).ThenInclude(bs => bs.Slot)
+                .Include(b => b.BookingItems).ThenInclude(bi => bi.Product).ThenInclude(p => p.Category)
+                .Include(b => b.Payments)
+                .OrderByDescending(b => b.CreatedAt)
+                .ToListAsync();
+
+            model.TotalBookingsCount = bookings.Count;
+            model.TotalSpending = bookings.Sum(b => b.NetAmount);
+
+            foreach (var b in bookings)
+            {
+                var cNames = string.Join(", ", b.BookingSlots.Select(s => s.Court?.CourtName ?? $"Court {s.CourtId}").Distinct());
+                var tSlots = string.Join(", ", b.BookingSlots.Select(s => s.Slot != null ? $"{s.Slot.StartTime:HH:mm}-{s.Slot.EndTime:HH:mm}" : $"Slot {s.SlotId}"));
+
+                string sText = "รอชำระเงิน";
+                string sBadge = "bg-warning text-dark";
+                switch (b.Status?.ToUpper())
+                {
+                    case "PENDING_VERIFICATION":
+                        sText = "รอฝ่ายบัญชีตรวจสอบสลิป";
+                        sBadge = "bg-warning text-dark";
+                        break;
+                    case "CONFIRMED":
+                        sText = "ยืนยันคิวแล้ว (พร้อมใช้สนาม)";
+                        sBadge = "bg-success text-white";
+                        break;
+                    case "CHECKED_IN":
+                        sText = "เช็คอินเข้าสนามแล้ว";
+                        sBadge = "bg-primary text-white";
+                        break;
+                    case "COMPLETED":
+                        sText = "เสร็จสิ้นการใช้บริการ";
+                        sBadge = "bg-secondary text-white";
+                        break;
+                    case "CANCELLED":
+                        sText = "ยกเลิกการจอง";
+                        sBadge = "bg-danger text-white";
+                        break;
+                }
+
+                model.CourtBookings.Add(new ProfileBookingItem
+                {
+                    BookingId = b.BookingId,
+                    BookingCode = b.BookingCode,
+                    PlayDate = b.PlayDate.ToString("dd/MM/yyyy"),
+                    CourtNames = string.IsNullOrEmpty(cNames) ? "ไม่ได้จองคอร์ท" : cNames,
+                    TimeSlots = tSlots,
+                    CourtAmount = b.CourtAmount,
+                    DiscountAmount = b.DiscountAmount,
+                    NetAmount = b.NetAmount,
+                    Status = b.Status,
+                    StatusText = sText,
+                    StatusBadgeClass = sBadge,
+                    SlipImageUrl = b.Payments.OrderByDescending(p => p.PaymentId).FirstOrDefault()?.SlipImageUrl,
+                    CreatedAt = b.CreatedAt
+                });
+
+                // แยกรายการสินค้าซื้อ (Purchases) และอุปกรณ์เช่า (Rentals)
+                foreach (var itm in b.BookingItems)
+                {
+                    if (itm.ItemType == "RENT")
+                    {
+                        model.TotalRentalItemsCount += (int)itm.Quantity;
+
+                        string rText = "จองไว้ (รอรับอุปกรณ์)";
+                        string rBadge = "bg-warning text-dark";
+                        if (itm.ItemStatus == "HANDED_OVER") { rText = "รับอุปกรณ์แล้ว"; rBadge = "bg-primary text-white"; }
+                        else if (itm.ItemStatus == "RETURNED") { rText = "ส่งคืนแล้ว"; rBadge = "bg-success text-white"; }
+                        else if (itm.ItemStatus == "DAMAGED") { rText = "ชำรุดเสียหาย"; rBadge = "bg-danger text-white"; }
+
+                        model.RentalHistory.Add(new ProfileRentalItem
+                        {
+                            BookingItemId = itm.BookingItemId,
+                            BookingCode = b.BookingCode,
+                            ProductName = itm.Product?.ProductName ?? $"อุปกรณ์ #{itm.ProductId}",
+                            CategoryName = itm.Product?.Category?.CategoryName ?? "อุปกรณ์เช่า",
+                            Quantity = itm.Quantity,
+                            UnitPrice = itm.UnitPrice,
+                            Deposit = itm.Product?.Deposit ?? 0m,
+                            LineTotal = itm.LineTotal,
+                            ItemStatus = itm.ItemStatus,
+                            ItemStatusText = rText,
+                            ItemStatusBadgeClass = rBadge,
+                            HandedOverAt = itm.HandedOverAt,
+                            ReturnedAt = itm.ReturnedAt,
+                            RentalDate = b.CreatedAt
+                        });
+                    }
+                    else
+                    {
+                        model.TotalSaleItemsCount += (int)itm.Quantity;
+                        model.PurchaseHistory.Add(new ProfileOrderItem
+                        {
+                            BookingItemId = itm.BookingItemId,
+                            BookingCode = b.BookingCode,
+                            ProductName = itm.Product?.ProductName ?? $"สินค้า #{itm.ProductId}",
+                            CategoryName = itm.Product?.Category?.CategoryName ?? "สินค้าขาย",
+                            Quantity = itm.Quantity,
+                            UnitPrice = itm.UnitPrice,
+                            LineTotal = itm.LineTotal,
+                            ItemStatus = itm.ItemStatus,
+                            OrderDate = b.CreatedAt
+                        });
+                    }
+                }
+            }
+
+            return View(model);
+        }
+
+        // ============================================================
+        // UPDATE PROFILE — แก้ไขชื่อ-นามสกุล และเบอร์โทรศัพท์
+        // ============================================================
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> UpdateProfile(string fullName, string phone)
+        {
+            string? uidStr = HttpContext.Session.GetString("UserId") ?? Request.Cookies["cb_user_id"];
+            if (string.IsNullOrEmpty(uidStr) || !uint.TryParse(uidStr, out uint uid))
+            {
+                return RedirectToAction("Login");
+            }
+
+            var user = await _db.Users.FindAsync(uid);
+            if (user != null)
+            {
+                if (!string.IsNullOrWhiteSpace(fullName)) user.FullName = fullName.Trim();
+                if (!string.IsNullOrWhiteSpace(phone)) user.Phone = phone.Trim();
+                user.UpdatedAt = DateTime.Now;
+                await _db.SaveChangesAsync();
+
+                try
+                {
+                    HttpContext.Session.SetString("FullName", user.FullName);
+                }
+                catch {}
+                Response.Cookies.Append("cb_user_name", WebUtility.UrlEncode(user.FullName));
+
+                TempData["SuccessMessage"] = "อัปเดตข้อมูลส่วนตัวสำเร็จเรียบร้อย!";
+            }
+
+            return RedirectToAction("Profile");
         }
     }
 }

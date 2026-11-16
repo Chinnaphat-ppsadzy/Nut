@@ -96,10 +96,10 @@
                     string curSection = ViewBag.Section as string ?? "";
                 }
 
-                <!-- หน้าหลัก (แสดงทุกส่วน) -->
+                <!-- Dashboard / Home -->
                 <a href="/Home/Customer"
                    class="btn @(curCtrl == "Home" && curAct == "Customer" && curSection == "" ? "btn-success" : "btn-light") w-100 text-start mb-2">
-                    <i class="bi bi-house-door me-2"></i>
+                    <i class="bi bi-house-door me-2 text-success"></i>
                     หน้าหลัก
                 </a>
 
@@ -113,14 +113,14 @@
                 <!-- ซื้ออุปกรณ์ / บริการเช่า -->
                 <a href="/Home/Customer?section=product"
                    class="btn @(curSection == "product" ? "btn-success" : "btn-light") w-100 text-start mb-2">
-                    <i class="bi bi-bag-check me-2" style="color:#0d9488;"></i>
+                    <i class="bi bi-bag-check me-2 text-success"></i>
                     ซื้ออุปกรณ์ & เช่าอุปกรณ์
                 </a>
 
                 <!-- ติดตามสถานะการจอง -->
                 <a href="/Home/Customer?section=tracking"
-                   class="btn @(curSection == "tracking" ? "btn-primary" : "btn-light") w-100 text-start mb-2">
-                    <i class="bi bi-clock-history me-2 text-primary"></i>
+                   class="btn @(curSection == "tracking" ? "btn-success" : "btn-light") w-100 text-start mb-2">
+                    <i class="bi bi-clock-history me-2 text-success"></i>
                     ดูสถานะการจอง
                 </a>
 
@@ -128,7 +128,7 @@
                 <a href="javascript:void(0)"
                    onclick="if(typeof showPromoInfo==='function'){showPromoInfo();}else{window.location.href='/Home/Customer?showpromo=1';}"
                    class="btn btn-light w-100 text-start mb-2">
-                    <i class="bi bi-ticket-perforated me-2 text-warning"></i>
+                    <i class="bi bi-ticket-perforated me-2 text-success"></i>
                     ดูโปรโมชั่นที่ใช้ได้
                 </a>
 
@@ -136,7 +136,7 @@
 
                 <!-- Account -->
                 <div class="text-secondary small fw-bold mb-3">
-                    <i class="bi bi-person-circle me-1 text-primary"></i>บัญชีผู้ใช้งาน
+                    <i class="bi bi-person-circle me-1 text-success"></i>บัญชีผู้ใช้งาน
                 </div>
 
                 @if (isLoggedIn)

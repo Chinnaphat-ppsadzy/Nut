@@ -1,0 +1,530 @@
+@{
+    Layout = "_AccountingLayout";
+    ViewData["Title"] = "คิดค่าปรับอุปกรณ์เสียหาย & จัดการคืนเงิน";
+
+    string activeTab = ViewBag.ActiveTab as string ?? "damages";
+    var damages = ViewBag.Damages as List<Chinnaphat_8272_L005.Models.EquipmentDamage> ?? new();
+    var refunds = ViewBag.Refunds as List<Chinnaphat_8272_L005.Models.Refund> ?? new();
+    var cancelledBookings = ViewBag.CancelledBookings as List<Chinnaphat_8272_L005.Models.Booking> ?? new();
+
+    int reportedCount = damages.Count(d => d.Status == "REPORTED");
+    int chargedCount = damages.Count(d => d.Status == "CHARGED");
+    int paidFinesCount = damages.Count(d => d.Status == "PAID");
+    decimal totalFinesCollected = damages.Where(d => d.Status == "PAID").Sum(d => d.FineAmount);
+    decimal totalRefunded = refunds.Where(r => r.Status == "COMPLETED").Sum(r => r.Amount);
+}
+
+<!-- ============================================================
+     HERO BANNER
+     ============================================================ -->
+<div class="card border-0 shadow-sm mb-4" style="border-radius:18px; background: linear-gradient(135deg, #1a472a 0%, #2d6a4f 60%, #52b788 100%); color:white;">
+    <div class="card-body p-4">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+            <div>
+                <span class="badge bg-white text-success fw-bold mb-2 font-monospace">FINES & REFUNDS MANAGEMENT</span>
+                <h4 class="fw-bold mb-1">
+                    <i class="bi bi-cash-coin me-2"></i>จัดการค่าปรับอุปกรณ์เสียหาย & ดำเนินการคืนเงิน (Refund)
+                </h4>
+                <p class="mb-0 text-white-50 small">
+                    ฝ่ายบัญชีประเมินค่าเสียหาย กำหนดค่าปรับอุปกรณ์เช่าชำรุด และอนุมัติคืนเงินแก่ลูกค้ากรณีบอกเลิกการจองตามเงื่อนไข
+                </p>
+            </div>
+            <div class="d-flex gap-2">
+                <a asp-action="Reports" class="btn btn-light fw-bold text-success px-4 py-2" style="border-radius:10px;">
+                    <i class="bi bi-graph-up-arrow me-1"></i> ดูรายงานการเงิน
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================
+     NAVIGATION TABS
+     ============================================================ -->
+<div class="d-flex gap-2 mb-4">
+    <a asp-action="DamagesAndRefunds" asp-route-tab="damages" class="btn @(activeTab == "damages" ? "btn-success" : "btn-light") fw-semibold px-4 py-2 shadow-sm" style="border-radius:12px;">
+        <i class="bi bi-tools me-2"></i> ค่าปรับอุปกรณ์เช่าชำรุด
+        @if (reportedCount > 0)
+        {
+            <span class="badge bg-danger ms-2">@reportedCount รายการใหม่</span>
+        }
+    </a>
+    <a asp-action="DamagesAndRefunds" asp-route-tab="refunds" class="btn @(activeTab == "refunds" ? "btn-success" : "btn-light") fw-semibold px-4 py-2 shadow-sm" style="border-radius:12px;">
+        <i class="bi bi-arrow-counterclockwise me-2"></i> จัดการคืนเงินลูกค้า (Refunds)
+        @if (cancelledBookings.Any())
+        {
+            <span class="badge bg-warning text-dark ms-2">@cancelledBookings.Count รอคืนเงิน</span>
+        }
+    </a>
+</div>
+
+<!-- ============================================================
+     TAB 1: DAMAGES & FINES
+     ============================================================ -->
+@if (activeTab == "damages")
+{
+    <!-- Stat Cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm p-3 h-100" style="border-radius:16px; border-left: 5px solid #dc3545 !important;">
+                <div class="text-muted small fw-bold">รอประเมินค่าปรับ</div>
+                <div class="fs-3 fw-bold text-danger mt-1">@reportedCount <span class="fs-6 fw-normal text-muted">รายการ</span></div>
+                <small class="text-secondary">แจ้งมาจากฝ่ายตรวจเช็คอุปกรณ์</small>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm p-3 h-100" style="border-radius:16px; border-left: 5px solid #fd7e14 !important;">
+                <div class="text-muted small fw-bold">คิดค่าปรับแล้ว (รอชำระ)</div>
+                <div class="fs-3 fw-bold text-dark mt-1">@chargedCount <span class="fs-6 fw-normal text-muted">รายการ</span></div>
+                <small class="text-secondary">ลูกค้ารอชำระค่าเสียหาย</small>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm p-3 h-100" style="border-radius:16px; border-left: 5px solid #198754 !important;">
+                <div class="text-muted small fw-bold">ชำระค่าปรับเรียบร้อย</div>
+                <div class="fs-3 fw-bold text-success mt-1">@paidFinesCount <span class="fs-6 fw-normal text-muted">รายการ</span></div>
+                <small class="text-success">ยอดรับรวม @totalFinesCollected.ToString("N2") ฿</small>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm p-3 h-100" style="border-radius:16px; border-left: 5px solid #6c757d !important;">
+                <div class="text-muted small fw-bold">รายการเสียหายทั้งหมด</div>
+                <div class="fs-3 fw-bold text-secondary mt-1">@damages.Count <span class="fs-6 fw-normal text-muted">รายการ</span></div>
+                <small class="text-muted">ประวัติการบันทึกทั้งหมด</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- Table of Damages -->
+    <div class="card border-0 shadow-sm" style="border-radius:18px; overflow:hidden;">
+        <div class="p-3 bg-white border-bottom d-flex justify-content-between align-items-center">
+            <h5 class="fw-bold mb-0 text-dark">
+                <i class="bi bi-shield-exclamation text-success me-2"></i>รายการอุปกรณ์เสียหายและค่าปรับ (@damages.Count รายการ)
+            </h5>
+        </div>
+
+        @if (damages.Any())
+        {
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr class="small text-secondary">
+                            <th style="width: 70px;">หลักฐาน</th>
+                            <th>รหัส / อุปกรณ์</th>
+                            <th>รหัสจอง / ลูกค้า</th>
+                            <th>รายละเอียดความเสียหาย</th>
+                            <th>ผู้รายงาน</th>
+                            <th>ค่าปรับ (฿)</th>
+                            <th>สถานะ</th>
+                            <th class="text-end">การจัดการ</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var d in damages)
+                        {
+                            var bItem = d.BookingItem;
+                            var booking = bItem?.Booking;
+                            var customer = booking?.User;
+                            <tr>
+                                <td>
+                                    @if (!string.IsNullOrEmpty(d.PhotoUrl))
+                                    {
+                                        <img src="@d.PhotoUrl" alt="หลักฐาน" class="rounded shadow-sm" style="width:50px; height:50px; object-fit:cover; cursor:pointer;" onclick="showImageModal('@d.PhotoUrl')" />
+                                    }
+                                    else
+                                    {
+                                        <div class="rounded bg-light text-muted d-flex align-items-center justify-content-center" style="width:50px; height:50px;">
+                                            <i class="bi bi-image"></i>
+                                        </div>
+                                    }
+                                </td>
+                                <td>
+                                    <div class="fw-bold text-dark">@(bItem?.Product?.ProductName ?? "อุปกรณ์เช่า")</div>
+                                    <span class="badge bg-secondary font-monospace">#DMG-@d.DamageId</span>
+                                </td>
+                                <td>
+                                    <div class="font-monospace text-primary fw-bold">@(booking?.BookingCode ?? "-")</div>
+                                    <small class="text-muted">@(customer?.FullName ?? "ลูกค้า")</small>
+                                </td>
+                                <td>
+                                    <div class="text-danger small fw-semibold">@d.Description</div>
+                                    <small class="text-muted">แจ้งเมื่อ: @d.CreatedAt.ToString("dd/MM/yyyy HH:mm")</small>
+                                </td>
+                                <td>
+                                    <small class="text-dark">@(d.ReportedByNavigation?.FullName ?? "เจ้าหน้าที่")</small>
+                                </td>
+                                <td>
+                                    <strong class="fs-6 font-monospace @(d.FineAmount > 0 ? "text-danger" : "text-muted")">
+                                        @d.FineAmount.ToString("N2") ฿
+                                    </strong>
+                                </td>
+                                <td>
+                                    @if (d.Status == "REPORTED")
+                                    {
+                                        <span class="badge bg-danger"><i class="bi bi-exclamation-circle me-1"></i>รอคิดค่าปรับ</span>
+                                    }
+                                    else if (d.Status == "CHARGED")
+                                    {
+                                        <span class="badge bg-warning text-dark"><i class="bi bi-clock me-1"></i>รอชำระค่าปรับ</span>
+                                    }
+                                    else if (d.Status == "PAID")
+                                    {
+                                        <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>ชำระแล้ว</span>
+                                    }
+                                    else if (d.Status == "WAIVED")
+                                    {
+                                        <span class="badge bg-secondary"><i class="bi bi-slash-circle me-1"></i>ยกเว้นค่าปรับ</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-light text-dark">@d.Status</span>
+                                    }
+                                </td>
+                                <td class="text-end">
+                                    <button type="button" class="btn btn-sm btn-outline-success px-3" style="border-radius:8px;"
+                                            onclick="openFineModal(@d.DamageId, '@(bItem?.Product?.ProductName ?? "อุปกรณ์")', @d.FineAmount, '@d.Status', '@d.Description')">
+                                        <i class="bi bi-pencil-square me-1"></i> กำหนดค่าปรับ
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else
+        {
+            <div class="p-5 text-center text-muted">
+                <i class="bi bi-check2-circle fs-1 d-block mb-2 text-success"></i>
+                <h6>ไม่มีประวัติอุปกรณ์เช่าชำรุดในขณะนี้</h6>
+                <small>เมื่อฝ่ายตรวจสอบอุปกรณ์พบความเสียหาย ข้อมูลจะปรากฏที่นี่เพื่อให้ฝ่ายบัญชีกำหนดค่าปรับ</small>
+            </div>
+        }
+    </div>
+}
+
+<!-- ============================================================
+     TAB 2: REFUNDS
+     ============================================================ -->
+@if (activeTab == "refunds")
+{
+    <!-- Stat Cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm p-3 h-100" style="border-radius:16px; border-left: 5px solid #ffc107 !important;">
+                <div class="text-muted small fw-bold">คิวที่ยกเลิกรอดำเนินการคืนเงิน</div>
+                <div class="fs-3 fw-bold text-dark mt-1">@cancelledBookings.Count <span class="fs-6 fw-normal text-muted">รายการ</span></div>
+                <small class="text-muted">บิลที่ชำระเงินแล้วแต่ถูกยกเลิก/สลิปไม่ตรง</small>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm p-3 h-100" style="border-radius:16px; border-left: 5px solid #0d6efd !important;">
+                <div class="text-muted small fw-bold">รายการที่คืนเงินสำเร็จแล้ว</div>
+                <div class="fs-3 fw-bold text-primary mt-1">@refunds.Count <span class="fs-6 fw-normal text-muted">รายการ</span></div>
+                <small class="text-secondary">ประวัติการบันทึกคืนเงิน</small>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm p-3 h-100" style="border-radius:16px; border-left: 5px solid #198754 !important;">
+                <div class="text-muted small fw-bold">ยอดเงินที่คืนให้ลูกค้าทั้งหมด</div>
+                <div class="fs-3 fw-bold text-success mt-1">@totalRefunded.ToString("N2") <span class="fs-6 fw-normal text-muted">฿</span></div>
+                <small class="text-success">โอนคืนลูกค้าเรียบร้อยแล้ว</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- Section A: Cancelled bookings that might need refund -->
+    <div class="card border-0 shadow-sm mb-4" style="border-radius:18px; overflow:hidden;">
+        <div class="p-3 bg-white border-bottom d-flex justify-content-between align-items-center">
+            <h5 class="fw-bold mb-0 text-dark">
+                <i class="bi bi-exclamation-diamond text-warning me-2"></i>รายการจองที่ยกเลิก / รอดำเนินการคืนเงิน (@cancelledBookings.Count รายการ)
+            </h5>
+        </div>
+
+        @if (cancelledBookings.Any())
+        {
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr class="small text-secondary">
+                            <th>รหัสการจอง</th>
+                            <th>ลูกค้า</th>
+                            <th>วันที่จอง</th>
+                            <th>ยอดเงินที่ชำระ</th>
+                            <th>เหตุผลการยกเลิก</th>
+                            <th>สถานะการจอง</th>
+                            <th class="text-end">การจัดการ</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var b in cancelledBookings)
+                        {
+                            bool hasRefunded = b.Refunds != null && b.Refunds.Any();
+                            <tr>
+                                <td>
+                                    <strong class="font-monospace text-primary">@b.BookingCode</strong>
+                                </td>
+                                <td>
+                                    <div class="fw-bold text-dark">@(b.User?.FullName ?? "ลูกค้า")</div>
+                                    <small class="text-muted">@(b.User?.Phone ?? "-")</small>
+                                </td>
+                                <td>
+                                    <div>@b.PlayDate.ToString("dd/MM/yyyy")</div>
+                                    <small class="text-muted">สร้างเมื่อ: @b.CreatedAt.ToString("dd/MM/yy HH:mm")</small>
+                                </td>
+                                <td>
+                                    <strong class="text-dark fs-6 font-monospace">@b.NetAmount.ToString("N2") ฿</strong>
+                                </td>
+                                <td>
+                                    <small class="text-danger">@(string.IsNullOrEmpty(b.CancelReason) ? "ลูกค้ายกเลิกการจอง" : b.CancelReason)</small>
+                                </td>
+                                <td>
+                                    <span class="badge bg-danger">@b.Status</span>
+                                    @if (hasRefunded)
+                                    {
+                                        <span class="badge bg-success ms-1">คืนเงินแล้ว</span>
+                                    }
+                                </td>
+                                <td class="text-end">
+                                    @if (!hasRefunded)
+                                    {
+                                        <button type="button" class="btn btn-sm btn-outline-warning text-dark px-3 fw-bold" style="border-radius:8px;"
+                                                onclick="openRefundModal(@b.BookingId, '@b.BookingCode', '@(b.User?.FullName ?? "ลูกค้า")', @b.NetAmount, '@(b.CancelReason ?? "")')">
+                                            <i class="bi bi-arrow-return-left me-1"></i> บันทึกคืนเงิน (Refund)
+                                        </button>
+                                    }
+                                    else
+                                    {
+                                        <button type="button" class="btn btn-sm btn-light text-muted px-3" disabled style="border-radius:8px;">
+                                            <i class="bi bi-check me-1"></i> ดำเนินการแล้ว
+                                        </button>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else
+        {
+            <div class="p-4 text-center text-muted">
+                <i class="bi bi-check2-circle fs-3 text-success d-block mb-1"></i>
+                <small>ไม่มีรายการจองยกเลิกที่ค้างการคืนเงินในขณะนี้</small>
+            </div>
+        }
+    </div>
+
+    <!-- Section B: Completed Refunds History -->
+    <div class="card border-0 shadow-sm" style="border-radius:18px; overflow:hidden;">
+        <div class="p-3 bg-white border-bottom d-flex justify-content-between align-items-center">
+            <h5 class="fw-bold mb-0 text-dark">
+                <i class="bi bi-clock-history text-success me-2"></i>ประวัติการคืนเงินให้ลูกค้าทั้งหมด (@refunds.Count รายการ)
+            </h5>
+        </div>
+
+        @if (refunds.Any())
+        {
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr class="small text-secondary">
+                            <th>รหัสคืนเงิน</th>
+                            <th>รหัสการจอง</th>
+                            <th>ชื่อลูกค้า</th>
+                            <th>ยอดเงินคืน</th>
+                            <th>เหตุผลการคืนเงิน</th>
+                            <th>ผู้ดำเนินการ (ฝ่ายบัญชี)</th>
+                            <th>วันที่ดำเนินการ</th>
+                            <th>สถานะ</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var r in refunds)
+                        {
+                            <tr>
+                                <td>
+                                    <span class="badge bg-secondary font-monospace">#REF-@r.RefundId</span>
+                                </td>
+                                <td>
+                                    <span class="font-monospace text-primary fw-bold">@(r.Booking?.BookingCode ?? "-")</span>
+                                </td>
+                                <td>
+                                    <div class="fw-bold text-dark">@(r.Booking?.User?.FullName ?? "ลูกค้า")</div>
+                                </td>
+                                <td>
+                                    <strong class="text-success fs-6 font-monospace">@r.Amount.ToString("N2") ฿</strong>
+                                </td>
+                                <td>
+                                    <small class="text-dark">@r.Reason</small>
+                                </td>
+                                <td>
+                                    <small class="text-muted">@(r.ProcessedByNavigation?.FullName ?? "ฝ่ายบัญชี")</small>
+                                </td>
+                                <td>
+                                    <small class="text-muted">@(r.ProcessedAt?.ToString("dd/MM/yyyy HH:mm") ?? r.CreatedAt.ToString("dd/MM/yyyy HH:mm"))</small>
+                                </td>
+                                <td>
+                                    <span class="badge bg-success">
+                                        <i class="bi bi-check-circle me-1"></i>@r.Status
+                                    </span>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else
+        {
+            <div class="p-5 text-center text-muted">
+                <i class="bi bi-inbox fs-1 d-block mb-2 text-success"></i>
+                <h6>ยังไม่มีประวัติการคืนเงินในระบบ</h6>
+            </div>
+        }
+    </div>
+}
+
+<!-- ============================================================
+     MODAL 1: กำหนดค่าปรับอุปกรณ์เสียหาย (DAMAGE FINE MODAL)
+     ============================================================ -->
+<div class="modal fade" id="fineModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius:20px; border:none; box-shadow:0 25px 60px rgba(0,0,0,0.25); overflow:hidden;">
+            <form asp-action="UpdateDamageFine" asp-controller="Accounting" method="post">
+                <input type="hidden" name="damageId" id="modalDamageId" />
+                <div class="modal-header text-white" style="background: linear-gradient(135deg, #1a472a 0%, #2d6a4f 100%);">
+                    <h5 class="modal-title fw-bold">
+                        <i class="bi bi-cash-coin me-2"></i>บันทึก/ปรับปรุงค่าปรับอุปกรณ์เสียหาย
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label text-muted small fw-bold">อุปกรณ์ที่เสียหาย:</label>
+                        <div class="fw-bold text-dark fs-6" id="modalProductName"></div>
+                        <div class="small text-danger mt-1" id="modalDamageDesc"></div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-dark">จำนวนเงินค่าปรับ (บาท):</label>
+                        <div class="input-group">
+                            <input type="number" step="0.01" min="0" name="fineAmount" id="modalFineAmount" class="form-control fw-bold fs-5 text-danger" required />
+                            <span class="input-group-text bg-light">บาท</span>
+                        </div>
+                        <small class="text-muted">ใส่ 0 บาท หากตัดสินยกเว้นค่าปรับ</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-dark">สถานะค่าปรับ:</label>
+                        <select name="status" id="modalStatus" class="form-select">
+                            <option value="CHARGED">คิดค่าปรับแล้ว (แจ้งลูกค้ารอชำระ)</option>
+                            <option value="PAID">ชำระค่าปรับเรียบร้อยแล้ว (ลูกค้ารับผิดชอบแล้ว)</option>
+                            <option value="WAIVED">ยกเว้นค่าปรับ (ไม่คิดเงิน/อุบัติเหตุในการเล่นตามปกติ)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary px-3" data-bs-dismiss="modal">ยกเลิก</button>
+                    <button type="submit" class="btn btn-success fw-bold px-4" style="background: linear-gradient(135deg, #1a472a, #2d6a4f); border:none;">
+                        <i class="bi bi-save me-1"></i> บันทึกข้อมูล
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================
+     MODAL 2: บันทึกการคืนเงิน (REFUND MODAL)
+     ============================================================ -->
+<div class="modal fade" id="refundModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius:20px; border:none; box-shadow:0 25px 60px rgba(0,0,0,0.25); overflow:hidden;">
+            <form asp-action="CreateRefund" asp-controller="Accounting" method="post">
+                <input type="hidden" name="bookingId" id="modalRefundBookingId" />
+                <div class="modal-header text-white" style="background: linear-gradient(135deg, #1a472a 0%, #2d6a4f 100%);">
+                    <h5 class="modal-title fw-bold">
+                        <i class="bi bi-arrow-counterclockwise me-2"></i>บันทึกการคืนเงินลูกค้า (Process Refund)
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="mb-3 p-3 bg-light rounded-3">
+                        <div class="d-flex justify-content-between">
+                            <span class="text-muted small">รหัสการจอง:</span>
+                            <span class="fw-bold font-monospace text-primary" id="modalRefundBookingCode"></span>
+                        </div>
+                        <div class="d-flex justify-content-between mt-1">
+                            <span class="text-muted small">ชื่อลูกค้า:</span>
+                            <span class="fw-bold text-dark" id="modalRefundCustomer"></span>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-dark">จำนวนเงินที่ต้องคืน (บาท):</label>
+                        <div class="input-group">
+                            <input type="number" step="0.01" min="0" name="amount" id="modalRefundAmount" class="form-control fw-bold fs-5 text-success" required />
+                            <span class="input-group-text bg-light">บาท</span>
+                        </div>
+                        <small class="text-muted">สามารถปรับลดตามเงื่อนไขการหักค่าธรรมเนียมยกเลิก (ถ้ามี)</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-dark">เหตุผลหรือบันทึกการคืนเงิน:</label>
+                        <textarea name="reason" id="modalRefundReason" rows="3" class="form-control" placeholder="ระบุเหตุผล เช่น ลูกค้ายกเลิกล่วงหน้าเกิน 24 ชม. โอนเงินคืนเข้าบัญชีธนาคารแล้ว"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary px-3" data-bs-dismiss="modal">ยกเลิก</button>
+                    <button type="submit" class="btn btn-warning fw-bold text-dark px-4" style="border:none;">
+                        <i class="bi bi-check-circle me-1"></i> ยืนยันการคืนเงิน
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================
+     MODAL 3: PHOTO PREVIEW
+     ============================================================ -->
+<div class="modal fade" id="imagePreviewModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content" style="border-radius:16px; border:none; background:transparent;">
+            <div class="text-end mb-2">
+                <button type="button" class="btn btn-light rounded-circle" data-bs-dismiss="modal"><i class="bi bi-x-lg"></i></button>
+            </div>
+            <img src="" id="fullImagePreview" class="w-100 rounded-3 shadow-lg" style="max-height:80vh; object-fit:contain; background:#000;" />
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function openFineModal(damageId, productName, fineAmount, status, desc) {
+            document.getElementById('modalDamageId').value = damageId;
+            document.getElementById('modalProductName').textContent = productName;
+            document.getElementById('modalDamageDesc').textContent = 'รายละเอียด: ' + desc;
+            document.getElementById('modalFineAmount').value = fineAmount;
+            document.getElementById('modalStatus').value = status;
+
+            new bootstrap.Modal(document.getElementById('fineModal')).show();
+        }
+
+        function openRefundModal(bookingId, bookingCode, customer, amount, reason) {
+            document.getElementById('modalRefundBookingId').value = bookingId;
+            document.getElementById('modalRefundBookingCode').textContent = bookingCode;
+            document.getElementById('modalRefundCustomer').textContent = customer;
+            document.getElementById('modalRefundAmount').value = amount;
+            document.getElementById('modalRefundReason').value = reason ? ('ลูกค้ายกเลิก: ' + reason) : 'ลูกค้ายกเลิกตามเงื่อนไข';
+
+            new bootstrap.Modal(document.getElementById('refundModal')).show();
+        }
+
+        function showImageModal(url) {
+            document.getElementById('fullImagePreview').src = url;
+            new bootstrap.Modal(document.getElementById('imagePreviewModal')).show();
+        }
+    </script>
+}

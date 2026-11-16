@@ -1,0 +1,175 @@
+@model List<Chinnaphat_8272_L005.Models.CourtIssue>
+@{
+    Layout = "_CourtStaffLayout";
+    ViewData["Title"] = "แจ้ง Admin กรณีอุปกรณ์ในสนามชำรุด";
+
+    var courts = ViewBag.Courts as List<Chinnaphat_8272_L005.Models.Court> ?? new();
+}
+
+<div class="row g-4">
+    <!-- ================= FORM: แจ้งอุปกรณ์ชำรุด ================= -->
+    <div class="col-lg-4">
+        <div class="card border-0 shadow-sm" style="border-radius:18px; overflow:hidden;">
+            <div class="p-3 text-white" style="background: linear-gradient(135deg, #1a472a 0%, #2d6a4f 60%, #52b788 100%);">
+                <h5 class="fw-bold mb-0 d-flex align-items-center">
+                    <i class="bi bi-wrench-adjustable me-2 fs-4"></i>แจ้งซ่อม/อุปกรณ์ชำรุดถึง Admin
+                </h5>
+                <small class="text-white-50">ส่งเรื่องตรงถึงผู้ดูแลระบบ (Admin) เพื่อจัดสรรช่างซ่อม</small>
+            </div>
+
+            <div class="card-body p-4 bg-white">
+                <form method="post" asp-action="ReportIssue">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-secondary">
+                            สนามหรือบริเวณที่พบปัญหา
+                        </label>
+                        <select name="courtId" class="form-select">
+                            <option value="">-- บริเวณส่วนกลาง / อุปกรณ์ทั่วไป --</option>
+                            @foreach (var c in courts)
+                            {
+                                <option value="@c.CourtId">@c.CourtName - @c.Description</option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-secondary">
+                            หมวดหมู่ปัญหาด่วน (เทมเพลต)
+                        </label>
+                        <select class="form-select mb-2" onchange="if(this.value){document.getElementById('issueDesc').value=this.value;}">
+                            <option value="">-- เลือกข้อความรวดเร็ว --</option>
+                            <option value="หลอดไฟ LED ส่องสว่างบนคอร์ทดับ 1 แผง (มุมทิศเหนือ) รบกวนการเล่น">หลอดไฟ LED ดับ 1 แผง</option>
+                            <option value="ตาข่ายแบดมินตันชำรุด เชือกขึงขาด เสาตาข่ายเอียง">ตาข่ายแบดมินตันชำรุด</option>
+                            <option value="พื้นยาง BWF มีรอยปริแตกหรือหลุดลอก อาจทำให้ลูกค้าสะดุดล้ม">พื้นยางมีรอยปริแตก</option>
+                            <option value="พัดลมระบายอากาศบนเพดานมีเสียงดังผิดปกติและไม่หมุน">พัดลมระบายอากาศไม่หมุน</option>
+                            <option value="เก้าอี้พักนักกีฬา / สกอร์บอร์ดประจำสนามชำรุดเสียหาย">เก้าอี้พัก/สกอร์บอร์ดชำรุด</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-bold small text-secondary">
+                            รายละเอียดปัญหา / อาการที่พบ <span class="text-danger">*</span>
+                        </label>
+                        <textarea name="description" id="issueDesc" class="form-control" rows="4" placeholder="ระบุรายละเอียด เช่น หลอดไฟ LED ช่อง 3 กระพริบดับ, เสาเน็ตหลวม..." required></textarea>
+                    </div>
+
+                    <div class="alert alert-info small mb-4">
+                        <i class="bi bi-info-circle me-1"></i> เมื่อส่งเรื่องแล้ว ข้อมูลจะปรากฏบนแดชบอร์ดของ Admin ทันที
+                    </div>
+
+                    <button type="submit" class="btn btn-success w-100 py-2 fw-bold" style="border-radius:10px; background:linear-gradient(135deg, #1a472a, #2d6a4f); border:none;">
+                        <i class="bi bi-send-fill me-1"></i> ส่งรายงานถึง Admin
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= LIST: ประวัติการแจ้งเรื่องทั้งหมด ================= -->
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm" style="border-radius:18px; overflow:hidden;">
+            <div class="p-3 bg-white border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <div>
+                    <h5 class="fw-bold mb-0 text-dark">
+                        <i class="bi bi-clock-history text-danger me-2"></i>ประวัติการแจ้งอุปกรณ์ชำรุดทั้งหมด
+                    </h5>
+                    <small class="text-muted">รวม @Model.Count รายการ</small>
+                </div>
+                <a asp-action="Index" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-arrow-left me-1"></i> ผังตารางคอร์ท
+                </a>
+            </div>
+
+            @if (Model.Any())
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr class="small text-secondary">
+                                <th>รหัสเรื่อง</th>
+                                <th>สนาม / บริเวณ</th>
+                                <th>รายละเอียดปัญหา</th>
+                                <th>ผู้แจ้งเรื่อง</th>
+                                <th>วันที่แจ้ง</th>
+                                <th>สถานะ Admin</th>
+                                <th>ผู้ดำเนินการแก้ไข</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var i in Model)
+                            {
+                                <tr>
+                                    <td>
+                                        <span class="badge bg-light text-dark border font-monospace">
+                                            #ISSUE-@i.IssueId.ToString("D3")
+                                        </span>
+                                    </td>
+                                    <td>
+                                        @if (i.Court != null)
+                                        {
+                                            <span class="badge bg-dark">@i.Court.CourtName</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-secondary">ส่วนกลาง / อุปกรณ์</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        <div class="fw-semibold text-dark small" style="max-width:260px;">
+                                            @i.Description
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <small class="text-muted">@(i.ReportedByNavigation?.FullName ?? "ฝ่ายดูแลคอร์ท")</small>
+                                    </td>
+                                    <td>
+                                        <small class="text-muted">@i.CreatedAt.ToString("dd/MM/yyyy HH:mm น.")</small>
+                                    </td>
+                                    <td>
+                                        @switch (i.Status?.ToUpper())
+                                        {
+                                            case "RESOLVED":
+                                                <span class="badge bg-success px-2 py-1">
+                                                    <i class="bi bi-check-circle-fill me-1"></i> ซ่อมเสร็จสิ้น
+                                                </span>
+                                                break;
+                                            case "IN_PROGRESS":
+                                                <span class="badge bg-info text-dark px-2 py-1">
+                                                    <i class="bi bi-wrench-adjustable me-1"></i> กำลังดำเนินการ
+                                                </span>
+                                                break;
+                                            default:
+                                                <span class="badge bg-warning text-dark px-2 py-1">
+                                                    <i class="bi bi-hourglass-split me-1"></i> รอ Admin รับเรื่อง
+                                                </span>
+                                                break;
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (i.ResolvedByNavigation != null)
+                                        {
+                                            <small class="text-success fw-bold d-block">@i.ResolvedByNavigation.FullName</small>
+                                            <small class="text-muted" style="font-size:0.7rem;">@i.ResolvedAt?.ToString("dd/MM HH:mm")</small>
+                                        }
+                                        else
+                                        {
+                                            <small class="text-muted">-</small>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <div class="p-5 text-center text-muted">
+                    <i class="bi bi-shield-check fs-1 d-block mb-2 text-success"></i>
+                    <h6>ไม่มีรายการแจ้งอุปกรณ์ชำรุด</h6>
+                    <small>อุปกรณ์และสนามทุกส่วนอยู่ในสภาพสมบูรณ์พร้อมใช้งาน</small>
+                </div>
+            }
+        </div>
+    </div>
+</div>

@@ -765,6 +765,50 @@ namespace Chinnaphat_8272_L005.Controllers
 
             await _db.SaveChangesAsync();
         }
+
+        // ============================================================
+        // COURT ISSUES — ตรวจสอบและจัดการรายการอุปกรณ์ชำรุดที่ฝ่ายดูแลคอร์ทแจ้งมา
+        // ============================================================
+        [HttpGet]
+        public async Task<IActionResult> CourtIssues()
+        {
+            ViewData["Title"] = "แจ้งซ่อม/อุปกรณ์ชำรุด (จากฝ่ายดูแลคอร์ท)";
+            var issues = await _db.CourtIssues
+                .Include(i => i.Court)
+                .Include(i => i.ReportedByNavigation)
+                .Include(i => i.ResolvedByNavigation)
+                .OrderByDescending(i => i.CreatedAt)
+                .ToListAsync();
+
+            ViewBag.PendingCount = issues.Count(i => i.Status == "PENDING");
+            ViewBag.InProgressCount = issues.Count(i => i.Status == "IN_PROGRESS");
+            ViewBag.ResolvedCount = issues.Count(i => i.Status == "RESOLVED");
+
+            return View(issues);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> UpdateIssueStatus(uint issueId, string status)
+        {
+            var issue = await _db.CourtIssues.FindAsync(issueId);
+            if (issue != null)
+            {
+                issue.Status = status.ToUpper();
+                if (issue.Status == "RESOLVED")
+                {
+                    issue.ResolvedAt = DateTime.Now;
+                    string? uidStr = HttpContext.Session.GetString("UserId") ?? Request.Cookies["cb_user_id"];
+                    if (!string.IsNullOrEmpty(uidStr) && uint.TryParse(uidStr, out uint uid))
+                    {
+                        issue.ResolvedBy = uid;
+                    }
+                }
+                await _db.SaveChangesAsync();
+                TempData["SuccessMessage"] = $"อัปเดตสถานะเรื่องแจ้งซ่อม #ISSUE-{issueId:D3} เป็น {status} เรียบร้อยแล้ว";
+            }
+            return RedirectToAction(nameof(CourtIssues));
+        }
     }
 }
 

@@ -20,13 +20,12 @@ namespace Chinnaphat_8272_L005.Models
         [Display(Name = "อีเมล")]
         public string Email { get; set; } = string.Empty;
 
-        [Required(ErrorMessage = "กรุณากรอกชื่อผู้ใช้")]
         [Display(Name = "ชื่อผู้ใช้")]
-        public string Username { get; set; } = string.Empty;
+        public string? Username { get; set; }
 
         [Required(ErrorMessage = "กรุณากรอกรหัสผ่าน")]
         [DataType(DataType.Password)]
-        [StringLength(100, MinimumLength = 6, ErrorMessage = "รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร")]
+        [StringLength(100, MinimumLength = 4, ErrorMessage = "รหัสผ่านต้องมีอย่างน้อย 4 ตัวอักษร")]
         [Display(Name = "รหัสผ่าน")]
         public string Password { get; set; } = string.Empty;
 
@@ -34,12 +33,10 @@ namespace Chinnaphat_8272_L005.Models
         [Display(Name = "บทบาท")]
         public string Role { get; set; } = string.Empty;
 
-        [Required(ErrorMessage = "กรุณาเลือกเพศ")]
         [Display(Name = "เพศ")]
-        public string Gender { get; set; } = string.Empty;
+        public string? Gender { get; set; }
 
         [Required(ErrorMessage = "กรุณากรอกเบอร์โทรศัพท์")]
-        [Phone(ErrorMessage = "รูปแบบเบอร์โทรไม่ถูกต้อง")]
         [Display(Name = "เบอร์โทรศัพท์")]
         public string Phone { get; set; } = string.Empty;
 

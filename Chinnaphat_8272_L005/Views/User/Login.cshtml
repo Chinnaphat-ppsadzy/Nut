@@ -234,6 +234,11 @@
 <script src="https://cdn.jsdelivr.net/npm/jquery-validation-unobtrusive@4.0.0/dist/jquery.validate.unobtrusive.min.js"></script>
 
 <script>
+    function fillLogin(email, pwd) {
+        document.getElementById('loginEmail').value = email;
+        document.getElementById('loginPassword').value = pwd;
+    }
+
     function togglePwd(inputId, iconId) {
         const input = document.getElementById(inputId);
         const icon  = document.getElementById(iconId);

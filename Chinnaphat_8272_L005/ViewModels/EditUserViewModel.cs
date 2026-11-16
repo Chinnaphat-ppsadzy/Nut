@@ -24,7 +24,6 @@ namespace Chinnaphat_8272_L005.ViewModels
         [Display(Name = "อีเมล")]
         public string Email { get; set; } = string.Empty;
 
-        [Phone(ErrorMessage = "รูปแบบเบอร์โทรไม่ถูกต้อง")]
         [Display(Name = "เบอร์โทรศัพท์")]
         public string? Phone { get; set; }
 

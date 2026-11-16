@@ -1,5 +1,6 @@
+@model Chinnaphat_8272_L005.ViewModels.AdminDashboardViewModel
 @{
-    ViewData["Title"] = "Dashboard";
+    ViewData["Title"] = "แดชบอร์ดภาพรวมระบบ";
     Layout = "_AdminLayout";
 }
 
@@ -11,6 +12,7 @@
         box-shadow: 0 2px 12px rgba(0,0,0,0.05);
         padding: 1.5rem;
         transition: transform 0.2s, box-shadow 0.2s;
+        height: 100%;
     }
     .stat-card:hover {
         transform: translateY(-3px);
@@ -24,7 +26,6 @@
     }
     .stat-value { font-size: 2rem; font-weight: 700; line-height: 1; }
     .stat-label { font-size: 0.85rem; color: #6b7280; margin-top: 0.25rem; }
-    .stat-change { font-size: 0.8rem; margin-top: 0.5rem; }
 
     .section-card {
         background: #fff;
@@ -41,52 +42,38 @@
     }
 
     .avatar-xs {
-        width: 34px; height: 34px; border-radius: 50%;
+        width: 36px; height: 36px; border-radius: 50%;
         background: linear-gradient(135deg,#2d6a4f,#52b788);
         display: inline-flex; align-items: center; justify-content: center;
-        color: white; font-weight: 700; font-size: 0.8rem;
+        color: white; font-weight: 700; font-size: 0.85rem;
+        flex-shrink: 0;
     }
-    .badge-role { font-size: 0.72rem; padding: 0.25rem 0.65rem; border-radius: 20px; font-weight: 600; }
+    .badge-role { font-size: 0.72rem; padding: 0.25rem 0.65rem; border-radius: 20px; font-weight: 600; white-space: nowrap; }
 
     .activity-dot {
-        width: 8px; height: 8px; border-radius: 50%;
+        width: 10px; height: 10px; border-radius: 50%;
         flex-shrink: 0; margin-top: 5px;
     }
 
-    .progress-bar-custom {
-        height: 8px; border-radius: 10px;
-        background: linear-gradient(90deg,#2d6a4f,#52b788);
+    .badge-purple {
+        background-color: #f3e8ff;
+        color: #7c3aed;
     }
 </style>
 
-<!-- ========== ADMIN TOP BAR & QUICK ACTIONS ========== -->
-<div class="card border-0 shadow-sm mb-4" style="border-radius:16px; background:linear-gradient(135deg, #1a472a 0%, #2d6a4f 60%, #52b788 100%); color:white;">
+<!-- ========== ADMIN HERO BANNER & QUICK ACTIONS ========== -->
+<div class="card border-0 shadow-sm mb-4" style="border-radius:18px; background:linear-gradient(135deg, #1a472a 0%, #2d6a4f 60%, #52b788 100%); color:white;">
     <div class="card-body p-4">
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
             <div>
-                <div class="d-flex align-items-center gap-2 mb-1">
-                    <span class="badge bg-warning text-dark font-monospace">ADMIN DASHBOARD</span>
-                    <span class="badge bg-white bg-opacity-25 text-white">CourtBook Arena</span>
-                </div>
-                <h3 class="fw-bold mb-1"><i class="bi bi-speedometer2 me-2"></i>แดชบอร์ดระบบจัดการหลังบ้าน</h3>
-                <p class="mb-0 text-white-50 small">ภาพรวมสถิติ ข้อมูลการจอง และทางลัดจัดการระบบทั้งหมด</p>
-            </div>
-            <div class="d-flex gap-2 flex-wrap">
-                <a asp-action="Court" asp-controller="Admin" class="btn btn-light fw-bold text-success shadow-sm" style="border-radius:10px;">
-                    <i class="bi bi-building me-1"></i>จัดการสนาม
-                </a>
-                <a asp-action="Promotion" asp-controller="Admin" class="btn btn-warning fw-bold text-dark shadow-sm" style="border-radius:10px;">
-                    <i class="bi bi-ticket-perforated me-1"></i>จัดการโปรโมชั่น 5 แบบ
-                </a>
-                <a asp-action="Product" asp-controller="Admin" class="btn btn-light fw-bold text-dark shadow-sm" style="border-radius:10px;">
-                    <i class="bi bi-box-seam me-1 text-primary"></i>สินค้า
-                </a>
+                <h3 class="fw-bold mb-1"><i class="bi bi-speedometer2 me-2"></i>แดชบอร์ดภาพรวมระบบหลังบ้าน</h3>
+                <p class="mb-0 text-white-50 small">สรุปสถิติจริงจากฐานข้อมูล ข้อมูลการจอง ผู้ใช้งาน สนาม และรายได้ของศูนย์กีฬา</p>
             </div>
         </div>
     </div>
 </div>
 
-<!-- ========== STAT CARDS ========== -->
+<!-- ========== 4 MAIN KPI STAT CARDS ========== -->
 <div class="row g-3 mb-4">
 
     <!-- Users -->
@@ -96,10 +83,15 @@
                 <div class="stat-icon" style="background:#e8f5e9;">
                     <i class="bi bi-people-fill text-success"></i>
                 </div>
-                <span class="badge bg-success-subtle text-success" style="border-radius:10px; font-size:0.72rem;">+12%</span>
+                <span class="badge bg-success-subtle text-success" style="border-radius:10px; font-size:0.75rem;">
+                    เปิดใช้งาน @Model.ActiveUsers คน
+                </span>
             </div>
-            <div class="stat-value">248</div>
-            <div class="stat-label">ผู้ใช้งานทั้งหมด</div>
+            <div class="stat-value text-dark font-monospace">@Model.TotalUsers.ToString("N0")</div>
+            <div class="stat-label">ผู้ใช้งานทั้งหมดในระบบ</div>
+            <div class="mt-2 text-muted small">
+                <i class="bi bi-person-plus text-success me-1"></i>ใหม่เดือนนี้: <strong>@Model.NewUsersThisMonth คน</strong>
+            </div>
         </div>
     </div>
 
@@ -110,10 +102,15 @@
                 <div class="stat-icon" style="background:#e0f2fe;">
                     <i class="bi bi-building text-primary"></i>
                 </div>
-                <span class="badge bg-primary-subtle text-primary" style="border-radius:10px; font-size:0.72rem;">+3</span>
+                <span class="badge bg-primary-subtle text-primary" style="border-radius:10px; font-size:0.75rem;">
+                    พร้อมใช้ @Model.AvailableCourts คอร์ท
+                </span>
             </div>
-            <div class="stat-value">12</div>
-            <div class="stat-label">สนามกีฬาทั้งหมด</div>
+            <div class="stat-value text-dark font-monospace">@Model.TotalCourts.ToString("N0")</div>
+            <div class="stat-label">คอร์ทแบดมินตันทั้งหมด</div>
+            <div class="mt-2 text-muted small">
+                <i class="bi bi-check-circle text-primary me-1"></i>สถานะ: ปกติ @Model.AvailableCourts/@Model.TotalCourts
+            </div>
         </div>
     </div>
 
@@ -124,10 +121,24 @@
                 <div class="stat-icon" style="background:#fef3c7;">
                     <i class="bi bi-calendar-check text-warning"></i>
                 </div>
-                <span class="badge bg-warning-subtle text-warning" style="border-radius:10px; font-size:0.72rem;">+8%</span>
+                @if (Model.PendingBookings > 0)
+                {
+                    <span class="badge bg-danger-subtle text-danger" style="border-radius:10px; font-size:0.75rem;">
+                        รอตรวจ @Model.PendingBookings คิว
+                    </span>
+                }
+                else
+                {
+                    <span class="badge bg-success-subtle text-success" style="border-radius:10px; font-size:0.75rem;">
+                        อนุมัติครบแล้ว
+                    </span>
+                }
             </div>
-            <div class="stat-value">1,340</div>
-            <div class="stat-label">การจองเดือนนี้</div>
+            <div class="stat-value text-dark font-monospace">@Model.TotalBookings.ToString("N0")</div>
+            <div class="stat-label">รายการจองทั้งหมด</div>
+            <div class="mt-2 text-muted small">
+                <i class="bi bi-calendar-event text-warning me-1"></i>จองในเดือนนี้: <strong>@Model.BookingsThisMonth.ToString("N0") รายการ</strong>
+            </div>
         </div>
     </div>
 
@@ -135,166 +146,301 @@
     <div class="col-6 col-xl-3">
         <div class="stat-card">
             <div class="d-flex justify-content-between align-items-start mb-3">
-                <div class="stat-icon" style="background:#fce7f3;">
-                    <i class="bi bi-currency-exchange" style="color:#db2777;"></i>
+                <div class="stat-icon" style="background:#dcfce7;">
+                    <i class="bi bi-cash-stack text-success"></i>
                 </div>
-                <span class="badge" style="background:#fce7f3; color:#db2777; border-radius:10px; font-size:0.72rem;">+15%</span>
+                <span class="badge bg-success text-white" style="border-radius:10px; font-size:0.75rem;">
+                    รับชำระแล้ว
+                </span>
             </div>
-            <div class="stat-value" style="font-size:1.6rem;">฿84,500</div>
-            <div class="stat-label">รายได้เดือนนี้</div>
+            <div class="stat-value text-success font-monospace" style="font-size:1.7rem;">฿@Model.TotalRevenue.ToString("N0")</div>
+            <div class="stat-label">รายได้สุทธิรวมทั้งหมด</div>
+            <div class="mt-2 text-muted small">
+                <i class="bi bi-graph-up-arrow text-success me-1"></i>ยอดเดือนนี้: <strong>฿@Model.RevenueThisMonth.ToString("N0")</strong>
+            </div>
         </div>
     </div>
 
 </div>
 
+<!-- ========== SECONDARY SUMMARY METRICS ========== -->
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="p-3 bg-white rounded-3 border shadow-sm d-flex align-items-center justify-content-between">
+            <div>
+                <div class="text-muted small fw-bold">โปรโมชั่นที่เปิดใช้งาน</div>
+                <div class="fs-4 fw-bold text-dark font-monospace mt-1">@Model.ActivePromotions <span class="fs-6 fw-normal text-muted">แคมเปญ</span></div>
+            </div>
+            <a asp-action="Promotion" asp-controller="Admin" class="btn btn-sm btn-outline-warning text-dark" style="border-radius:8px;">
+                <i class="bi bi-gear me-1"></i>ตั้งค่า
+            </a>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="p-3 bg-white rounded-3 border shadow-sm d-flex align-items-center justify-content-between">
+            <div>
+                <div class="text-muted small fw-bold">สินค้าและอุปกรณ์ในระบบ</div>
+                <div class="fs-4 fw-bold text-primary font-monospace mt-1">@Model.TotalProducts <span class="fs-6 fw-normal text-muted">รายการ</span></div>
+                @if (Model.LowStockProducts > 0)
+                {
+                    <small class="text-danger"><i class="bi bi-exclamation-triangle me-1"></i>ใกล้หมด: @Model.LowStockProducts รายการ</small>
+                }
+            </div>
+            <a asp-action="Product" asp-controller="Admin" class="btn btn-sm btn-outline-primary" style="border-radius:8px;">
+                <i class="bi bi-box-seam me-1"></i>ดูสต็อก
+            </a>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="p-3 bg-white rounded-3 border shadow-sm d-flex align-items-center justify-content-between">
+            <div>
+                <div class="text-muted small fw-bold">แจ้งซ่อม/อุปกรณ์ชำรุดรอดำเนินการ</div>
+                <div class="fs-4 fw-bold @(Model.PendingIssues > 0 ? "text-danger" : "text-success") font-monospace mt-1">
+                    @Model.PendingIssues <span class="fs-6 fw-normal text-muted">เรื่อง</span>
+                </div>
+            </div>
+            <a asp-action="CourtIssues" asp-controller="Admin" class="btn btn-sm btn-outline-danger" style="border-radius:8px;">
+                <i class="bi bi-wrench me-1"></i>ตรวจสอบ
+            </a>
+        </div>
+    </div>
+</div>
 
-<!-- ========== MIDDLE ROW ========== -->
+<!-- ========== MIDDLE ROW: COURT STATS & RECENT ACTIVITIES ========== -->
 <div class="row g-3 mb-4">
 
-    <!-- Court Usage -->
-    <div class="col-lg-5">
+    <!-- Court Usage Statistics -->
+    <div class="col-lg-6">
         <div class="section-card h-100">
-            <div class="card-header">
-                <i class="bi bi-bar-chart-fill text-success me-2"></i>อัตราการใช้สนาม
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-dribbble text-success me-2"></i>สถิติการใช้งานคอร์ทแบดมินตัน</span>
+                <a asp-action="Court" asp-controller="Admin" class="btn btn-sm btn-outline-success" style="border-radius:8px; font-size:0.8rem;">
+                    จัดการคอร์ท <i class="bi bi-arrow-right ms-1"></i>
+                </a>
             </div>
             <div class="card-body p-4">
-                @{
-                    var courts = new[] {
-                        new { Name = "สนาม A (แบดมินตัน)", Pct = 92, Color = "#52b788" },
-                        new { Name = "สนาม B (บาสเกตบอล)", Pct = 75, Color = "#3b82f6" },
-                        new { Name = "สนาม C (วอลเลย์บอล)", Pct = 60, Color = "#f59e0b" },
-                        new { Name = "สนาม D (ฟุตบอล)",    Pct = 48, Color = "#ec4899" },
-                        new { Name = "สนาม E (เทนนิส)",    Pct = 35, Color = "#8b5cf6" },
-                    };
-                }
-                @foreach (var c in courts)
+                @if (Model.CourtStats.Any())
                 {
-                    <div class="mb-3">
-                        <div class="d-flex justify-content-between mb-1">
-                            <small class="fw-semibold">@c.Name</small>
-                            <small class="text-muted">@c.Pct%</small>
-                        </div>
-                        <div class="progress" style="height:8px; border-radius:10px; background:#f1f5f9;">
-                            <div class="progress-bar" role="progressbar"
-                                 style="width:@(c.Pct)%; background:@(c.Color); border-radius:10px;">
+                    foreach (var c in Model.CourtStats)
+                    {
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <div>
+                                    <strong class="text-dark">@c.CourtName</strong>
+                                    <span class="badge @(c.Status == "AVAILABLE" ? "bg-success-subtle text-success" : "bg-warning-subtle text-warning") ms-1" style="font-size:0.7rem;">
+                                        @c.Status
+                                    </span>
+                                </div>
+                                <div class="text-end">
+                                    <span class="font-monospace small fw-bold">@c.TotalSlotsBooked รอบ</span>
+                                    <small class="text-muted">(@c.TotalCourtRevenue.ToString("N0") ฿)</small>
+                                </div>
+                            </div>
+                            <div class="progress" style="height:10px; border-radius:10px; background:#f1f5f9;">
+                                <div class="progress-bar" role="progressbar"
+                                     style="width:@(c.Percentage)%; background:@(c.Color); border-radius:10px;"
+                                     title="@c.CourtName จองแล้ว @c.TotalSlotsBooked รอบ">
+                                </div>
                             </div>
                         </div>
+                    }
+                }
+                else
+                {
+                    <div class="p-4 text-center text-muted">
+                        <i class="bi bi-building fs-3 d-block mb-1"></i>
+                        ยังไม่มีข้อมูลคอร์ทในระบบ
                     </div>
                 }
             </div>
         </div>
     </div>
 
-    <!-- Recent Activity -->
-    <div class="col-lg-7">
+    <!-- Recent Activity Feed -->
+    <div class="col-lg-6">
         <div class="section-card h-100">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <span><i class="bi bi-activity text-success me-2"></i>กิจกรรมล่าสุด</span>
+                <span><i class="bi bi-activity text-success me-2"></i>ความเคลื่อนไหวล่าสุดในระบบ</span>
+                <span class="badge bg-light text-muted border font-monospace">Real-time Feed</span>
             </div>
             <div class="card-body p-4">
-                @{
-                    var activities = new[] {
-                        new { Dot="#22c55e", Text="สมชาย ใจดี จองสนาม A เวลา 09:00–10:00",  Time="5 นาทีที่แล้ว" },
-                        new { Dot="#3b82f6", Text="สมหญิง รักเรียน สมัครสมาชิกใหม่",          Time="18 นาทีที่แล้ว" },
-                        new { Dot="#f59e0b", Text="วิชัย เก่งมาก ยกเลิกการจองสนาม B",         Time="45 นาทีที่แล้ว" },
-                        new { Dot="#22c55e", Text="นภา สวยงาม จองสนาม C เวลา 14:00–15:00",   Time="1 ชั่วโมงที่แล้ว" },
-                        new { Dot="#ec4899", Text="Admin เพิ่มโปรโมชั่นใหม่ ลด 20%",          Time="2 ชั่วโมงที่แล้ว" },
-                        new { Dot="#8b5cf6", Text="ระบบชำระเงินสำเร็จ ฿500",                  Time="3 ชั่วโมงที่แล้ว" },
-                    };
-                }
-                <div class="d-flex flex-column gap-3">
-                    @foreach (var a in activities)
-                    {
-                        <div class="d-flex gap-3">
-                            <div class="activity-dot" style="background:@(a.Dot);"></div>
-                            <div class="flex-grow-1">
-                                <div style="font-size:0.88rem;">@a.Text</div>
-                                <small class="text-muted">@a.Time</small>
+                @if (Model.RecentActivities.Any())
+                {
+                    <div class="d-flex flex-column gap-3">
+                        @foreach (var a in Model.RecentActivities)
+                        {
+                            <div class="d-flex gap-3 align-items-start">
+                                <div class="activity-dot bg-@a.BadgeColor"></div>
+                                <div class="flex-grow-1">
+                                    <div class="d-flex justify-content-between align-items-baseline">
+                                        <div class="fw-semibold text-dark" style="font-size:0.88rem;">@a.Title</div>
+                                        <small class="text-muted font-monospace" style="font-size:0.75rem;">@a.TimeAgo</small>
+                                    </div>
+                                    <div class="text-muted small" style="font-size:0.8rem;">@a.Description</div>
+                                </div>
                             </div>
-                        </div>
-                    }
-                </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="p-4 text-center text-muted">
+                        <i class="bi bi-check-circle fs-3 d-block mb-1 text-success"></i>
+                        ยังไม่มีกิจกรรมใหม่ในขณะนี้
+                    </div>
+                }
             </div>
         </div>
     </div>
 
 </div>
 
+<!-- ========== BOTTOM ROW: RECENT BOOKINGS & RECENT USERS ========== -->
+<div class="row g-3">
 
-<!-- ========== USERS TABLE ========== -->
-<div class="section-card">
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <span><i class="bi bi-people text-success me-2"></i>ผู้ใช้งานล่าสุด</span>
-        <a asp-action="UserList" asp-controller="User"
-           class="btn btn-sm btn-outline-success" style="border-radius:8px; font-size:0.8rem;">
-            ดูทั้งหมด <i class="bi bi-arrow-right ms-1"></i>
-        </a>
-    </div>
-    <div class="card-body p-0">
-        <div class="table-responsive">
-            <table class="table table-hover mb-0" style="font-size:0.88rem;">
-                <thead class="table-light">
-                    <tr>
-                        <th class="px-4 py-3" style="font-size:0.75rem; text-transform:uppercase; letter-spacing:0.5px; color:#6b7280; font-weight:600;">ชื่อ-นามสกุล</th>
-                        <th class="py-3" style="font-size:0.75rem; text-transform:uppercase; letter-spacing:0.5px; color:#6b7280; font-weight:600;">อีเมล</th>
-                        <th class="py-3" style="font-size:0.75rem; text-transform:uppercase; letter-spacing:0.5px; color:#6b7280; font-weight:600;">บทบาท</th>
-                        <th class="py-3" style="font-size:0.75rem; text-transform:uppercase; letter-spacing:0.5px; color:#6b7280; font-weight:600;">สถานะ</th>
-                        <th class="py-3" style="font-size:0.75rem; text-transform:uppercase; letter-spacing:0.5px; color:#6b7280; font-weight:600;">วันที่สมัคร</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @{
-                        var users = new[] {
-                            new { Name="Chinnaphat Supsombat", Email="chinnaphat@email.com", Role="Admin",  Active=true,  Date="10/01/2026" },
-                            new { Name="สมชาย ใจดี",           Email="somchai@email.com",    Role="User",   Active=true,  Date="15/02/2026" },
-                            new { Name="สมหญิง รักเรียน",      Email="somying@email.com",    Role="User",   Active=false, Date="20/03/2026" },
-                            new { Name="วิชัย เก่งมาก",         Email="wichai@email.com",     Role="Staff",  Active=true,  Date="05/04/2026" },
-                            new { Name="นภา สวยงาม",           Email="napa@email.com",       Role="User",   Active=true,  Date="01/05/2026" },
-                        };
-                    }
-                    @foreach (var u in users)
-                    {
-                        <tr>
-                            <td class="px-4 py-3">
-                                <div class="d-flex align-items-center gap-2">
-                                    <div class="avatar-xs">@u.Name.Substring(0,1)</div>
-                                    <span class="fw-semibold">@u.Name</span>
-                                </div>
-                            </td>
-                            <td class="py-3 text-muted">@u.Email</td>
-                            <td class="py-3">
-                                @if (u.Role == "Admin")
+    <!-- Recent Bookings Table -->
+    <div class="col-lg-7">
+        <div class="section-card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-journal-check text-success me-2"></i>รายการจองสนามล่าสุด</span>
+            </div>
+            <div class="card-body p-0">
+                @if (Model.RecentBookings.Any())
+                {
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0" style="font-size:0.88rem;">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="px-3 py-2 text-secondary small">รหัสจอง</th>
+                                    <th class="py-2 text-secondary small">ลูกค้า</th>
+                                    <th class="py-2 text-secondary small">วันที่เล่น</th>
+                                    <th class="py-2 text-secondary small text-end">ยอดสุทธิ</th>
+                                    <th class="py-2 text-secondary small text-center">สถานะ</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var b in Model.RecentBookings)
                                 {
-                                    <span class="badge-role bg-danger bg-opacity-10 text-danger">Admin</span>
+                                    <tr>
+                                        <td class="px-3">
+                                            <span class="font-monospace fw-bold text-primary">@b.BookingCode</span>
+                                        </td>
+                                        <td>
+                                            <div class="fw-semibold text-dark">@(b.User?.FullName ?? "ลูกค้า")</div>
+                                        </td>
+                                        <td>
+                                            <span>@b.PlayDate.ToString("dd/MM/yyyy")</span>
+                                        </td>
+                                        <td class="text-end font-monospace fw-bold text-success">
+                                            @b.NetAmount.ToString("N0") ฿
+                                        </td>
+                                        <td class="text-center">
+                                            @if (b.Status == "CONFIRMED" || b.Status == "COMPLETED")
+                                            {
+                                                <span class="badge bg-success-subtle text-success" style="font-size:0.72rem;">@b.Status</span>
+                                            }
+                                            else if (b.Status == "PENDING_VERIFICATION")
+                                            {
+                                                <span class="badge bg-warning-subtle text-warning" style="font-size:0.72rem;">รอตรวจ</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-secondary-subtle text-secondary" style="font-size:0.72rem;">@b.Status</span>
+                                            }
+                                        </td>
+                                    </tr>
                                 }
-                                else if (u.Role == "Staff")
-                                {
-                                    <span class="badge-role bg-warning bg-opacity-10 text-warning">Staff</span>
-                                }
-                                else
-                                {
-                                    <span class="badge-role bg-primary bg-opacity-10 text-primary">User</span>
-                                }
-                            </td>
-                            <td class="py-3">
-                                @if (u.Active)
-                                {
-                                    <span class="badge bg-success-subtle text-success" style="border-radius:20px; font-size:0.72rem; padding:0.28rem 0.65rem;">
-                                        <i class="bi bi-circle-fill me-1" style="font-size:0.4rem;"></i>เปิดใช้งาน
-                                    </span>
-                                }
-                                else
-                                {
-                                    <span class="badge bg-danger-subtle text-danger" style="border-radius:20px; font-size:0.72rem; padding:0.28rem 0.65rem;">
-                                        <i class="bi bi-circle-fill me-1" style="font-size:0.4rem;"></i>ปิดใช้งาน
-                                    </span>
-                                }
-                            </td>
-                            <td class="py-3 text-muted">@u.Date</td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
+                            </tbody>
+                        </table>
+                    </div>
+                }
+                else
+                {
+                    <div class="p-4 text-center text-muted">
+                        <i class="bi bi-calendar-x fs-3 d-block mb-1"></i>
+                        ยังไม่มีข้อมูลการจอง
+                    </div>
+                }
+            </div>
         </div>
     </div>
+
+    <!-- Recent Users Table -->
+    <div class="col-lg-5">
+        <div class="section-card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-people text-success me-2"></i>ผู้ใช้งานล่าสุด</span>
+                <a asp-action="UserList" asp-controller="User"
+                   class="btn btn-sm btn-outline-success" style="border-radius:8px; font-size:0.8rem;">
+                    ดูทั้งหมด (@Model.TotalUsers) <i class="bi bi-arrow-right ms-1"></i>
+                </a>
+            </div>
+            <div class="card-body p-0">
+                @if (Model.RecentUsers.Any())
+                {
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0" style="font-size:0.88rem;">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="px-3 py-2 text-secondary small">ผู้ใช้</th>
+                                    <th class="py-2 text-secondary small">บทบาท</th>
+                                    <th class="py-2 text-secondary small text-center">สถานะ</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var u in Model.RecentUsers)
+                                {
+                                    string roleCode = u.Role?.RoleCode ?? "CUSTOMER";
+                                    string badgeClass = roleCode switch
+                                    {
+                                        "ADMIN" => "bg-danger bg-opacity-10 text-danger",
+                                        "COURT_STAFF" => "bg-warning bg-opacity-10 text-warning",
+                                        "SALES_STAFF" => "bg-info bg-opacity-10 text-info",
+                                        "ACCOUNTING" => "badge-purple",
+                                        _ => "bg-primary bg-opacity-10 text-primary"
+                                    };
+                                    string roleName = u.Role?.RoleName ?? roleCode;
+
+                                    <tr>
+                                        <td class="px-3">
+                                            <div class="d-flex align-items-center gap-2">
+                                                <div class="avatar-xs">
+                                                    @(u.FullName.Length > 0 ? u.FullName.Substring(0, 1) : "?")
+                                                </div>
+                                                <div style="line-height:1.2;">
+                                                    <div class="fw-semibold text-dark" style="font-size:0.85rem;">@u.FullName</div>
+                                                    <small class="text-muted" style="font-size:0.75rem;">@u.Email</small>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <span class="badge-role @badgeClass">@roleName</span>
+                                        </td>
+                                        <td class="text-center">
+                                            @if (u.Status != null && (u.Status == "ACTIVE" || u.Status == "active"))
+                                            {
+                                                <span class="badge bg-success-subtle text-success" style="border-radius:20px; font-size:0.7rem;">เปิดใช้</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-danger-subtle text-danger" style="border-radius:20px; font-size:0.7rem;">ปิดใช้</span>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+                else
+                {
+                    <div class="p-4 text-center text-muted">
+                        <i class="bi bi-people fs-3 d-block mb-1"></i>
+                        ยังไม่มีผู้ใช้งานในระบบ
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
 </div>

@@ -1,0 +1,367 @@
+@model List<Chinnaphat_8272_L005.Models.Booking>
+@{
+    Layout = "_AccountingLayout";
+    ViewData["Title"] = "ตรวจสอบสลิปโอนเงิน & อนุมัติคิวจอง";
+
+    string currentFilter = ViewBag.CurrentFilter as string ?? "PENDING";
+    string searchTerm = ViewBag.SearchTerm as string ?? "";
+
+    int pendingCount = ViewBag.PendingCount ?? 0;
+    int confirmedCount = ViewBag.ConfirmedCount ?? 0;
+    int rejectedCount = ViewBag.RejectedCount ?? 0;
+    int totalCount = ViewBag.TotalCount ?? 0;
+}
+
+<style>
+    .slip-thumbnail {
+        width: 60px;
+        height: 60px;
+        object-fit: cover;
+        border-radius: 10px;
+        cursor: pointer;
+        transition: transform 0.2s, box-shadow 0.2s;
+        border: 2px solid #52b788;
+    }
+    .slip-thumbnail:hover {
+        transform: scale(1.1);
+        box-shadow: 0 4px 15px rgba(45, 106, 79, 0.3);
+    }
+</style>
+
+<!-- ============================================================
+     HERO BANNER: ฝ่ายบัญชีและการเงิน
+     ============================================================ -->
+<div class="card border-0 shadow-sm mb-4" style="border-radius:18px; background: linear-gradient(135deg, #1a472a 0%, #2d6a4f 60%, #52b788 100%); color:white;">
+    <div class="card-body p-4">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+            <div>
+                <div class="d-flex align-items-center gap-2 mb-1">
+                    <span class="badge bg-white text-success fw-bold font-monospace">FINANCIAL VERIFICATION</span>
+                    <span class="badge bg-white bg-opacity-25 text-white">CourtBook Arena</span>
+                </div>
+                <h4 class="fw-bold mb-1">
+                    <i class="bi bi-shield-check me-2"></i>ตรวจสอบความถูกต้องของสลิปโอนเงิน & ยอดเงิน
+                </h4>
+                <p class="mb-0 text-white-50 small">
+                    ตรวจสอบสลิปโอนเงินจากลูกค้า ตรวจสอบยอดสุทธิ และกด "อนุมัติ" เพื่อยืนยันคิวจองสนามและปล่อยคอร์ทให้พร้อมใช้งาน
+                </p>
+            </div>
+            <div class="d-flex gap-2">
+                <a asp-action="Reports" class="btn btn-light fw-bold text-success px-4 py-2 shadow-sm" style="border-radius:10px;">
+                    <i class="bi bi-graph-up-arrow me-1"></i> ดูรายงานยอดขาย
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================
+     FILTER TABS & SEARCH
+     ============================================================ -->
+<div class="card border-0 shadow-sm mb-4" style="border-radius:16px;">
+    <div class="card-body p-3">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+            <!-- Filter Pills -->
+            <div class="d-flex gap-2 flex-wrap">
+                <a asp-action="Index" asp-route-filter="PENDING" class="btn btn-sm @(currentFilter == "PENDING" ? "btn-success" : "btn-light") fw-semibold px-3 py-2" style="border-radius:10px;">
+                    <i class="bi bi-hourglass-split me-1"></i> รอตรวจสอบสลิป
+                    <span class="badge bg-white text-success ms-1">@pendingCount</span>
+                </a>
+                <a asp-action="Index" asp-route-filter="CONFIRMED" class="btn btn-sm @(currentFilter == "CONFIRMED" ? "btn-success" : "btn-light") fw-semibold px-3 py-2" style="border-radius:10px;">
+                    <i class="bi bi-check-circle-fill me-1"></i> ยืนยันคิวแล้ว
+                    <span class="badge bg-white text-success ms-1">@confirmedCount</span>
+                </a>
+                <a asp-action="Index" asp-route-filter="REJECTED" class="btn btn-sm @(currentFilter == "REJECTED" ? "btn-success" : "btn-light") fw-semibold px-3 py-2" style="border-radius:10px;">
+                    <i class="bi bi-x-circle-fill me-1"></i> สลิปไม่ผ่าน / ยกเลิก
+                    <span class="badge bg-white text-danger ms-1">@rejectedCount</span>
+                </a>
+                <a asp-action="Index" asp-route-filter="ALL" class="btn btn-sm @(currentFilter == "ALL" ? "btn-success" : "btn-light") fw-semibold px-3 py-2" style="border-radius:10px;">
+                    <i class="bi bi-collection me-1"></i> ทั้งหมด
+                    <span class="badge bg-secondary ms-1">@totalCount</span>
+                </a>
+            </div>
+
+            <!-- Search -->
+            <form method="get" asp-action="Index" class="d-flex gap-2">
+                <input type="hidden" name="filter" value="@currentFilter" />
+                <div class="input-group" style="max-width:280px;">
+                    <span class="input-group-text bg-white"><i class="bi bi-search text-success"></i></span>
+                    <input type="text" name="search" class="form-control" placeholder="ค้นหารหัสจอง, ชื่อ, เบอร์..." value="@searchTerm" />
+                </div>
+                <button type="submit" class="btn btn-success fw-bold px-3" style="background:linear-gradient(135deg, #1a472a, #2d6a4f); border:none; border-radius:8px;">
+                    ค้นหา
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================
+     TABLE: รายการสลิปโอนเงินและการจอง
+     ============================================================ -->
+<div class="card border-0 shadow-sm" style="border-radius:18px; overflow:hidden;">
+    <div class="p-3 bg-white border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <h5 class="fw-bold mb-0 text-dark">
+            <i class="bi bi-list-check text-success me-2"></i>รายการคิวจองที่ต้องตรวจสอบ (@Model.Count รายการ)
+        </h5>
+        <small class="text-muted">คลิกที่รูปสลิปเพื่อขยายดูรายละเอียดการโอนเงิน</small>
+    </div>
+
+    @if (Model.Any())
+    {
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr class="small text-secondary">
+                        <th>สลิปโอนเงิน</th>
+                        <th>รหัสการจอง / วันที่</th>
+                        <th>ลูกค้า / เบอร์โทร</th>
+                        <th>คอร์ท & เวลา</th>
+                        <th>ยอดชำระสุทธิ</th>
+                        <th>สถานะ</th>
+                        <th class="text-center" style="min-width:200px;">การดำเนินการของฝ่ายบัญชี</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var b in Model)
+                    {
+                        var payment = b.Payments.OrderByDescending(p => p.PaymentId).FirstOrDefault();
+                        string? slipUrl = payment?.SlipImageUrl;
+                        bool hasSlip = !string.IsNullOrEmpty(slipUrl);
+
+                        <tr>
+                            <!-- สลิป -->
+                            <td>
+                                @if (hasSlip)
+                                {
+                                    <img src="@slipUrl" alt="Slip" class="slip-thumbnail" onclick="viewFullSlipModal('@slipUrl', '@b.BookingCode', '@b.NetAmount.ToString("N2")', '@(b.User?.FullName ?? "ลูกค้า")')" />
+                                }
+                                else
+                                {
+                                    <div class="rounded-3 bg-light border d-flex align-items-center justify-content-center text-muted" style="width:60px; height:60px; font-size:0.75rem;">
+                                        ไม่มีสลิป
+                                    </div>
+                                }
+                            </td>
+
+                            <!-- รหัสจอง -->
+                            <td>
+                                <strong class="font-monospace text-success fs-6">@b.BookingCode</strong>
+                                <small class="text-muted d-block" style="font-size:0.75rem;">
+                                    จองเมื่อ: @b.CreatedAt.ToString("dd/MM/yyyy HH:mm")
+                                </small>
+                                <span class="badge bg-light text-dark border mt-1" style="font-size:0.7rem;">
+                                    <i class="bi bi-calendar3 me-1"></i>เล่นวันที่: @b.PlayDate.ToString("dd/MM/yyyy")
+                                </span>
+                            </td>
+
+                            <!-- ลูกค้า -->
+                            <td>
+                                <div class="fw-bold text-dark">@(b.User?.FullName ?? "คุณลูกค้า")</div>
+                                <small class="text-muted"><i class="bi bi-telephone me-1"></i>@(b.User?.Phone ?? "-")</small>
+                            </td>
+
+                            <!-- คอร์ท & เวลา -->
+                            <td>
+                                @if (b.BookingSlots.Any())
+                                {
+                                    @foreach (var s in b.BookingSlots)
+                                    {
+                                        <div class="small">
+                                            <span class="badge bg-dark me-1">@(s.Court?.CourtName ?? $"Court {s.CourtId}")</span>
+                                            <span class="text-secondary">@(s.Slot != null ? $"{s.Slot.StartTime:HH:mm} - {s.Slot.EndTime:HH:mm}" : $"Slot #{s.SlotId}")</span>
+                                        </div>
+                                    }
+                                }
+                                else
+                                {
+                                    <span class="text-muted small">-</span>
+                                }
+                            </td>
+
+                            <!-- ยอดสุทธิ -->
+                            <td>
+                                <div class="fw-bold text-dark fs-6">@b.NetAmount.ToString("N2") ฿</div>
+                                <small class="text-muted d-block" style="font-size:0.72rem;">
+                                    (สนาม @b.CourtAmount.ToString("N0") + สินค้า @b.SaleAmount.ToString("N0") + เช่า @b.RentalAmount.ToString("N0"))
+                                </small>
+                                @if (b.DiscountAmount > 0)
+                                {
+                                    <small class="text-success d-block fw-semibold" style="font-size:0.72rem;">
+                                        ส่วนลด -@b.DiscountAmount.ToString("N0") ฿
+                                    </small>
+                                }
+                            </td>
+
+                            <!-- สถานะ -->
+                            <td>
+                                @switch (b.Status)
+                                {
+                                    case "PENDING_VERIFICATION":
+                                        <span class="badge bg-warning text-dark px-2 py-1">
+                                            <i class="bi bi-hourglass-split me-1"></i> รอตรวจสลิป
+                                        </span>
+                                        break;
+                                    case "CONFIRMED":
+                                        <span class="badge bg-success px-2 py-1">
+                                            <i class="bi bi-check-circle-fill me-1"></i> ยืนยันคิวแล้ว
+                                        </span>
+                                        break;
+                                    case "CHECKED_IN":
+                                    case "IN_USE":
+                                        <span class="badge bg-primary px-2 py-1">
+                                            <i class="bi bi-person-walking me-1"></i> เข้าใช้สนามแล้ว
+                                        </span>
+                                        break;
+                                    case "COMPLETED":
+                                        <span class="badge bg-secondary px-2 py-1">
+                                            เสร็จสิ้นแล้ว
+                                        </span>
+                                        break;
+                                    case "SLIP_REJECTED":
+                                        <span class="badge bg-danger px-2 py-1" title="@b.CancelReason">
+                                            <i class="bi bi-x-circle-fill me-1"></i> สลิปไม่ผ่าน
+                                        </span>
+                                        break;
+                                    default:
+                                        <span class="badge bg-light text-dark border px-2 py-1">
+                                            @b.Status
+                                        </span>
+                                        break;
+                                }
+                            </td>
+
+                            <!-- ปุ่มดำเนินการ -->
+                            <td class="text-center">
+                                @if (b.Status == "PENDING_VERIFICATION")
+                                {
+                                    <div class="d-flex justify-content-center gap-1">
+                                        <button type="button" class="btn btn-sm btn-success fw-bold px-3 py-1 shadow-sm" style="background:linear-gradient(135deg, #1a472a, #2d6a4f); border:none; border-radius:8px;" onclick="approveBookingModal(@b.BookingId, '@b.BookingCode', '@b.NetAmount.ToString("N2")')">
+                                            <i class="bi bi-check-circle me-1"></i> อนุมัติสลิป
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-danger px-2 py-1" style="border-radius:8px;" onclick="promptRejectSlip(@b.BookingId, '@b.BookingCode')" title="ปฏิเสธสลิป">
+                                            <i class="bi bi-x-circle"></i> ปฏิเสธ
+                                        </button>
+                                    </div>
+                                }
+                                else if (b.Status == "CONFIRMED" || b.Status == "CHECKED_IN" || b.Status == "COMPLETED")
+                                {
+                                    var receipt = b.Receipts.FirstOrDefault();
+                                    if (receipt != null)
+                                    {
+                                        <a asp-action="PrintReceipt" asp-route-id="@receipt.ReceiptId" target="_blank" class="btn btn-sm btn-outline-success px-3 py-1" style="border-radius:8px;">
+                                            <i class="bi bi-receipt me-1"></i> ใบเสร็จ (@receipt.ReceiptNo)
+                                        </a>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-success small fw-semibold"><i class="bi bi-check-all me-1"></i> อนุมัติแล้ว</span>
+                                    }
+                                }
+                                else if (b.Status == "SLIP_REJECTED")
+                                {
+                                    <small class="text-danger d-block">@b.CancelReason</small>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+    else
+    {
+        <div class="p-5 text-center text-muted">
+            <i class="bi bi-inbox fs-1 d-block mb-2 text-success"></i>
+            <h6>ไม่มีรายการสลิปในหมวดนี้</h6>
+            <small>สามารถคลิกดูหมวด "ทั้งหมด" หรือใช้ช่องค้นหาด้านบน</small>
+        </div>
+    }
+</div>
+
+<!-- ============================================================
+     MODAL: ดูสลิปโอนเงินแบบเต็มรูป
+     ============================================================ -->
+<div class="modal fade" id="fullSlipModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius:20px; border:none; overflow:hidden; box-shadow:0 25px 60px rgba(0,0,0,0.25);">
+            <div class="modal-header text-white border-0" style="background: linear-gradient(135deg, #1a472a 0%, #2d6a4f 60%, #52b788 100%);">
+                <h6 class="modal-title fw-bold mb-0">
+                    <i class="bi bi-receipt me-2"></i>ตรวจสอบสลิปโอนเงิน (<span id="modalSlipCode"></span>)
+                </h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4 text-center bg-light">
+                <div class="mb-3">
+                    <img id="modalSlipImg" src="" alt="Slip Full" class="img-fluid rounded-3 shadow-sm border" style="max-height:420px; width:auto;" />
+                </div>
+                <div class="p-3 bg-white rounded-3 border text-start small">
+                    <div class="d-flex justify-content-between mb-1">
+                        <span class="text-muted">ลูกค้า:</span>
+                        <strong id="modalSlipCustomer">-</strong>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span class="text-muted">ยอดที่ต้องชำระ:</span>
+                        <strong class="text-success fs-6" id="modalSlipAmount">-</strong>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer bg-white border-0">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">ปิด</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function viewFullSlipModal(url, code, amount, customer) {
+            document.getElementById('modalSlipImg').src = url;
+            document.getElementById('modalSlipCode').innerText = code;
+            document.getElementById('modalSlipAmount').innerText = amount + ' ฿';
+            document.getElementById('modalSlipCustomer').innerText = customer;
+            new bootstrap.Modal(document.getElementById('fullSlipModal')).show();
+        }
+
+        function approveBookingModal(bookingId, code, amount) {
+            if (!confirm(`ยืนยันการอนุมัติสลิปโอนเงิน และยืนยันคิวจอง ${code}?\nยอดเงิน: ${amount} บาท\n(ระบบจะออกใบเสร็จรับเงินให้อัตโนมัติ)`)) return;
+
+            fetch('/Accounting/ApproveBooking', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `bookingId=${bookingId}`
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    alert(data.message);
+                    window.location.reload();
+                } else {
+                    alert('เกิดข้อผิดพลาด: ' + data.message);
+                }
+            })
+            .catch(err => alert('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้: ' + err));
+        }
+
+        function promptRejectSlip(bookingId, code) {
+            const reason = prompt(`ระบุเหตุผลในการปฏิเสธสลิปของรายการ ${code}:`, 'ยอดเงินในสลิปไม่ตรงกับยอดชำระสุทธิ');
+            if (reason) {
+                fetch('/Accounting/RejectSlip', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: `bookingId=${bookingId}&reason=${encodeURIComponent(reason)}`
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        alert(data.message);
+                        window.location.reload();
+                    } else {
+                        alert('เกิดข้อผิดพลาด: ' + data.message);
+                    }
+                })
+                .catch(err => alert('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้: ' + err));
+            }
+        }
+    </script>
+}

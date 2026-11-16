@@ -69,7 +69,7 @@
 
     /* ✅ สีสำหรับ badge บทบาท ACCOUNTING */
     .text-purple  { color: #7c3aed !important; }
-    .bg-purple    { background-color: #7c3aed !important; }
+    .bg-purple    { background-color: #eadeffff !important; }
 </style>
 
 @* แสดง Success/Error Message *@
@@ -212,7 +212,7 @@
             <table class="table table-hover mb-0 user-table" id="userTable">
                 <thead class="table-light">
                     <tr>
-                        <th class="px-4 py-3">#</th>
+                        <th class="px-4 py-3" style="width: 70px;">ลำดับ</th>
                         <th class="py-3">ชื่อ-นามสกุล / อีเมล</th>
                         <th class="py-3">เบอร์โทร</th>
                         <th class="py-3">บทบาท</th>
@@ -222,10 +222,13 @@
                     </tr>
                 </thead>
                 <tbody>
+                    @{
+                        int rowNumber = 1;
+                    }
                     @foreach (var user in Model.Users)
                     {
                         <tr>
-                            <td class="px-4">@user.Id</td>
+                            <td class="px-4 fw-bold text-secondary">@(rowNumber++)</td>
                             <td>
                                 <div class="d-flex align-items-center gap-2">
                                     <div class="avatar-sm">
@@ -273,14 +276,23 @@
                                    class="btn btn-sm btn-outline-primary me-1" title="แก้ไข" style="border-radius:8px;">
                                     <i class="bi bi-pencil-square"></i>
                                 </a>
-                                <form asp-action="DeleteUser" asp-controller="User" method="post" class="d-inline"
-                                      onsubmit="return confirm('ยืนยันการลบผู้ใช้ @user.FullName?')">
-                                    @Html.AntiForgeryToken()
-                                    <input type="hidden" name="id" value="@user.Id" />
-                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="ลบ" style="border-radius:8px;">
-                                        <i class="bi bi-trash"></i>
+                                @if (Model.IsLoggedIn && Model.LoggedInUsername == user.FullName)
+                                {
+                                    <button type="button" class="btn btn-sm btn-light text-muted" title="บัญชีของคุณ (ไม่สามารถลบตัวเองได้)" disabled style="border-radius:8px;">
+                                        <i class="bi bi-shield-lock"></i>
                                     </button>
-                                </form>
+                                }
+                                else
+                                {
+                                    <form asp-action="DeleteUser" asp-controller="User" method="post" class="d-inline"
+                                          onsubmit="return confirm('ยืนยันการลบผู้ใช้ @Html.Raw(user.FullName.Replace("'", "\\'")) ออกจากระบบ?')">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@user.Id" />
+                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="ลบผู้ใช้" style="border-radius:8px;">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                }
                             </td>
                         </tr>
                     }

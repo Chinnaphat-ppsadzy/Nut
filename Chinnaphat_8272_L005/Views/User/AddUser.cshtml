@@ -152,7 +152,7 @@
 
     /* สีสำหรับบทบาท ACCOUNTING */
     .text-purple { color: #7c3aed !important; }
-    .bg-purple   { background-color: #7c3aed !important; }
+    .bg-purple   { background-color: #eadeffff !important; }
 </style>
 
 @if (TempData["SuccessMessage"] != null)
@@ -243,11 +243,11 @@
 
                 <div class="row g-3 mb-3">
                     <div class="col-6">
-                        <label asp-for="Gender" class="form-label">เพศ <span class="required-star">*</span></label>
+                        <label asp-for="Gender" class="form-label">เพศ</label>
                         <div class="input-wrapper">
                             <i class="bi bi-gender-ambiguous bi-icon"></i>
                             <select asp-for="Gender" class="form-select" id="addGender">
-                                <option value="">-- เลือกเพศ --</option>
+                                <option value="">-- ไม่ระบุ --</option>
                                 <option value="male">ชาย</option>
                                 <option value="female">หญิง</option>
                                 <option value="other">อื่น ๆ</option>
@@ -279,10 +279,10 @@
 
                 <div class="row g-3 mb-3">
                     <div class="col-6">
-                        <label asp-for="Username" class="form-label">ชื่อผู้ใช้ <span class="required-star">*</span></label>
+                        <label asp-for="Username" class="form-label">ชื่อผู้ใช้ (ไม่บังคับ)</label>
                         <div class="input-wrapper">
                             <i class="bi bi-at bi-icon"></i>
-                            <input asp-for="Username" class="form-control" id="addUsername" placeholder="ชื่อผู้ใช้" />
+                            <input asp-for="Username" class="form-control" id="addUsername" placeholder="จะใช้อีเมลเป็นชื่อผู้ใช้อัตโนมัติ" />
                         </div>
                         <span asp-validation-for="Username" class="text-danger small"></span>
                     </div>

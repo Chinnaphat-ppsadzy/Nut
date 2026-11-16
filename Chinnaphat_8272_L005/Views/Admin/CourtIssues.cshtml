@@ -1,0 +1,180 @@
+@model List<Chinnaphat_8272_L005.Models.CourtIssue>
+@{
+    ViewData["Title"] = "แจ้งซ่อม/อุปกรณ์ชำรุด (จากฝ่ายดูแลคอร์ท)";
+    Layout = "_AdminLayout";
+
+    int pendingCount = ViewBag.PendingCount ?? 0;
+    int inProgressCount = ViewBag.InProgressCount ?? 0;
+    int resolvedCount = ViewBag.ResolvedCount ?? 0;
+}
+
+<div class="card border-0 shadow-sm mb-4" style="border-radius:18px; background: linear-gradient(135deg, #1a472a 0%, #2d6a4f 60%, #52b788 100%); color:white;">
+    <div class="card-body p-4">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+            <div>
+                <h4 class="fw-bold mb-1">
+                    <i class="bi bi-wrench-adjustable me-2"></i>รายการแจ้งซ่อม / อุปกรณ์ชำรุดในสนาม
+                </h4>
+                <p class="mb-0 text-white-50 small">
+                    รายงานตรงจากฝ่ายดูแลคอร์ท (Court Supervisor) เพื่อให้ Admin ประสานงานซ่อมบำรุงและปิดเคส
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- สถิติการแจ้งซ่อม -->
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm h-100 border-start border-4 border-warning" style="border-radius:14px;">
+            <div class="card-body p-3">
+                <div class="small text-muted mb-1"><i class="bi bi-hourglass-split me-1 text-warning"></i>รอ Admin รับเรื่อง</div>
+                <h3 class="fw-bold mb-0 text-warning">@pendingCount</h3>
+                <small class="text-muted">รอดำเนินการ</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm h-100 border-start border-4 border-info" style="border-radius:14px;">
+            <div class="card-body p-3">
+                <div class="small text-muted mb-1"><i class="bi bi-tools me-1 text-info"></i>กำลังดำเนินการแก้ไข</div>
+                <h3 class="fw-bold mb-0 text-info">@inProgressCount</h3>
+                <small class="text-muted">กำลังซ่อมแซม</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm h-100 border-start border-4 border-success" style="border-radius:14px;">
+            <div class="card-body p-3">
+                <div class="small text-muted mb-1"><i class="bi bi-check-circle me-1 text-success"></i>ซ่อมแซมเสร็จสิ้น</div>
+                <h3 class="fw-bold mb-0 text-success">@resolvedCount</h3>
+                <small class="text-muted">ปิดเรื่องแล้ว</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ตารางรายการแจ้งซ่อม -->
+<div class="card border-0 shadow-sm" style="border-radius:18px; overflow:hidden;">
+    <div class="p-3 bg-white border-bottom d-flex justify-content-between align-items-center">
+        <h5 class="fw-bold mb-0 text-dark">
+            <i class="bi bi-list-task me-2 text-danger"></i>รายการที่แจ้งเข้ามาทั้งหมด (@Model.Count เรื่อง)
+        </h5>
+    </div>
+
+    @if (Model.Any())
+    {
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr class="small text-secondary">
+                        <th>รหัสเรื่อง</th>
+                        <th>สนาม / บริเวณ</th>
+                        <th>รายละเอียดอุปกรณ์ชำรุด</th>
+                        <th>ผู้แจ้ง (ฝ่ายดูแลคอร์ท)</th>
+                        <th>วันที่แจ้ง</th>
+                        <th>สถานะ</th>
+                        <th class="text-end">การจัดการ (Admin)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var i in Model)
+                    {
+                        <tr>
+                            <td>
+                                <strong class="font-monospace text-primary">#ISSUE-@i.IssueId.ToString("D3")</strong>
+                            </td>
+                            <td>
+                                @if (i.Court != null)
+                                {
+                                    <span class="badge bg-dark fs-6 px-2 py-1">@i.Court.CourtName</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-secondary">ส่วนกลาง / ทั่วไป</span>
+                                }
+                            </td>
+                            <td>
+                                <div class="fw-bold text-dark small" style="max-width:300px;">
+                                    @i.Description
+                                </div>
+                            </td>
+                            <td>
+                                <small class="text-muted">@(i.ReportedByNavigation?.FullName ?? "ฝ่ายดูแลคอร์ท")</small>
+                            </td>
+                            <td>
+                                <small class="text-muted">@i.CreatedAt.ToString("dd/MM/yyyy HH:mm น.")</small>
+                            </td>
+                            <td>
+                                @switch (i.Status?.ToUpper())
+                                {
+                                    case "RESOLVED":
+                                        <span class="badge bg-success px-2 py-1">
+                                            <i class="bi bi-check-circle-fill me-1"></i> ซ่อมเสร็จสิ้น
+                                        </span>
+                                        break;
+                                    case "IN_PROGRESS":
+                                        <span class="badge bg-info text-dark px-2 py-1">
+                                            <i class="bi bi-tools me-1"></i> กำลังซ่อมแซม
+                                        </span>
+                                        break;
+                                    default:
+                                        <span class="badge bg-warning text-dark px-2 py-1">
+                                            <i class="bi bi-hourglass-split me-1"></i> รอดำเนินการ
+                                        </span>
+                                        break;
+                                }
+                            </td>
+                            <td class="text-end">
+                                @if (i.Status == "PENDING")
+                                {
+                                    <form method="post" asp-action="UpdateIssueStatus" class="d-inline">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="issueId" value="@i.IssueId" />
+                                        <input type="hidden" name="status" value="IN_PROGRESS" />
+                                        <button type="submit" class="btn btn-sm btn-info text-dark fw-bold me-1">
+                                            <i class="bi bi-wrench me-1"></i> รับเรื่อง/จัดช่าง
+                                        </button>
+                                    </form>
+                                    <form method="post" asp-action="UpdateIssueStatus" class="d-inline">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="issueId" value="@i.IssueId" />
+                                        <input type="hidden" name="status" value="RESOLVED" />
+                                        <button type="submit" class="btn btn-sm btn-success fw-bold">
+                                            <i class="bi bi-check-lg me-1"></i> ปิดเรื่อง
+                                        </button>
+                                    </form>
+                                }
+                                else if (i.Status == "IN_PROGRESS")
+                                {
+                                    <form method="post" asp-action="UpdateIssueStatus" class="d-inline">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="issueId" value="@i.IssueId" />
+                                        <input type="hidden" name="status" value="RESOLVED" />
+                                        <button type="submit" class="btn btn-sm btn-success fw-bold">
+                                            <i class="bi bi-check-circle-fill me-1"></i> ซ่อมแซมเสร็จสิ้น
+                                        </button>
+                                    </form>
+                                }
+                                else
+                                {
+                                    <span class="text-muted small">
+                                        แก้ไขโดย @(i.ResolvedByNavigation?.FullName ?? "Admin")
+                                    </span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+    else
+    {
+        <div class="p-5 text-center text-muted">
+            <i class="bi bi-shield-check fs-1 d-block mb-2 text-success"></i>
+            <h6>ไม่มีรายการแจ้งอุปกรณ์ชำรุด</h6>
+            <small>ระบบสนามและอุปกรณ์ทุกชิ้นทำงานได้ตามปกติ</small>
+        </div>
+    }
+</div>

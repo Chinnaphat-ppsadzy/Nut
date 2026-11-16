@@ -38,21 +38,22 @@
     {
         promotions = new List<Chinnaphat_8272_L005.Models.Promotion>
         {
-            new() { PromoName = "โปรฯ เช่าสนาม (Time-based)", PromoCode = "COURT_OFFPEAK", Description = "จองคอร์ทช่วงเวลา 09.00 - 15.00 น. (จันทร์-ศุกร์) ลดราคาค่าเช่าคอร์ท 20%", DiscountValue = 20, DiscountType = "PERCENT", IsActive = true },
-            new() { PromoName = "โปรฯ ส่งเสริมการขาย (Volume-based Sale)", PromoCode = "SHUTTLE_2ND_50", Description = "หากลูกค้าซื้อลูกแบดมินตันรุ่นใดก็ได้ตั้งแต่ 2 หลอดขึ้นไป ระบบจะลดราคาลูกแบดหลอดที่ 2 ทันที 50%", DiscountValue = 50, DiscountType = "PERCENT", IsActive = true },
-            new() { PromoName = "โปรฯ ส่งเสริมการเช่า (Bundle Rental)", PromoCode = "BUNDLE_RENT_20", Description = "หากลูกค้าเช่าไม้แบดมินตัน 2 ไม้ พร้อมกับเช่ารองเท้า 2 คู่ ในบิลเดียวกัน ระบบจะลดราคาค่าเช่าอุปกรณ์เซ็ตนี้ 20%", DiscountValue = 20, DiscountType = "PERCENT", IsActive = true },
-            new() { PromoName = "โปรฯ ซื้อคู่เช่า (Cross-selling Buy & Rent)", PromoCode = "CROSS_FREE_SHOES", Description = "หากลูกค้าซื้อลูกแบดมินตัน 1 หลอด + เช่าไม้แบดมินตัน 2 ไม้ รับสิทธิ์เช่ารองเท้าฟรี 1 คู่ (ระบบตัดราคารองเท้าออก 1 คู่)", DiscountValue = 1, DiscountType = "FREE_ITEM", IsActive = true },
-            new() { PromoName = "โปรฯ ยอดซื้อรวม (Total Bill Discount)", PromoCode = "NEW_MEMBER_100", Description = "สมาชิกใหม่ที่จองคอร์ทครั้งแรก และมียอดรวมในบิลตั้งแต่ 600 บาทขึ้นไป รับส่วนลดหักท้ายบิลทันที 100 บาท", DiscountValue = 100, DiscountType = "FIXED_AMOUNT", MinBillAmount = 600, IsActive = true }
+            new() { PromoName = "คอร์ทช่วงกลางวัน ลด 20%", PromoCode = "PROMO_TIME", Description = "จองคอร์ทช่วงเวลา 09.00 - 15.00 น. (จันทร์-ศุกร์) ลดราคาค่าเช่าคอร์ท 20%", DiscountValue = 20, DiscountType = "PERCENT", IsActive = true },
+            new() { PromoName = "ลูกแบด 2 หลอด ลดหลอดที่ 2 50%", PromoCode = "PROMO_VOLUME", Description = "หากลูกค้าซื้อลูกแบดมินตันรุ่นใดก็ได้ตั้งแต่ 2 หลอดขึ้นไป ระบบจะลดราคาลูกแบดหลอดที่ 2 ทันที 50%", DiscountValue = 50, DiscountType = "PERCENT", IsActive = true },
+            new() { PromoName = "ไม้ 2 + รองเท้า 2 ลด 20%", PromoCode = "PROMO_BUNDLE", Description = "หากลูกค้าเช่าไม้แบดมินตัน 2 ไม้ พร้อมกับเช่ารองเท้า 2 คู่ ในบิลเดียวกัน ระบบจะลดราคาค่าเช่าอุปกรณ์เซ็ตนี้ 20%", DiscountValue = 20, DiscountType = "PERCENT", IsActive = true },
+            new() { PromoName = "ลูกแบด + ไม้ 2 รองเท้าฟรี", PromoCode = "PROMO_CROSS", Description = "หากลูกค้าซื้อลูกแบดมินตัน 1 หลอด + เช่าไม้แบดมินตัน 2 ไม้ รับสิทธิ์เช่ารองเท้าฟรี 1 คู่ (ระบบตัดราคารองเท้าออก 1 คู่)", DiscountValue = 1, DiscountType = "FREE_ITEM", IsActive = true },
+            new() { PromoName = "สมาชิกใหม่ ยอด 600+ ลด 100", PromoCode = "PROMO_TOTAL", Description = "สมาชิกใหม่ที่จองคอร์ทครั้งแรก และมียอดรวมในบิลตั้งแต่ 600 บาทขึ้นไป รับส่วนลดหักท้ายบิลทันที 100 บาท", DiscountValue = 100, DiscountType = "FIXED_AMOUNT", MinBillAmount = 600, IsActive = true }
         };
     }
 
     var products = ViewBag.Products as List<Chinnaphat_8272_L005.Models.Product> ?? new();
     var myBookings = ViewBag.MyBookings as List<Chinnaphat_8272_L005.ViewModels.BookingTrackItem> ?? new();
+    var bookedSlots = ViewBag.BookedSlots as HashSet<string> ?? new HashSet<string>();
 
     string? userId = Context.Session.GetString("UserId") ?? Context.Request.Cookies["cb_user_id"];
-    string? rawUserName = Context.Session.GetString("FullName") ?? Context.Request.Cookies["cb_user_name"];
+    string? rawUserName = ViewBag.CurrentUserName as string ?? Context.Session.GetString("FullName") ?? Context.Request.Cookies["cb_user_name"];
     string? currentUserName = !string.IsNullOrEmpty(rawUserName) ? System.Net.WebUtility.UrlDecode(rawUserName) : null;
-    string? currentUserPhone = Context.Request.Cookies["cb_phone"];
+    string? currentUserPhone = ViewBag.CurrentUserPhone as string ?? Context.Session.GetString("Phone") ?? Context.Request.Cookies["cb_phone"];
     bool isLoggedIn = !string.IsNullOrEmpty(userId);
 }
 
@@ -421,13 +422,13 @@
                 </a>
             </div>
             <div class="col-6 col-md">
-                <a href="#myBookingsSection" class="btn btn-outline-primary w-100 py-3" style="border-radius:12px;">
+                <a href="#myBookingsSection" class="btn btn-outline-success w-100 py-3" style="border-radius:12px;">
                     <i class="bi bi-clock-history d-block mb-1" style="font-size:1.5rem;"></i>
                     <span class="fw-bold">ติดตามสถานะการจอง</span>
                 </a>
             </div>
             <div class="col-6 col-md">
-                <a href="#productSection" class="btn btn-outline-teal w-100 py-3" style="border-radius:12px; color:#0d9488; border-color:#0d9488;" onmouseover="this.style.background='#0d9488';this.style.color='#fff';" onmouseout="this.style.background='transparent';this.style.color='#0d9488';">
+                <a href="#productSection" class="btn btn-outline-success w-100 py-3" style="border-radius:12px;">
                     <i class="bi bi-box-seam d-block mb-1" style="font-size:1.5rem;"></i>
                     <span>ซื้อ/เช่าอุปกรณ์</span>
                 </a>
@@ -488,7 +489,7 @@
             <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
                 <div class="d-flex gap-2 flex-wrap">
                     <span class="badge bg-success-subtle text-success px-3 py-2" style="border-radius:20px;">
-                        <i class="bi bi-check-circle-fill me-1"></i> แบดมินตัน 4 คอร์ท
+                        <i class="bi bi-check-circle-fill me-1"></i> แบดมินตัน @courts.Count คอร์ท
                     </span>
                     <span class="badge bg-light text-secondary border px-3 py-2" style="border-radius:20px;">
                         <i class="bi bi-p-square-fill text-primary me-1"></i> ที่จอดรถฟรี
@@ -502,7 +503,7 @@
                 </div>
                 <div class="text-end">
                     <small class="text-muted d-block">อัตราค่าบริการ</small>
-                    <span class="fs-5 fw-bold text-success">200 บาท</span>
+                    <span class="fs-5 fw-bold text-success">@(courts.Any() ? courts.Min(c => c.PricePerHour).ToString("N0") : "200") บาท</span>
                     <small class="text-muted"> / ชั่วโมง</small>
                 </div>
             </div>
@@ -620,19 +621,6 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @{
-                            // จำลอง slot ที่ถูกจองในระบบเพื่อความสมจริงแบบ Matchday
-                            // (เช่น ช่วงค่ำ 18:00 - 20:00 บางคอร์ทมีผู้จองแล้ว)
-                            var defaultBookedSet = new HashSet<string>
-                            {
-                                "1_11", // Court 1 at 18:00
-                                "2_11", // Court 2 at 18:00
-                                "2_12", // Court 2 at 19:00
-                                "3_13", // Court 3 at 20:00
-                                "4_10", // Court 4 at 17:00
-                            };
-                        }
-
                         @foreach (var slot in timeSlots)
                         {
                             string timeRange = $"{slot.StartTime.ToString("HH:mm")} - {slot.EndTime.ToString("HH:mm")}";
@@ -650,12 +638,33 @@
                                 @foreach (var court in courts)
                                 {
                                     string slotKey = $"{court.CourtId}_{slot.SlotId}";
-                                    bool isBooked = defaultBookedSet.Contains(slotKey);
+                                    bool isCourtClosed = court.Status != null && court.Status != "AVAILABLE" && court.Status != "available";
+                                    bool isBooked = isCourtClosed || bookedSlots.Contains(slotKey);
 
                                     <td class="court-cell-@court.CourtId">
-                                        @if (isBooked)
+                                        @if (isCourtClosed)
                                         {
-                                            <div class="slot-cell booked" title="ช่วงเวลานี้ถูกจองแล้ว">
+                                            <div class="slot-cell booked court-closed"
+                                                 data-court-id="@court.CourtId"
+                                                 data-court-name="@court.CourtName"
+                                                 data-slot-id="@slot.SlotId"
+                                                 data-price="@court.PricePerHour"
+                                                 title="สนามปิดปรับปรุง">
+                                                <div class="slot-price">-</div>
+                                                <span class="slot-status-text text-danger">
+                                                    <i class="bi bi-tools me-1"></i>ปิดปรับปรุง
+                                                </span>
+                                            </div>
+                                        }
+                                        else if (isBooked)
+                                        {
+                                            <div class="slot-cell booked"
+                                                 data-court-id="@court.CourtId"
+                                                 data-court-name="@court.CourtName"
+                                                 data-slot-id="@slot.SlotId"
+                                                 data-time-range="@timeRange"
+                                                 data-price="@court.PricePerHour"
+                                                 title="ช่วงเวลานี้ถูกจองแล้ว">
                                                 <div class="slot-price">@court.PricePerHour.ToString("N0")฿</div>
                                                 <span class="slot-status-text">
                                                     <i class="bi bi-lock-fill me-1"></i>จองแล้ว
@@ -738,11 +747,11 @@
      ============================================================ -->
 <div id="productSection" class="mt-5 mb-5 scroll-mt-4">
     <div class="card border-0 shadow-sm" style="border-radius:18px; overflow:hidden;">
-        <div class="p-4 text-white" style="background: linear-gradient(135deg, #0f766e 0%, #0d9488 50%, #2dd4bf 100%);">
+        <div class="p-4 text-white" style="background: linear-gradient(135deg, #1a472a 0%, #2d6a4f 60%, #52b788 100%);">
             <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
                 <div>
-                    <span class="badge bg-white text-dark fw-bold mb-2">
-                        <i class="bi bi-shop me-1 text-teal"></i> CourtBook Pro Shop & Rental
+                    <span class="badge bg-white text-success fw-bold mb-2">
+                        <i class="bi bi-shop me-1 text-success"></i> CourtBook Pro Shop & Rental
                     </span>
                     <h3 class="fw-bold mb-1">
                         <i class="bi bi-box-seam me-2"></i>สินค้าและบริการเช่าอุปกรณ์
@@ -926,10 +935,10 @@
 <div id="myBookingsSection" class="mt-5 mb-5 scroll-mt-4">
     <div class="card border-0 shadow-sm" style="border-radius:18px; overflow:hidden;">
         <!-- Header -->
-        <div class="p-4 text-white" style="background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 50%, #3b82f6 100%);">
+        <div class="p-4 text-white" style="background: linear-gradient(135deg, #1a472a 0%, #2d6a4f 60%, #52b788 100%);">
             <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
                 <div>
-                    <span class="badge bg-white text-primary fw-bold mb-2">
+                    <span class="badge bg-white text-success fw-bold mb-2">
                         <i class="bi bi-clock-history me-1"></i> Real-time Booking Tracking
                     </span>
                     <h3 class="fw-bold mb-1">
@@ -966,7 +975,7 @@
             <div class="card border-0 shadow-sm rounded-4 overflow-hidden bg-white">
                 <div class="p-3 border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2">
                     <h6 class="fw-bold mb-0 text-dark">
-                        <i class="bi bi-list-check me-2 text-primary"></i>รายการจองล่าสุดในระบบ (@myBookings.Count รายการ)
+                        <i class="bi bi-list-check me-2 text-primary"></i>@(isLoggedIn ? "รายการจองของคุณ" : "รายการจองล่าสุดในระบบ") (@myBookings.Count รายการ)
                     </h6>
                     <small class="text-muted">อัปเดตสถานะตรงจากฝ่ายบัญชีและการเงิน</small>
                 </div>
@@ -1222,7 +1231,7 @@
 
                             <!-- โค้ดส่วนลด -->
                             <div class="input-group input-group-sm mt-3">
-                                <input type="text" id="promoCodeInput" class="form-control" placeholder="โค้ดส่วนลด (เช่น NEW_MEMBER_100)" style="border-radius:8px 0 0 8px;">
+                                <input type="text" id="promoCodeInput" class="form-control" placeholder="โค้ดส่วนลด (เช่น PROMO_TOTAL หรือ NEW_MEMBER_100)" style="border-radius:8px 0 0 8px;">
                                 <button class="btn btn-outline-success" type="button" onclick="applyPromoCode()">ใช้โค้ด</button>
                             </div>
                             <div id="promoMsg" class="small mt-1"></div>
@@ -1239,7 +1248,7 @@
                             </div>
                             <div class="mb-2">
                                 <label class="small text-muted">เบอร์โทรศัพท์ <span class="text-danger">*</span></label>
-                                <input type="tel" class="form-control form-control-sm" id="custPhone" value="@(string.IsNullOrEmpty(currentUserPhone) ? "081-234-5678" : currentUserPhone)" required>
+                                <input type="tel" class="form-control form-control-sm" id="custPhone" placeholder="08x-xxx-xxxx" value="@(string.IsNullOrEmpty(currentUserPhone) ? "" : currentUserPhone)" required>
                             </div>
                         </div>
 
@@ -1608,6 +1617,7 @@
             document.getElementById('datePickerInput').value = dateIso;
             clearAllSelected();
             updateDateLabels(dateIso);
+            loadBookedSlotsForDate(dateIso);
         }
 
         function onDateInputChange(dateIso) {
@@ -1623,6 +1633,48 @@
             });
             clearAllSelected();
             updateDateLabels(dateIso);
+            loadBookedSlotsForDate(dateIso);
+        }
+
+        async function loadBookedSlotsForDate(dateIso) {
+            try {
+                const response = await fetch(`/Home/GetBookedSlots?date=${dateIso}`);
+                const data = await response.json();
+                const bookedSet = new Set(data.bookedSlots || []);
+
+                document.querySelectorAll('.slot-cell').forEach(cell => {
+                    if (cell.classList.contains('court-closed')) return;
+
+                    const courtId = cell.getAttribute('data-court-id');
+                    const slotId = cell.getAttribute('data-slot-id');
+                    if (!courtId || !slotId) return;
+
+                    const key = `${courtId}_${slotId}`;
+                    const price = cell.getAttribute('data-price') || '200';
+                    const numPrice = parseFloat(price).toLocaleString();
+
+                    if (bookedSet.has(key)) {
+                        cell.classList.remove('selected');
+                        cell.classList.add('booked');
+                        cell.removeAttribute('onclick');
+                        cell.title = 'ช่วงเวลานี้ถูกจองแล้ว';
+                        const priceEl = cell.querySelector('.slot-price');
+                        if (priceEl) priceEl.innerText = `${numPrice}฿`;
+                        const statusEl = cell.querySelector('.slot-status-text');
+                        if (statusEl) statusEl.innerHTML = '<i class="bi bi-lock-fill me-1"></i>จองแล้ว';
+                    } else {
+                        cell.classList.remove('booked', 'selected');
+                        cell.setAttribute('onclick', 'toggleSlot(this)');
+                        cell.title = '';
+                        const priceEl = cell.querySelector('.slot-price');
+                        if (priceEl) priceEl.innerText = `${numPrice}฿`;
+                        const statusEl = cell.querySelector('.slot-status-text');
+                        if (statusEl) statusEl.innerText = 'ว่าง';
+                    }
+                });
+            } catch (err) {
+                console.error('Error fetching booked slots:', err);
+            }
         }
 
         function updateDateLabels(dateIso) {
@@ -1754,9 +1806,9 @@
 
             // 5. Total bill discount (>= 600 THB)
             const currentTotal = (courtSubtotal + saleSubtotal + rentalSubtotal) - promoDiscounts;
-            if (currentTotal >= 600 && appliedManualPromoCode === 'NEW_MEMBER_100') {
+            if (currentTotal >= 600 && (appliedManualPromoCode === 'NEW_MEMBER_100' || appliedManualPromoCode === 'PROMO_TOTAL')) {
                 promoDiscounts += 100;
-                promoBadges.push(`🎉 โปรฯ ยอดรวมบิล 600 บาทขึ้นไป ลด 100 บาท`);
+                promoBadges.push(`🎉 โปรฯ ยอดรวมบิล 600 บาทขึ้นไป ลด 100 บาท (PROMO_TOTAL)`);
             }
 
             const netTotal = Math.max(0, (courtSubtotal + saleSubtotal + rentalSubtotal) - promoDiscounts);
@@ -1903,7 +1955,7 @@
             const code = document.getElementById('promoCodeInput').value.trim().toUpperCase();
             const promoMsg = document.getElementById('promoMsg');
 
-            if (code === 'NEW_MEMBER_100') {
+            if (code === 'NEW_MEMBER_100' || code === 'PROMO_TOTAL') {
                 appliedManualPromoCode = code;
                 renderModalCartItems();
                 promoMsg.className = 'small mt-1 text-success fw-bold';

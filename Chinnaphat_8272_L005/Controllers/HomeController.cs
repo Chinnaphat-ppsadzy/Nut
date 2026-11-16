@@ -157,23 +157,49 @@ public class HomeController : Controller
                                    .ToListAsync();
             ViewBag.Products = products;
 
+            var bookedSlotKeys = new HashSet<string>();
             if (DateOnly.TryParse(selectedDate, out DateOnly targetDate))
             {
                 var booked = await _db.BookingSlots
-                                      .Where(bs => bs.PlayDate == targetDate && bs.LockKey == 1)
-                                      .Select(bs => new { bs.CourtId, bs.SlotId })
+                                      .Include(bs => bs.Booking)
+                                      .Where(bs => bs.PlayDate == targetDate && (bs.LockKey == 1 || (bs.Booking != null && bs.Booking.Status != "CANCELLED")))
+                                      .Select(bs => $"{bs.CourtId}_{bs.SlotId}")
+                                      .Distinct()
                                       .ToListAsync();
-                ViewBag.BookedSlots = booked;
+                bookedSlotKeys = new HashSet<string>(booked);
+            }
+            ViewBag.BookedSlots = bookedSlotKeys;
+
+            // ตรวจสอบข้อมูลผู้ใช้งานที่ล็อกอิน
+            string? loggedInUidStr = HttpContext.Session.GetString("UserId") ?? Request.Cookies["cb_user_id"];
+            if (!string.IsNullOrEmpty(loggedInUidStr) && uint.TryParse(loggedInUidStr, out uint currentUid))
+            {
+                var currentUser = await _db.Users.FindAsync(currentUid);
+                if (currentUser != null)
+                {
+                    ViewBag.CurrentUserName = currentUser.FullName;
+                    ViewBag.CurrentUserPhone = currentUser.Phone;
+                    ViewBag.CurrentUserEmail = currentUser.Email;
+                }
             }
 
             // ดึงประวัติการจองและติดตามสถานะ (My Bookings)
             var myBookingsList = new List<BookingTrackItem>();
-            var rawBookings = await _db.Bookings
+            var bookingsQuery = _db.Bookings
                 .Include(b => b.BookingSlots).ThenInclude(bs => bs.Court)
                 .Include(b => b.BookingSlots).ThenInclude(bs => bs.Slot)
                 .Include(b => b.BookingItems).ThenInclude(bi => bi.Product)
                 .Include(b => b.Payments)
                 .Include(b => b.User)
+                .AsQueryable();
+
+            if (!string.IsNullOrEmpty(loggedInUidStr) && uint.TryParse(loggedInUidStr, out uint lUid))
+            {
+                // ถ้าล็อกอินอยู่ ให้แสดงการจองของผู้ใช้นั้นโดยเฉพาะ
+                bookingsQuery = bookingsQuery.Where(b => b.UserId == lUid);
+            }
+
+            var rawBookings = await bookingsQuery
                 .OrderByDescending(b => b.CreatedAt)
                 .Take(20)
                 .ToListAsync();
@@ -675,6 +701,27 @@ public class HomeController : Controller
         return Json(new { success = true, message = "อัปโหลดสลิปเรียบร้อย! ส่งเรื่องให้ฝ่ายบัญชีตรวจสอบแล้ว", slipUrl });
     }
 
+    // ============================================================
+    // CUSTOMER: ดึงรายการคอร์ท/ช่วงเวลาที่ถูกจองตามวันที่ (Real-time DB)
+    // ============================================================
+    [HttpGet]
+    public async Task<IActionResult> GetBookedSlots(string date)
+    {
+        if (!DateOnly.TryParse(date, out DateOnly targetDate))
+        {
+            return Json(new { success = false, bookedSlots = new List<string>() });
+        }
+
+        var booked = await _db.BookingSlots
+                              .Include(bs => bs.Booking)
+                              .Where(bs => bs.PlayDate == targetDate && (bs.LockKey == 1 || (bs.Booking != null && bs.Booking.Status != "CANCELLED")))
+                              .Select(bs => $"{bs.CourtId}_{bs.SlotId}")
+                              .Distinct()
+                              .ToListAsync();
+
+        return Json(new { success = true, bookedSlots = booked });
+    }
+
     // Helper classes for input deserialization
     public class SlotSelectionInput
     {
@@ -695,10 +742,141 @@ public class HomeController : Controller
         public decimal Price { get; set; }
     }
 
-    public IActionResult Admin()
+    public async Task<IActionResult> Admin()
     {
-        ViewData["Title"] = "Dashboard";
-        return View();
+        ViewData["Title"] = "แดชบอร์ดภาพรวมระบบ";
+
+        var today = DateTime.Today;
+        var firstDayOfMonth = new DateTime(today.Year, today.Month, 1);
+        var firstDayOfMonthDateOnly = DateOnly.FromDateTime(firstDayOfMonth);
+
+        var vm = new AdminDashboardViewModel();
+
+        // 1. Users
+        var allUsers = await _db.Users.Include(u => u.Role).ToListAsync();
+        vm.TotalUsers = allUsers.Count;
+        vm.ActiveUsers = allUsers.Count(u => u.Status != null && (u.Status == "ACTIVE" || u.Status == "active"));
+        vm.NewUsersThisMonth = allUsers.Count(u => u.CreatedAt >= firstDayOfMonth);
+        vm.RecentUsers = allUsers.OrderByDescending(u => u.UserId).Take(6).ToList();
+
+        // 2. Courts
+        var allCourts = await _db.Courts.Include(c => c.BookingSlots).ToListAsync();
+        vm.TotalCourts = allCourts.Count;
+        vm.AvailableCourts = allCourts.Count(c => c.Status == "AVAILABLE" || c.Status == "available");
+
+        // 3. Bookings
+        var allBookings = await _db.Bookings
+            .Include(b => b.User)
+            .Include(b => b.BookingSlots).ThenInclude(bs => bs.Court)
+            .ToListAsync();
+
+        vm.TotalBookings = allBookings.Count;
+        vm.BookingsThisMonth = allBookings.Count(b => b.PlayDate >= firstDayOfMonthDateOnly);
+        vm.PendingBookings = allBookings.Count(b => b.Status == "PENDING_VERIFICATION");
+
+        // 4. Revenue
+        var confirmedBookings = allBookings.Where(b => b.Status == "CONFIRMED" || b.Status == "CHECKED_IN" || b.Status == "COMPLETED").ToList();
+        vm.TotalRevenue = confirmedBookings.Sum(b => b.NetAmount);
+        vm.RevenueThisMonth = confirmedBookings.Where(b => b.PlayDate >= firstDayOfMonthDateOnly).Sum(b => b.NetAmount);
+
+        // 5. Additional Metrics
+        vm.ActivePromotions = await _db.Promotions.CountAsync(p => p.IsActive == true);
+        var allProducts = await _db.Products.ToListAsync();
+        vm.TotalProducts = allProducts.Count;
+        vm.LowStockProducts = allProducts.Count(p => p.StockQty <= 5);
+        vm.PendingIssues = await _db.CourtIssues.CountAsync(i => i.Status == "PENDING" || i.Status == "IN_PROGRESS");
+
+        // 6. Recent Bookings
+        vm.RecentBookings = allBookings.OrderByDescending(b => b.CreatedAt).Take(5).ToList();
+
+        // 7. Court Stats
+        var courtColors = new[] { "#2d6a4f", "#1d4ed8", "#d97706", "#7c3aed", "#e11d48", "#059669", "#4f46e5" };
+        int colorIdx = 0;
+        int maxSlots = allCourts.Any() ? allCourts.Max(c => c.BookingSlots.Count) : 0;
+        if (maxSlots == 0) maxSlots = 1;
+
+        foreach (var c in allCourts.OrderBy(c => c.CourtId))
+        {
+            int slotCount = c.BookingSlots.Count;
+            int pct = (int)Math.Round((double)slotCount / maxSlots * 100);
+            if (pct > 100) pct = 100;
+            if (pct < 10 && slotCount > 0) pct = 15;
+
+            decimal courtRev = c.BookingSlots.Sum(bs => bs.Price);
+
+            vm.CourtStats.Add(new CourtUsageStat
+            {
+                CourtId = c.CourtId,
+                CourtName = c.CourtName,
+                TotalSlotsBooked = slotCount,
+                Percentage = pct,
+                Status = c.Status,
+                TotalCourtRevenue = courtRev,
+                Color = courtColors[colorIdx % courtColors.Length]
+            });
+            colorIdx++;
+        }
+
+        // 8. Recent Activities Feed
+        var activities = new List<AdminActivityItem>();
+
+        foreach (var b in allBookings.OrderByDescending(b => b.CreatedAt).Take(5))
+        {
+            string courtNames = b.BookingSlots.Any()
+                ? string.Join(", ", b.BookingSlots.Select(bs => bs.Court?.CourtName).Where(cn => cn != null).Distinct())
+                : "คอร์ทแบดมินตัน";
+
+            activities.Add(new AdminActivityItem
+            {
+                Title = $"{b.User?.FullName ?? "ลูกค้า"} จอง {courtNames}",
+                Description = $"รหัสการจอง #{b.BookingCode} | ยอด {b.NetAmount:N0} ฿ ({b.Status})",
+                Timestamp = b.CreatedAt,
+                TimeAgo = GetTimeAgo(b.CreatedAt),
+                Icon = "bi-calendar-check",
+                BadgeColor = b.Status == "CONFIRMED" || b.Status == "COMPLETED" ? "success" : "warning"
+            });
+        }
+
+        foreach (var u in allUsers.OrderByDescending(u => u.CreatedAt).Take(4))
+        {
+            activities.Add(new AdminActivityItem
+            {
+                Title = $"สมาชิกใหม่: {u.FullName}",
+                Description = $"{u.Email} ({u.Role?.RoleName ?? "CUSTOMER"})",
+                Timestamp = u.CreatedAt,
+                TimeAgo = GetTimeAgo(u.CreatedAt),
+                Icon = "bi-person-plus",
+                BadgeColor = "primary"
+            });
+        }
+
+        var latestIssues = await _db.CourtIssues.Include(ci => ci.Court).OrderByDescending(ci => ci.CreatedAt).Take(3).ToListAsync();
+        foreach (var ci in latestIssues)
+        {
+            activities.Add(new AdminActivityItem
+            {
+                Title = $"แจ้งซ่อม/ชำรุด: {ci.Court?.CourtName ?? "อุปกรณ์"}",
+                Description = ci.Description,
+                Timestamp = ci.CreatedAt,
+                TimeAgo = GetTimeAgo(ci.CreatedAt),
+                Icon = "bi-exclamation-triangle",
+                BadgeColor = "danger"
+            });
+        }
+
+        vm.RecentActivities = activities.OrderByDescending(a => a.Timestamp).Take(7).ToList();
+
+        return View(vm);
+    }
+
+    private static string GetTimeAgo(DateTime dt)
+    {
+        var span = DateTime.Now - dt;
+        if (span.TotalMinutes < 1) return "เมื่อสักครู่";
+        if (span.TotalMinutes < 60) return $"{(int)span.TotalMinutes} นาทีที่แล้ว";
+        if (span.TotalHours < 24) return $"{(int)span.TotalHours} ชั่วโมงที่แล้ว";
+        if (span.TotalDays < 30) return $"{(int)span.TotalDays} วันที่แล้ว";
+        return dt.ToString("dd/MM/yyyy");
     }
 
   public IActionResult Lab5(string Name, string LastName)

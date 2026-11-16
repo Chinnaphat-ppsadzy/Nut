@@ -75,6 +75,10 @@ namespace Chinnaphat_8272_L005.Controllers
                     HttpContext.Session.SetString("Email", user.Email);
                     HttpContext.Session.SetString("RoleCode", roleCode);
                     HttpContext.Session.SetString("RoleName", userRole?.RoleName ?? roleCode);
+                    if (!string.IsNullOrEmpty(user.Phone))
+                    {
+                        HttpContext.Session.SetString("Phone", user.Phone);
+                    }
                 }
                 catch {}
 
@@ -90,6 +94,10 @@ namespace Chinnaphat_8272_L005.Controllers
                 Response.Cookies.Append("cb_email", user.Email, cookieOptions);
                 Response.Cookies.Append("cb_role_code", roleCode, cookieOptions);
                 Response.Cookies.Append("cb_role_name", WebUtility.UrlEncode(userRole?.RoleName ?? roleCode), cookieOptions);
+                if (!string.IsNullOrEmpty(user.Phone))
+                {
+                    Response.Cookies.Append("cb_phone", user.Phone, cookieOptions);
+                }
 
                 // เก็บข้อมูลผู้ใช้ที่ล็อกอินผ่าน TempData
                 TempData["IsLoggedIn"]  = true;
@@ -109,6 +117,14 @@ namespace Chinnaphat_8272_L005.Controllers
                 if (roleCode == "SALES_STAFF")
                 {
                     return RedirectToAction("Sales", "SalesStaff");
+                }
+                else if (roleCode == "COURT_STAFF")
+                {
+                    return RedirectToAction("Index", "CourtStaff");
+                }
+                else if (roleCode == "ACCOUNTING")
+                {
+                    return RedirectToAction("Index", "Accounting");
                 }
                 else if (roleCode == "ADMIN")
                 {
@@ -190,6 +206,41 @@ namespace Chinnaphat_8272_L005.Controllers
 
 
         // ============================================================
+        // ROLE HELPER — ตรวจสอบและสร้าง 5 บทบาทพื้นฐานถ้ายังไม่มี
+        // ============================================================
+        private void EnsureRolesExist()
+        {
+            var expectedRoles = new[]
+            {
+                ("ADMIN", "ผู้ดูแลระบบ / เจ้าของคอร์ท", "ผู้ดูแลระบบสูงสุด จัดการข้อมูลและโปรโมชั่น"),
+                ("CUSTOMER", "ลูกค้า / สมาชิก", "ผู้ใช้ทั่วไป จองสนามและซื้ออุปกรณ์"),
+                ("COURT_STAFF", "ฝ่ายดูแลคอร์ท", "ดูแลคอร์ท เช็คอิน-เช็คเอาต์ ล็อกคอร์ท"),
+                ("SALES_STAFF", "ฝ่ายซื้อ-เช่าอุปกรณ์", "จำหน่ายสินค้า ให้เช่าอุปกรณ์ เช็คสต็อก"),
+                ("ACCOUNTING", "ฝ่ายบัญชีและการเงิน", "ตรวจสอบสลิป ออกใบเสร็จ ค่าปรับ คืนเงิน รายงานการเงิน")
+            };
+
+            bool changed = false;
+            foreach (var (code, name, desc) in expectedRoles)
+            {
+                var existing = _db.Roles.FirstOrDefault(r => r.RoleCode == code);
+                if (existing == null)
+                {
+                    _db.Roles.Add(new Role
+                    {
+                        RoleCode = code,
+                        RoleName = name,
+                        Description = desc
+                    });
+                    changed = true;
+                }
+            }
+            if (changed)
+            {
+                _db.SaveChanges();
+            }
+        }
+
+        // ============================================================
         // ADD USER (Admin) — CREATE: เพิ่มผู้ใช้ใหม่ลงฐานข้อมูล
         // ============================================================
 
@@ -197,8 +248,8 @@ namespace Chinnaphat_8272_L005.Controllers
         public IActionResult AddUser()
         {
             ViewData["Title"] = "เพิ่มผู้ใช้งาน";
-            // READ — ดึงรายการ Role จากฐานข้อมูล
-            ViewBag.Roles = (from r in _db.Roles select r).ToList();
+            EnsureRolesExist();
+            ViewBag.Roles = _db.Roles.OrderBy(r => r.RoleId).ToList();
             return View(new AddUserViewModel());
         }
 
@@ -206,50 +257,62 @@ namespace Chinnaphat_8272_L005.Controllers
         [ValidateAntiForgeryToken]
         public IActionResult AddUser(AddUserViewModel model)
         {
+            EnsureRolesExist();
+
+            // กำหนดค่า username ให้เป็น email หากไม่ได้กรอกมา
+            if (string.IsNullOrWhiteSpace(model.Username))
+            {
+                model.Username = model.Email;
+            }
+
             if (ModelState.IsValid)
             {
                 // READ — ตรวจสอบว่า Email ซ้ำหรือไม่
-                var existingUser = (from u in _db.Users
-                                    where u.Email == model.Email
-                                    select u).FirstOrDefault();
+                string cleanEmail = model.Email?.Trim().ToLower() ?? "";
+                var existingUser = _db.Users.FirstOrDefault(u => u.Email.ToLower() == cleanEmail);
 
                 if (existingUser != null)
                 {
-                    ModelState.AddModelError("Email", "อีเมลนี้ถูกใช้งานแล้ว");
-                    ViewBag.Roles = (from r in _db.Roles select r).ToList();
+                    ModelState.AddModelError("Email", "อีเมลนี้ถูกใช้งานแล้วในระบบ");
+                    ViewBag.Roles = _db.Roles.OrderBy(r => r.RoleId).ToList();
                     ViewData["Title"] = "เพิ่มผู้ใช้งาน";
                     return View(model);
                 }
 
                 // READ — ค้นหา RoleId จาก RoleCode
-                var role = (from r in _db.Roles
-                            where r.RoleCode == model.Role
-                            select r).FirstOrDefault();
-
+                string roleCode = string.IsNullOrWhiteSpace(model.Role) ? "CUSTOMER" : model.Role.Trim().ToUpper();
+                var role = _db.Roles.FirstOrDefault(r => r.RoleCode == roleCode);
                 byte roleId = role != null ? role.RoleId : (byte)1;
 
-                // CREATE — บันทึกผู้ใช้ใหม่ลงฐานข้อมูล
-                var newUser = new User
+                try
                 {
-                    RoleId       = roleId,
-                    Email        = model.Email,
-                    PasswordHash = model.Password,
-                    FullName     = $"{model.FirstName} {model.LastName}",
-                    Phone        = model.Phone,
-                    Status       = model.IsActive ? "active" : "inactive",
-                    HasBooked    = false,
-                    CreatedAt    = DateTime.Now,
-                    UpdatedAt    = DateTime.Now
-                };
+                    // CREATE — บันทึกผู้ใช้ใหม่ลงฐานข้อมูล
+                    var newUser = new User
+                    {
+                        RoleId       = roleId,
+                        Email        = model.Email.Trim(),
+                        PasswordHash = model.Password,
+                        FullName     = $"{model.FirstName?.Trim()} {model.LastName?.Trim()}".Trim(),
+                        Phone        = model.Phone?.Trim(),
+                        Status       = model.IsActive ? "ACTIVE" : "INACTIVE",
+                        HasBooked    = false,
+                        CreatedAt    = DateTime.Now,
+                        UpdatedAt    = DateTime.Now
+                    };
 
-                _db.Users.Add(newUser);
-                _db.SaveChanges();
+                    _db.Users.Add(newUser);
+                    _db.SaveChanges();
 
-                TempData["SuccessMessage"] = $"เพิ่มผู้ใช้ {model.Email} สำเร็จ!";
-                return RedirectToAction("UserList");
+                    TempData["SuccessMessage"] = $"เพิ่มผู้ใช้ {newUser.FullName} ({newUser.Email}) สำเร็จ!";
+                    return RedirectToAction("UserList");
+                }
+                catch (Exception ex)
+                {
+                    ModelState.AddModelError("", "เกิดข้อผิดพลาดในการบันทึก: " + ex.Message);
+                }
             }
 
-            ViewBag.Roles = (from r in _db.Roles select r).ToList();
+            ViewBag.Roles = _db.Roles.OrderBy(r => r.RoleId).ToList();
             ViewData["Title"] = "เพิ่มผู้ใช้งาน";
             return View(model);
         }
@@ -262,12 +325,13 @@ namespace Chinnaphat_8272_L005.Controllers
         public IActionResult UserList()
         {
             ViewData["Title"] = "รายชื่อผู้ใช้งาน";
+            EnsureRolesExist();
 
-            // READ — ดึงข้อมูลผู้ใช้ทั้งหมดจากฐานข้อมูลพร้อม Role
+            // READ — ดึงข้อมูลผู้ใช้ทั้งหมดจากฐานข้อมูลพร้อม Role (เรียงตามลำดับรหัสจากน้อยไปมาก)
             var usersFromDb = (from u in _db.Users
                                join r in _db.Roles on u.RoleId equals r.RoleId into roleGroup
                                from rg in roleGroup.DefaultIfEmpty()
-                               orderby u.CreatedAt descending
+                               orderby u.UserId ascending
                                select new UserListItemViewModel
                                {
                                    Id        = (int)u.UserId,
@@ -278,7 +342,7 @@ namespace Chinnaphat_8272_L005.Controllers
                                    RoleCode  = rg != null ? rg.RoleCode : "CUSTOMER",
                                    Phone     = u.Phone ?? "-",
                                    Gender    = "-",
-                                   IsActive  = u.Status == "active",
+                                   IsActive  = u.Status != null && (u.Status == "ACTIVE" || u.Status == "active"),
                                    CreatedAt = u.CreatedAt,
                                    Source    = "Database"
                                }).ToList();
@@ -295,28 +359,129 @@ namespace Chinnaphat_8272_L005.Controllers
 
 
         // ============================================================
-        // DELETE USER — DELETE: ลบผู้ใช้ออกจากฐานข้อมูล
+        // DELETE USER — DELETE: ลบผู้ใช้ออกจากฐานข้อมูล (พร้อมจัดการ FK ป้องกัน Error)
         // ============================================================
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public IActionResult DeleteUser(int id)
+        public async Task<IActionResult> DeleteUser(int id)
         {
-            // READ — ค้นหา User ที่ต้องการลบ
-            var user = (from u in _db.Users
-                        where u.UserId == (uint)id
-                        select u).FirstOrDefault();
+            try
+            {
+                // ตรวจสอบห้ามลบบัญชีที่กำลังล็อกอินอยู่
+                string? currentUidStr = HttpContext.Session.GetString("UserId") ?? Request.Cookies["cb_user_id"];
+                if (uint.TryParse(currentUidStr, out uint currentUid) && currentUid == (uint)id)
+                {
+                    TempData["ErrorMessage"] = "ไม่สามารถลบบัญชีของตนเองที่กำลังเข้าสู่ระบบอยู่ได้";
+                    return RedirectToAction("UserList");
+                }
 
-            if (user != null)
-            {
-                // DELETE — ลบออกจากฐานข้อมูล
+                // READ — ค้นหา User ที่ต้องการลบ
+                var user = await _db.Users.FirstOrDefaultAsync(u => u.UserId == (uint)id);
+                if (user == null)
+                {
+                    TempData["ErrorMessage"] = "ไม่พบผู้ใช้ที่ต้องการลบในระบบ";
+                    return RedirectToAction("UserList");
+                }
+
+                string userEmail = user.Email;
+                string userName = user.FullName;
+
+                // 1. ลบ Carts และ CartItems ของผู้ใช้ (ถ้ามี)
+                var userCarts = await _db.Carts.Include(c => c.CartItems).Where(c => c.UserId == user.UserId).ToListAsync();
+                if (userCarts.Any())
+                {
+                    foreach (var cart in userCarts)
+                    {
+                        _db.CartItems.RemoveRange(cart.CartItems);
+                    }
+                    _db.Carts.RemoveRange(userCarts);
+                }
+
+                // 2. ลบ Bookings ของผู้ใช้ (ถ้ามี) พร้อมตารางลูกที่เกี่ยวข้อง
+                var userBookings = await _db.Bookings
+                    .Include(b => b.Payments)
+                    .Include(b => b.BookingSlots)
+                    .Include(b => b.BookingItems).ThenInclude(bi => bi.EquipmentDamages)
+                    .Include(b => b.Receipts)
+                    .Include(b => b.Refunds)
+                    .Where(b => b.UserId == user.UserId)
+                    .ToListAsync();
+
+                if (userBookings.Any())
+                {
+                    foreach (var b in userBookings)
+                    {
+                        _db.Receipts.RemoveRange(b.Receipts);
+                        _db.Refunds.RemoveRange(b.Refunds);
+                        foreach (var bi in b.BookingItems)
+                        {
+                            _db.EquipmentDamages.RemoveRange(bi.EquipmentDamages);
+                        }
+                        _db.BookingItems.RemoveRange(b.BookingItems);
+                        _db.BookingSlots.RemoveRange(b.BookingSlots);
+                        _db.Payments.RemoveRange(b.Payments);
+                    }
+                    _db.Bookings.RemoveRange(userBookings);
+                }
+
+                // 3. ปลดการอ้างอิงพนักงานใน Booking และ BookingItem อื่นๆ (ถ้าผู้ใช้นี้เป็น staff)
+                var handledCheckins = await _db.Bookings.Where(b => b.CheckedInBy == user.UserId || b.CheckedOutBy == user.UserId).ToListAsync();
+                foreach (var b in handledCheckins)
+                {
+                    if (b.CheckedInBy == user.UserId) b.CheckedInBy = null;
+                    if (b.CheckedOutBy == user.UserId) b.CheckedOutBy = null;
+                }
+
+                var handedItems = await _db.BookingItems.Where(bi => bi.HandedOverBy == user.UserId || bi.ReturnedBy == user.UserId).ToListAsync();
+                foreach (var bi in handedItems)
+                {
+                    if (bi.HandedOverBy == user.UserId) bi.HandedOverBy = null;
+                    if (bi.ReturnedBy == user.UserId) bi.ReturnedBy = null;
+                }
+
+                // 4. ลบ CourtBlocks ที่ผู้ใช้นี้สร้าง
+                var blocks = await _db.CourtBlocks.Where(cb => cb.CreatedBy == user.UserId).ToListAsync();
+                if (blocks.Any())
+                {
+                    _db.CourtBlocks.RemoveRange(blocks);
+                }
+
+                // 5. ปลดการอ้างอิงหรือลบ WalkInQueues
+                var walkIns = await _db.WalkInQueues.Where(w => w.HandledBy == user.UserId).ToListAsync();
+                if (walkIns.Any())
+                {
+                    _db.WalkInQueues.RemoveRange(walkIns);
+                }
+
+                // 6. ลบผู้ใช้ออกจากฐานข้อมูล
                 _db.Users.Remove(user);
-                _db.SaveChanges();
-                TempData["SuccessMessage"] = $"ลบผู้ใช้ {user.Email} สำเร็จ!";
+                await _db.SaveChangesAsync();
+
+                TempData["SuccessMessage"] = $"ลบผู้ใช้ {userName} ({userEmail}) สำเร็จเรียบร้อย!";
             }
-            else
+            catch (Exception ex)
             {
-                TempData["ErrorMessage"] = "ไม่พบผู้ใช้ที่ต้องการลบ";
+                // หากติด Foreign key ที่ลบไม่ได้ ให้ Soft delete แทน เพื่อไม่ให้เกิดข้อผิดพลาด 500
+                try
+                {
+                    var fallbackUser = await _db.Users.FindAsync((uint)id);
+                    if (fallbackUser != null)
+                    {
+                        fallbackUser.Status = "INACTIVE";
+                        fallbackUser.UpdatedAt = DateTime.Now;
+                        await _db.SaveChangesAsync();
+                        TempData["SuccessMessage"] = $"ผู้ใช้ {fallbackUser.FullName} มีประวัติการทำรายการ/บันทึกเอกสารในระบบ จึงได้ทำการเปลี่ยนสถานะเป็น 'ปิดใช้งาน' ให้เรียบร้อยแล้ว";
+                    }
+                    else
+                    {
+                        TempData["ErrorMessage"] = "ไม่พบผู้ใช้ที่ต้องการลบ";
+                    }
+                }
+                catch
+                {
+                    TempData["ErrorMessage"] = "เกิดข้อผิดพลาดในการลบผู้ใช้: " + ex.Message;
+                }
             }
 
             return RedirectToAction("UserList");
@@ -331,6 +496,7 @@ namespace Chinnaphat_8272_L005.Controllers
         public IActionResult EditUser(int id)
         {
             ViewData["Title"] = "แก้ไขผู้ใช้งาน";
+            EnsureRolesExist();
 
             // READ — ดึงข้อมูล User จากฐานข้อมูล
             var user = (from u in _db.Users
@@ -340,7 +506,7 @@ namespace Chinnaphat_8272_L005.Controllers
             if (user == null)
                 return RedirectToAction("UserList");
 
-            ViewBag.Roles = (from r in _db.Roles select r).ToList();
+            ViewBag.Roles = _db.Roles.OrderBy(r => r.RoleId).ToList();
 
             var currentRole = (from r in _db.Roles
                                where r.RoleId == user.RoleId
@@ -357,7 +523,7 @@ namespace Chinnaphat_8272_L005.Controllers
                 Email     = user.Email,
                 Phone     = user.Phone ?? "",
                 Role      = currentRole?.RoleCode ?? "CUSTOMER",
-                IsActive  = user.Status == "active"
+                IsActive  = user.Status != null && (user.Status == "ACTIVE" || user.Status == "active")
             };
 
             return View("EditUser", model);
@@ -367,6 +533,8 @@ namespace Chinnaphat_8272_L005.Controllers
         [ValidateAntiForgeryToken]
         public IActionResult EditUser(int id, EditUserViewModel model)
         {
+            EnsureRolesExist();
+
             if (ModelState.IsValid)
             {
                 // READ — ค้นหา User ที่ต้องการแก้ไข
@@ -380,33 +548,42 @@ namespace Chinnaphat_8272_L005.Controllers
                     if (!string.IsNullOrEmpty(model.Role))
                     {
                         var role = (from r in _db.Roles
-                                    where r.RoleCode == model.Role
+                                    where r.RoleCode == model.Role.Trim().ToUpper()
                                     select r).FirstOrDefault();
                         if (role != null) user.RoleId = role.RoleId;
                     }
 
                     // UPDATE — อัปเดตข้อมูลในฐานข้อมูล
-                    user.FullName  = $"{model.FirstName} {model.LastName}";
-                    user.Email     = model.Email;
-                    user.Phone     = model.Phone;
-                    user.Status    = model.IsActive ? "active" : "inactive";
+                    user.FullName  = $"{model.FirstName?.Trim()} {model.LastName?.Trim()}".Trim();
+                    user.Email     = model.Email.Trim();
+                    user.Phone     = model.Phone?.Trim();
+                    user.Status    = model.IsActive ? "ACTIVE" : "INACTIVE";
                     user.UpdatedAt = DateTime.Now;
 
                     // UPDATE Password เฉพาะเมื่อกรอกมาเท่านั้น
                     if (!string.IsNullOrEmpty(model.Password))
                         user.PasswordHash = model.Password;
 
-                    _db.SaveChanges();
-                    TempData["SuccessMessage"] = $"\u2713 แก้ไขข้อมูลผู้ใช้ {user.Email} สำเร็จ!";
+                    try
+                    {
+                        _db.SaveChanges();
+                        TempData["SuccessMessage"] = $"แก้ไขข้อมูลผู้ใช้ {user.Email} สำเร็จ!";
+                        return RedirectToAction("UserList");
+                    }
+                    catch (Exception ex)
+                    {
+                        ModelState.AddModelError("", "เกิดข้อผิดพลาดในการบันทึก: " + ex.Message);
+                    }
+                }
+                else
+                {
+                    TempData["ErrorMessage"] = "ไม่พบผู้ใช้ที่ต้องการแก้ไข";
                     return RedirectToAction("UserList");
                 }
-
-                TempData["ErrorMessage"] = "ไม่พบผู้ใช้ที่ต้องการแก้ไข";
-                return RedirectToAction("UserList");
             }
 
             // ModelState ไม่ผ่าน — โหลด Roles ใหม่แล้ว return view เดิม
-            ViewBag.Roles = (from r in _db.Roles select r).ToList();
+            ViewBag.Roles = _db.Roles.OrderBy(r => r.RoleId).ToList();
             model.UserId  = id;
             ViewData["Title"] = "แก้ไขผู้ใช้งาน";
             return View("EditUser", model);

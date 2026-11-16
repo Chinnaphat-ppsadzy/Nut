@@ -1,0 +1,737 @@
+@using Chinnaphat_8272_L005.Models
+@using Chinnaphat_8272_L005.Controllers
+@{
+    Layout = "_CourtStaffLayout";
+    ViewData["Title"] = "ตารางการจองประจำวัน & ควบคุมไฟ/พัดลม";
+
+    string selectedDateStr = ViewBag.SelectedDate as string ?? DateTime.Today.ToString("yyyy-MM-dd");
+    DateTime selectedDate = DateTime.TryParse(selectedDateStr, out var d) ? d : DateTime.Today;
+
+    var courts = ViewBag.Courts as List<Court> ?? new();
+    var timeSlots = ViewBag.TimeSlots as List<TimeSlot> ?? new();
+    var bookings = ViewBag.BookingsToday as List<Booking> ?? new();
+    var activeBlocks = ViewBag.ActiveBlocks as List<CourtBlock> ?? new();
+    var amenities = ViewBag.Amenities as Dictionary<ushort, CourtAmenityState> ?? new();
+
+    int totalBookings = ViewBag.TotalBookingsCount ?? 0;
+    int checkedInCount = ViewBag.CheckedInCount ?? 0;
+    int waitingCheckInCount = ViewBag.WaitingCheckInCount ?? 0;
+    int completedCount = ViewBag.CompletedCount ?? 0;
+    int maintenanceCount = ViewBag.MaintenanceCount ?? 0;
+    int walkInWaiting = ViewBag.WalkInWaitingCount ?? 0;
+    int pendingIssues = ViewBag.PendingIssuesCount ?? 0;
+}
+
+<style>
+    .timeline-slot {
+        height: 62px;
+        min-width: 90px;
+        font-size: 0.78rem;
+        padding: 4px 6px;
+        border: 1px solid #e2e8f0;
+        cursor: pointer;
+        transition: all 0.15s;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+        position: relative;
+    }
+    .timeline-slot:hover {
+        filter: brightness(0.95);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.08);
+        z-index: 2;
+    }
+    .slot-available {
+        background-color: #ecfdf5;
+        color: #065f46;
+        border-color: #a7f3d0;
+    }
+    .slot-confirmed {
+        background-color: #fef3c7;
+        color: #92400e;
+        border-color: #fde68a;
+    }
+    .slot-checkedin {
+        background-color: #dbeafe;
+        color: #1e40af;
+        border-color: #bfdbfe;
+        font-weight: 600;
+    }
+    .slot-completed {
+        background-color: #f1f5f9;
+        color: #64748b;
+        border-color: #cbd5e1;
+    }
+    .slot-blocked {
+        background-color: #fee2e2;
+        color: #991b1b;
+        border-color: #fecaca;
+    }
+    .court-switch-card {
+        border-radius: 16px;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .court-switch-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 25px rgba(0,0,0,0.08) !important;
+    }
+</style>
+
+<!-- ============================================================
+     TOP BAR: วันที่ & ตัวเลือกวันที่
+     ============================================================ -->
+<div class="card border-0 shadow-sm mb-4" style="border-radius:18px; background: linear-gradient(135deg, #2d6a4f, #52b788); color:white;">
+    <div class="card-body p-4">
+        <div class="row align-items-center g-3">
+            <div class="col-lg-6">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="rounded-circle bg-white text-success d-flex align-items-center justify-content-center shadow-sm" style="width:52px; height:52px; font-size:1.6rem;">
+                        <i class="bi bi-calendar2-week"></i>
+                    </div>
+                    <div>
+                        <h4 class="fw-bold mb-1 text-white">
+                            ตารางคอร์ทประจำวัน (Daily Schedule)
+                        </h4>
+                        <p class="mb-0 text-white-50 small">
+                            วันที่: <span class="fw-bold text-white">@selectedDate.ToString("dddd ที่ dd MMMM yyyy", new System.Globalization.CultureInfo("th-TH"))</span>
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-6">
+                <form method="get" asp-action="Index" class="d-flex justify-content-lg-end align-items-center gap-2 flex-wrap">
+                    <button type="button" class="btn btn-light btn-sm fw-semibold text-success" onclick="setScheduleDate('@DateTime.Today.ToString("yyyy-MM-dd")')">
+                        <i class="bi bi-clock-history me-1"></i> วันนี้
+                    </button>
+                    <button type="button" class="btn btn-outline-light btn-sm fw-semibold" onclick="setScheduleDate('@DateTime.Today.AddDays(1).ToString("yyyy-MM-dd")')">
+                        พรุ่งนี้
+                    </button>
+                    <div class="input-group" style="max-width: 200px;">
+                        <span class="input-group-text bg-white border-0"><i class="bi bi-calendar3 text-success"></i></span>
+                        <input type="date" id="scheduleDateInput" name="date" class="form-control border-0" value="@selectedDateStr" onchange="this.form.submit()" />
+                    </div>
+                    <button type="submit" class="btn btn-dark fw-bold px-3" style="border-radius:8px;">
+                        <i class="bi bi-search me-1"></i> ค้นหา
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================
+     STATS BADGES (สถิติสถานะสนามและการจอง)
+     ============================================================ -->
+<div class="row g-3 mb-4">
+    <!-- จองวันนี้ทั้งหมด -->
+    <div class="col-6 col-md-4 col-xl-2">
+        <div class="card border-0 shadow-sm h-100" style="border-radius:14px;">
+            <div class="card-body p-3 text-center">
+                <div class="small text-muted mb-1"><i class="bi bi-calendar-check me-1 text-primary"></i>จองวันนี้</div>
+                <h3 class="fw-bold mb-0 text-dark">@totalBookings</h3>
+                <small class="text-muted" style="font-size:0.75rem;">รายการทั้งหมด</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- เช็คอินแล้ว (กำลังเล่น) -->
+    <div class="col-6 col-md-4 col-xl-2">
+        <div class="card border-0 shadow-sm h-100 border-start border-4 border-primary" style="border-radius:14px;">
+            <div class="card-body p-3 text-center">
+                <div class="small text-muted mb-1"><i class="bi bi-person-walking me-1 text-primary"></i>กำลังใช้งาน</div>
+                <h3 class="fw-bold mb-0 text-primary">@checkedInCount</h3>
+                <small class="text-muted" style="font-size:0.75rem;">Check-in แล้ว</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- รอเข้าใช้งาน -->
+    <div class="col-6 col-md-4 col-xl-2">
+        <div class="card border-0 shadow-sm h-100 border-start border-4 border-warning" style="border-radius:14px;">
+            <div class="card-body p-3 text-center">
+                <div class="small text-muted mb-1"><i class="bi bi-hourglass-split me-1 text-warning"></i>รอเข้าใช้สนาม</div>
+                <h3 class="fw-bold mb-0 text-warning">@waitingCheckInCount</h3>
+                <small class="text-muted" style="font-size:0.75rem;">ยืนยันแล้ว รอมาถึง</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- เสร็จสิ้น -->
+    <div class="col-6 col-md-4 col-xl-2">
+        <div class="card border-0 shadow-sm h-100" style="border-radius:14px;">
+            <div class="card-body p-3 text-center">
+                <div class="small text-muted mb-1"><i class="bi bi-check-circle me-1 text-success"></i>เสร็จสิ้น</div>
+                <h3 class="fw-bold mb-0 text-success">@completedCount</h3>
+                <small class="text-muted" style="font-size:0.75rem;">Check-out แล้ว</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- คิว Walk-in รอเรียก -->
+    <div class="col-6 col-md-4 col-xl-2">
+        <div class="card border-0 shadow-sm h-100 border-start border-4 border-info" style="border-radius:14px;">
+            <div class="card-body p-3 text-center">
+                <div class="small text-muted mb-1"><i class="bi bi-people-fill me-1 text-info"></i>Walk-in รอคิว</div>
+                <h3 class="fw-bold mb-0 text-info">@walkInWaiting</h3>
+                <a asp-action="WalkIn" class="small text-decoration-none text-info fw-semibold" style="font-size:0.75rem;">
+                    จัดการคิว <i class="bi bi-arrow-right"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- ปัญหาอุปกรณ์ชำรุด -->
+    <div class="col-6 col-md-4 col-xl-2">
+        <div class="card border-0 shadow-sm h-100 border-start border-4 border-danger" style="border-radius:14px;">
+            <div class="card-body p-3 text-center">
+                <div class="small text-muted mb-1"><i class="bi bi-exclamation-triangle-fill me-1 text-danger"></i>อุปกรณ์ชำรุด</div>
+                <h3 class="fw-bold mb-0 text-danger">@pendingIssues</h3>
+                <a asp-action="Issues" class="small text-decoration-none text-danger fw-semibold" style="font-size:0.75rem;">
+                    แจ้ง Admin <i class="bi bi-arrow-right"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================
+     COURT AMENITIES CONTROL BOARD (แผงควบคุมไฟและพัดลมประจำคอร์ท)
+     ============================================================ -->
+<div class="card border-0 shadow-sm mb-4" style="border-radius:18px; overflow:hidden;">
+    <div class="p-3 text-white d-flex justify-content-between align-items-center flex-wrap gap-2" style="background: linear-gradient(135deg, #1a472a 0%, #2d6a4f 60%, #52b788 100%);">
+        <div>
+            <span class="badge bg-white text-success fw-bold mb-1"><i class="bi bi-lightning-charge-fill me-1"></i> Arena Automation</span>
+            <h5 class="fw-bold mb-0">แผงควบคุมระบบไฟส่องสว่าง & พัดลมระบายอากาศประจำคอร์ท</h5>
+        </div>
+        <div class="small text-white-50">
+            <i class="bi bi-info-circle me-1"></i> เมื่อกด Check-in ระบบจะเปิดไฟและพัดลมของคอร์ทนั้นอัตโนมัติ
+        </div>
+    </div>
+
+    <div class="card-body p-4 bg-light">
+        <div class="row g-3">
+            @foreach (var court in courts)
+            {
+                var state = amenities.ContainsKey(court.CourtId) ? amenities[court.CourtId] : new CourtAmenityState();
+                bool isBlocked = activeBlocks.Any(b => b.CourtId == court.CourtId);
+
+                <div class="col-md-6 col-xl-3">
+                    <div class="card border-0 shadow-sm h-100 court-switch-card bg-white" id="court_card_@court.CourtId">
+                        <div class="card-body p-3">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h6 class="fw-bold text-dark mb-0 d-flex align-items-center">
+                                    <span class="badge bg-dark me-2">@court.CourtName</span>
+                                    <small class="text-muted fw-normal">@court.Description</small>
+                                </h6>
+                                @if (isBlocked || court.Status == "MAINTENANCE")
+                                {
+                                    <span class="badge bg-danger-subtle text-danger border border-danger">ซ่อมบำรุง</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-success-subtle text-success border border-success">พร้อมบริการ</span>
+                                }
+                            </div>
+
+                            <hr class="my-2 opacity-25" />
+
+                            <!-- สวิตช์ไฟส่องสว่าง (Lights) -->
+                            <div class="d-flex justify-content-between align-items-center mb-2 p-2 rounded-3 bg-light">
+                                <div class="d-flex align-items-center gap-2">
+                                    <div class="rounded-circle d-flex align-items-center justify-content-center @(state.LightsOn ? "bg-warning text-dark glow-light" : "bg-secondary text-white")" style="width:34px; height:34px; font-size:1.1rem;" id="light_icon_@court.CourtId">
+                                        <i class="bi bi-lightbulb-fill"></i>
+                                    </div>
+                                    <div>
+                                        <div class="fw-bold small lh-1">ไฟสนาม BWF</div>
+                                        <small class="text-muted" id="light_text_@court.CourtId" style="font-size:0.72rem;">
+                                            @(state.LightsOn ? "เปิดอยู่ (ON)" : "ปิด (OFF)")
+                                        </small>
+                                    </div>
+                                </div>
+                                <button type="button" class="btn btn-sm @(state.LightsOn ? "btn-warning text-dark fw-bold" : "btn-outline-secondary")" id="btn_light_@court.CourtId" onclick="toggleAmenity(@court.CourtId, 'light')">
+                                    <i class="bi bi-power me-1"></i> <span id="btn_light_text_@court.CourtId">@(state.LightsOn ? "ปิดไฟ" : "เปิดไฟ")</span>
+                                </button>
+                            </div>
+
+                            <!-- สวิตช์พัดลมระบายอากาศ (Fans) -->
+                            <div class="d-flex justify-content-between align-items-center p-2 rounded-3 bg-light">
+                                <div class="d-flex align-items-center gap-2">
+                                    <div class="rounded-circle d-flex align-items-center justify-content-center @(state.FansOn ? "bg-primary text-white glow-fan" : "bg-secondary text-white")" style="width:34px; height:34px; font-size:1.1rem;" id="fan_icon_@court.CourtId">
+                                        <i class="bi bi-fan @(state.FansOn ? "fan-spinning" : "")"></i>
+                                    </div>
+                                    <div>
+                                        <div class="fw-bold small lh-1">พัดลมระบายอากาศ</div>
+                                        <small class="text-muted" id="fan_text_@court.CourtId" style="font-size:0.72rem;">
+                                            @(state.FansOn ? "ทำงานอยู่ (ON)" : "ปิด (OFF)")
+                                        </small>
+                                    </div>
+                                </div>
+                                <button type="button" class="btn btn-sm @(state.FansOn ? "btn-primary fw-bold" : "btn-outline-secondary")" id="btn_fan_@court.CourtId" onclick="toggleAmenity(@court.CourtId, 'fan')">
+                                    <i class="bi bi-power me-1"></i> <span id="btn_fan_text_@court.CourtId">@(state.FansOn ? "ปิดพัดลม" : "เปิดพัดลม")</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================
+     DAILY TIMETABLE GRID (ตารางช่วงเวลาคอร์ทแบบ Matrix)
+     ============================================================ -->
+<div class="card border-0 shadow-sm mb-4" style="border-radius:18px; overflow:hidden;">
+    <div class="p-3 bg-white border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <h5 class="fw-bold mb-0 text-dark">
+            <i class="bi bi-grid-3x3-gap-fill text-success me-2"></i>ผังตารางเวลาสนามประจำวัน (Timeline Matrix)
+        </h5>
+        <div class="d-flex align-items-center gap-2 small flex-wrap">
+            <span class="badge slot-available px-2 py-1"><i class="bi bi-circle-fill me-1 text-success"></i> ว่าง</span>
+            <span class="badge slot-confirmed px-2 py-1"><i class="bi bi-circle-fill me-1 text-warning"></i> ยืนยันแล้ว (รอเช็คอิน)</span>
+            <span class="badge slot-checkedin px-2 py-1"><i class="bi bi-circle-fill me-1 text-primary"></i> เช็คอินแล้ว (กำลังเล่น)</span>
+            <span class="badge slot-completed px-2 py-1"><i class="bi bi-circle-fill me-1 text-secondary"></i> เล่นเสร็จสิ้น</span>
+            <span class="badge slot-blocked px-2 py-1"><i class="bi bi-circle-fill me-1 text-danger"></i> ปิดซ่อมบำรุง</span>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-bordered mb-0 align-middle">
+            <thead class="table-dark" style="background: linear-gradient(135deg, #1a472a 0%, #2d6a4f 100%);">
+                <tr class="small text-center">
+                    <th style="min-width:130px; width:130px;">สนาม / ช่วงเวลา</th>
+                    @foreach (var slot in timeSlots)
+                    {
+                        <th style="min-width:105px;">
+                            <div>@slot.StartTime.ToString("HH:mm") - @slot.EndTime.ToString("HH:mm")</div>
+                        </th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var court in courts)
+                {
+                    <tr>
+                        <td class="fw-bold bg-white text-center align-middle border-end">
+                            <span class="badge bg-dark fs-6 d-block mb-1">@court.CourtName</span>
+                            <small class="text-muted d-block" style="font-size:0.75rem;">@court.PricePerHour.ToString("N0") ฿/ชม.</small>
+                        </td>
+
+                        @foreach (var slot in timeSlots)
+                        {
+                            // 1. ตรวจสอบว่า slot นี้ถูกบล็อกซ่อมบำรุงหรือไม่
+                            DateTime slotStart = selectedDate.Date.Add(slot.StartTime.ToTimeSpan());
+                            DateTime slotEnd = selectedDate.Date.Add(slot.EndTime.ToTimeSpan());
+
+                            var block = activeBlocks.FirstOrDefault(b => b.CourtId == court.CourtId && b.BlockStart < slotEnd && b.BlockEnd > slotStart);
+
+                            // 2. ตรวจสอบการจอง
+                            var bookedSlot = bookings
+                                .SelectMany(b => b.BookingSlots, (b, bs) => new { Booking = b, Slot = bs })
+                                .FirstOrDefault(x => x.Slot.CourtId == court.CourtId && x.Slot.SlotId == slot.SlotId);
+
+                            if (block != null)
+                            {
+                                <td class="timeline-slot slot-blocked" title="ปิดซ่อมบำรุง: @block.Reason">
+                                    <i class="bi bi-cone-striped fs-6 text-danger"></i>
+                                    <div class="fw-bold text-truncate" style="max-width:90px;">ซ่อมบำรุง</div>
+                                    <small class="text-muted text-truncate" style="font-size:0.68rem; max-width:90px;">@block.Reason</small>
+                                </td>
+                            }
+                            else if (bookedSlot != null)
+                            {
+                                var b = bookedSlot.Booking;
+                                string slotClass = "slot-confirmed";
+                                string statusBadgeText = "ยืนยันแล้ว";
+
+                                if (b.Status == "CHECKED_IN" || b.Status == "IN_USE")
+                                {
+                                    slotClass = "slot-checkedin";
+                                    statusBadgeText = "กำลังใช้งาน";
+                                }
+                                else if (b.Status == "COMPLETED")
+                                {
+                                    slotClass = "slot-completed";
+                                    statusBadgeText = "เสร็จสิ้น";
+                                }
+
+                                <td class="timeline-slot @slotClass" onclick="openBookingDetailModal('@b.BookingId', '@b.BookingCode', '@(b.User?.FullName ?? "ลูกค้า")', '@(b.User?.Phone ?? "-")', '@b.Status', '@b.PlayDate.ToString("dd/MM/yyyy")', '@court.CourtName', '@slot.StartTime.ToString("HH:mm") - @slot.EndTime.ToString("HH:mm")')">
+                                    <div class="fw-bold text-truncate w-100" style="font-size:0.8rem;">
+                                        @(b.User?.FullName ?? "คุณลูกค้า")
+                                    </div>
+                                    <div class="badge bg-white text-dark shadow-xs border mt-1" style="font-size:0.68rem;">
+                                        @statusBadgeText
+                                    </div>
+                                    <small class="font-monospace text-muted mt-1" style="font-size:0.65rem;">@b.BookingCode</small>
+                                </td>
+                            }
+                            else
+                            {
+                                <td class="timeline-slot slot-available" onclick="promptWalkInForSlot('@court.CourtId', '@court.CourtName', '@slot.SlotId', '@slot.StartTime.ToString("HH:mm") - @slot.EndTime.ToString("HH:mm")')">
+                                    <i class="bi bi-plus-circle text-success fs-6 mb-1"></i>
+                                    <div class="text-success fw-semibold" style="font-size:0.75rem;">ว่าง</div>
+                                    <small class="text-muted" style="font-size:0.65rem;">จัด Walk-in</small>
+                                </td>
+                            }
+                        }
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- ============================================================
+     BOOKING CHECK-IN / CHECK-OUT TABLE (ตารางการจองวันนี้ & เช็คอิน)
+     ============================================================ -->
+<div class="card border-0 shadow-sm rounded-4 overflow-hidden bg-white mb-5">
+    <div class="p-3 border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <h5 class="fw-bold mb-0 text-dark">
+            <i class="bi bi-card-checklist text-primary me-2"></i>รายการจองและสถานะ Check-in วันนี้ (@bookings.Count รายการ)
+        </h5>
+        <div class="d-flex align-items-center gap-2">
+            <input type="text" id="bookingSearchInput" class="form-control form-control-sm" placeholder="ค้นหาชื่อ, รหัสจอง, เบอร์โทร..." style="max-width:240px;" onkeyup="filterBookingRows()" />
+        </div>
+    </div>
+
+    @if (bookings.Any())
+    {
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0" id="bookingsTable">
+                <thead class="table-light">
+                    <tr class="small text-secondary">
+                        <th>รหัสการจอง</th>
+                        <th>คอร์ท & เวลา</th>
+                        <th>ข้อมูลลูกค้า</th>
+                        <th>อุปกรณ์เช่า</th>
+                        <th>สถานะการจอง</th>
+                        <th>บันทึกเวลา</th>
+                        <th class="text-center" style="min-width:180px;">จัดการ Check-in / Out</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var b in bookings)
+                    {
+                        var rentalItems = b.BookingItems.Where(i => i.ItemType == "RENT").ToList();
+                        string trBg = "";
+                        if (b.Status == "CHECKED_IN") trBg = "table-primary bg-opacity-25";
+                        else if (b.Status == "COMPLETED") trBg = "text-muted";
+
+                        <tr class="@trBg" id="booking_row_@b.BookingId">
+                            <td>
+                                <strong class="font-monospace text-primary">@b.BookingCode</strong>
+                                <small class="text-muted d-block" style="font-size:0.72rem;">@b.CreatedAt.ToString("HH:mm น.")</small>
+                            </td>
+                            <td>
+                                @if (b.BookingSlots.Any())
+                                {
+                                    @foreach (var s in b.BookingSlots)
+                                    {
+                                        <div class="small">
+                                            <span class="badge bg-dark me-1">@(s.Court?.CourtName ?? $"Court {s.CourtId}")</span>
+                                            <span class="text-secondary">@(s.Slot != null ? $"{s.Slot.StartTime:HH:mm} - {s.Slot.EndTime:HH:mm}" : $"Slot #{s.SlotId}")</span>
+                                        </div>
+                                    }
+                                }
+                                else
+                                {
+                                    <span class="text-muted small">-</span>
+                                }
+                            </td>
+                            <td>
+                                <div class="fw-bold text-dark">@(b.User?.FullName ?? "คุณลูกค้า")</div>
+                                <small class="text-muted"><i class="bi bi-telephone me-1"></i>@(b.User?.Phone ?? "-")</small>
+                            </td>
+                            <td>
+                                @if (rentalItems.Any())
+                                {
+                                    @foreach (var r in rentalItems)
+                                    {
+                                        <span class="badge bg-teal text-white me-1 mb-1" style="background:#0d9488; font-size:0.7rem;">
+                                            <i class="bi bi-tag-fill me-1"></i>@(r.Product?.ProductName ?? "อุปกรณ์") x @r.Quantity
+                                        </span>
+                                    }
+                                }
+                                else
+                                {
+                                    <span class="text-muted small">-</span>
+                                }
+                            </td>
+                            <td id="status_cell_@b.BookingId">
+                                @if (b.Status == "CHECKED_IN" || b.Status == "IN_USE")
+                                {
+                                    <span class="badge bg-primary px-2 py-1">
+                                        <i class="bi bi-person-check-fill me-1"></i> เช็คอินแล้ว (กำลังเล่น)
+                                    </span>
+                                }
+                                else if (b.Status == "COMPLETED")
+                                {
+                                    <span class="badge bg-secondary px-2 py-1">
+                                        <i class="bi bi-check-all me-1"></i> เสร็จสิ้นแล้ว
+                                    </span>
+                                }
+                                else if (b.Status == "CONFIRMED")
+                                {
+                                    <span class="badge bg-success px-2 py-1">
+                                        <i class="bi bi-check-circle-fill me-1"></i> ยืนยันคิวแล้ว
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-warning text-dark px-2 py-1">
+                                        @b.Status
+                                    </span>
+                                }
+                            </td>
+                            <td class="small" id="time_cell_@b.BookingId">
+                                @if (b.CheckedInAt.HasValue)
+                                {
+                                    <div class="text-primary"><i class="bi bi-box-arrow-in-right me-1"></i>In: @b.CheckedInAt.Value.ToString("HH:mm:ss")</div>
+                                }
+                                @if (b.CheckedOutAt.HasValue)
+                                {
+                                    <div class="text-secondary"><i class="bi bi-box-arrow-left me-1"></i>Out: @b.CheckedOutAt.Value.ToString("HH:mm:ss")</div>
+                                }
+                            </td>
+                            <td class="text-center" id="action_cell_@b.BookingId">
+                                @if (b.Status == "CHECKED_IN" || b.Status == "IN_USE")
+                                {
+                                    <button type="button" class="btn btn-sm btn-outline-danger px-3 py-1 fw-bold" onclick="doCheckOut(@b.BookingId)" style="border-radius:8px;">
+                                        <i class="bi bi-box-arrow-left me-1"></i> Check-out
+                                    </button>
+                                }
+                                else if (b.Status == "COMPLETED")
+                                {
+                                    <span class="text-success small fw-semibold"><i class="bi bi-check-circle me-1"></i> เรียบร้อย</span>
+                                }
+                                else
+                                {
+                                    <button type="button" class="btn btn-sm btn-success px-3 py-1 fw-bold" onclick="doCheckIn(@b.BookingId)" style="border-radius:8px;">
+                                        <i class="bi bi-box-arrow-in-right me-1"></i> Check-in
+                                    </button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+    else
+    {
+        <div class="p-5 text-center text-muted">
+            <i class="bi bi-calendar-x fs-1 d-block mb-2 text-secondary"></i>
+            <h6>ไม่มีรายการจองสำหรับวันที่เลือก</h6>
+            <small>สามารถเปลี่ยนวันที่ค้นหาด้านบน หรือกดจัดคิว Walk-in เข้าใช้คอร์ทว่างได้ทันที</small>
+        </div>
+    }
+</div>
+
+<!-- ============================================================
+     BOOKING DETAIL POPUP MODAL
+     ============================================================ -->
+<div class="modal fade" id="bookingDetailModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius:20px; border:none; box-shadow:0 25px 60px rgba(0,0,0,0.25);">
+            <div class="modal-header bg-dark text-white p-3 border-0" style="border-top-left-radius:20px; border-top-right-radius:20px;">
+                <h5 class="modal-title fw-bold mb-0">
+                    <i class="bi bi-info-circle-fill text-warning me-2"></i>รายละเอียดคิวจองสนาม
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="p-3 bg-light rounded-3 mb-3 border">
+                    <div class="d-flex justify-content-between mb-1">
+                        <small class="text-muted">รหัสการจอง</small>
+                        <strong class="font-monospace text-primary" id="modalBookingCode">-</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-1">
+                        <small class="text-muted">ชื่อลูกค้า</small>
+                        <strong id="modalCustomerName">-</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-1">
+                        <small class="text-muted">เบอร์โทรศัพท์</small>
+                        <strong id="modalCustomerPhone">-</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-1">
+                        <small class="text-muted">สนาม & เวลา</small>
+                        <strong class="text-success" id="modalCourtSlot">-</strong>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <small class="text-muted">สถานะปัจจุบัน</small>
+                        <span class="badge bg-primary" id="modalStatusBadge">-</span>
+                    </div>
+                </div>
+
+                <div class="d-grid gap-2" id="modalActionButtons">
+                    <!-- Dynamic buttons -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================
+     JAVASCRIPT LOGIC
+     ============================================================ -->
+@section Scripts {
+    <script>
+        function setScheduleDate(d) {
+            document.getElementById('scheduleDateInput').value = d;
+            document.getElementById('scheduleDateInput').form.submit();
+        }
+
+        // Toggle Amenity (Lights or Fans) via AJAX
+        function toggleAmenity(courtId, type) {
+            fetch('/CourtStaff/ToggleAmenity', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `courtId=${courtId}&amenityType=${type}`
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    if (data.amenity === 'light') {
+                        const icon = document.getElementById(`light_icon_${courtId}`);
+                        const text = document.getElementById(`light_text_${courtId}`);
+                        const btn = document.getElementById(`btn_light_${courtId}`);
+                        const btnText = document.getElementById(`btn_light_text_${courtId}`);
+
+                        if (data.isOn) {
+                            icon.className = 'rounded-circle d-flex align-items-center justify-content-center bg-warning text-dark glow-light';
+                            text.innerText = 'เปิดอยู่ (ON)';
+                            btn.className = 'btn btn-sm btn-warning text-dark fw-bold';
+                            btnText.innerText = 'ปิดไฟ';
+                        } else {
+                            icon.className = 'rounded-circle d-flex align-items-center justify-content-center bg-secondary text-white';
+                            text.innerText = 'ปิด (OFF)';
+                            btn.className = 'btn btn-sm btn-outline-secondary';
+                            btnText.innerText = 'เปิดไฟ';
+                        }
+                    } else if (data.amenity === 'fan') {
+                        const icon = document.getElementById(`fan_icon_${courtId}`);
+                        const text = document.getElementById(`fan_text_${courtId}`);
+                        const btn = document.getElementById(`btn_fan_${courtId}`);
+                        const btnText = document.getElementById(`btn_fan_text_${courtId}`);
+
+                        if (data.isOn) {
+                            icon.className = 'rounded-circle d-flex align-items-center justify-content-center bg-primary text-white glow-fan';
+                            icon.querySelector('i').className = 'bi bi-fan fan-spinning';
+                            text.innerText = 'ทำงานอยู่ (ON)';
+                            btn.className = 'btn btn-sm btn-primary fw-bold';
+                            btnText.innerText = 'ปิดพัดลม';
+                        } else {
+                            icon.className = 'rounded-circle d-flex align-items-center justify-content-center bg-secondary text-white';
+                            icon.querySelector('i').className = 'bi bi-fan';
+                            text.innerText = 'ปิด (OFF)';
+                            btn.className = 'btn btn-sm btn-outline-secondary';
+                            btnText.innerText = 'เปิดพัดลม';
+                        }
+                    }
+                } else {
+                    alert('เกิดข้อผิดพลาด: ' + data.message);
+                }
+            })
+            .catch(err => alert('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้: ' + err));
+        }
+
+        // Check-in via AJAX
+        function doCheckIn(bookingId) {
+            if (!confirm('ยืนยันการทำรายการ Check-in เมื่อลูกค้ามาถึงสนาม? (ระบบจะเปิดไฟและพัดลมให้อัตโนมัติ)')) return;
+
+            fetch('/CourtStaff/CheckIn', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `bookingId=${bookingId}`
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    alert(data.message);
+                    window.location.reload();
+                } else {
+                    alert('ไม่สามารถ Check-in ได้: ' + data.message);
+                }
+            })
+            .catch(err => alert('เกิดข้อผิดพลาด: ' + err));
+        }
+
+        // Check-out via AJAX
+        function doCheckOut(bookingId) {
+            if (!confirm('ยืนยันการทำรายการ Check-out เมื่อลูกค้าเล่นเสร็จสิ้น?')) return;
+
+            fetch('/CourtStaff/CheckOut', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `bookingId=${bookingId}`
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    let msg = data.message;
+                    if (data.reminder) msg += '\n\nข้อควรปฏิบัติ: ' + data.reminder;
+                    alert(msg);
+                    window.location.reload();
+                } else {
+                    alert('ไม่สามารถ Check-out ได้: ' + data.message);
+                }
+            })
+            .catch(err => alert('เกิดข้อผิดพลาด: ' + err));
+        }
+
+        // Quick Modal detail
+        let currentModalBookingId = null;
+        function openBookingDetailModal(id, code, name, phone, status, date, court, slot) {
+            currentModalBookingId = id;
+            document.getElementById('modalBookingCode').innerText = code;
+            document.getElementById('modalCustomerName').innerText = name;
+            document.getElementById('modalCustomerPhone').innerText = phone;
+            document.getElementById('modalCourtSlot').innerText = `${court} (${slot})`;
+            document.getElementById('modalStatusBadge').innerText = status;
+
+            const btnContainer = document.getElementById('modalActionButtons');
+            btnContainer.innerHTML = '';
+
+            if (status === 'CONFIRMED' || status === 'PENDING_VERIFICATION') {
+                btnContainer.innerHTML = `
+                    <button type="button" class="btn btn-success fw-bold py-2" onclick="doCheckIn(${id})">
+                        <i class="bi bi-box-arrow-in-right me-1"></i> ทำการ Check-in (เปิดไฟ/พัดลม)
+                    </button>
+                `;
+            } else if (status === 'CHECKED_IN' || status === 'IN_USE') {
+                btnContainer.innerHTML = `
+                    <button type="button" class="btn btn-danger fw-bold py-2" onclick="doCheckOut(${id})">
+                        <i class="bi bi-box-arrow-left me-1"></i> ทำการ Check-out
+                    </button>
+                `;
+            } else {
+                btnContainer.innerHTML = `
+                    <div class="text-center text-muted small py-2">คิวนี้ทำรายการเสร็จสิ้นแล้ว</div>
+                `;
+            }
+
+            const modal = new bootstrap.Modal(document.getElementById('bookingDetailModal'));
+            modal.show();
+        }
+
+        // Direct prompt Walk-in for available slot
+        function promptWalkInForSlot(courtId, courtName, slotId, timeText) {
+            if (confirm(`คอร์ท ${courtName} ช่วงเวลา ${timeText} ยังว่าง\nต้องการเปิดหน้าลงทะเบียนคิว Walk-in หรือไม่?`)) {
+                window.location.href = `/CourtStaff/WalkIn?courtId=${courtId}&slotId=${slotId}`;
+            }
+        }
+
+        // Filter booking table rows
+        function filterBookingRows() {
+            const val = document.getElementById('bookingSearchInput').value.toLowerCase();
+            const rows = document.querySelectorAll('#bookingsTable tbody tr');
+            rows.forEach(r => {
+                r.style.display = r.innerText.toLowerCase().includes(val) ? '' : 'none';
+            });
+        }
+    </script>
+}

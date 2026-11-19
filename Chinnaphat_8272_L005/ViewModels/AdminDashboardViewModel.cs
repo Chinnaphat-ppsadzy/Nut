@@ -20,6 +20,9 @@ namespace Chinnaphat_8272_L005.ViewModels
 
         public decimal TotalRevenue { get; set; }
         public decimal RevenueThisMonth { get; set; }
+        public decimal ApprovedBookingRevenue { get; set; }
+        public decimal PaidWalkInRevenue { get; set; }
+        public decimal PosSalesRevenue { get; set; }
 
         // Additional Metrics
         public int ActivePromotions { get; set; }

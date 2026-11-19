@@ -158,6 +158,11 @@
             <div class="mt-2 text-muted small">
                 <i class="bi bi-graph-up-arrow text-success me-1"></i>ยอดเดือนนี้: <strong>฿@Model.RevenueThisMonth.ToString("N0")</strong>
             </div>
+            <div class="mt-2 text-muted" style="font-size:.72rem; line-height:1.65;">
+                <div>จองที่บัญชีอนุมัติ: <strong>฿@Model.ApprovedBookingRevenue.ToString("N0")</strong></div>
+                <div>Walk-in ที่ชำระแล้ว: <strong>฿@Model.PaidWalkInRevenue.ToString("N0")</strong></div>
+                <div>ขาย/เช่า POS: <strong>฿@Model.PosSalesRevenue.ToString("N0")</strong></div>
+            </div>
         </div>
     </div>
 

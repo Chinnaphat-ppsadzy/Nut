@@ -93,9 +93,16 @@ namespace Chinnaphat_8272_L005.Controllers
 
             try
             {
+                paymentMethod = (paymentMethod ?? string.Empty).Trim().ToUpperInvariant();
+                if (paymentMethod is not ("CASH" or "QR") || subtotal < 0 || discount < 0 || netTotal < 0)
+                {
+                    TempData["ErrorMessage"] = "ข้อมูลยอดขายหรือช่องทางชำระเงินไม่ถูกต้อง";
+                    return RedirectToAction(nameof(Sales));
+                }
+
                 // Parse items JSON
                 var items = System.Text.Json.JsonSerializer.Deserialize<List<PosCartItemDto>>(itemsJson);
-                if (items == null || !items.Any())
+                if (items == null || !items.Any() || items.Any(i => i.ProductId <= 0 || i.Qty <= 0 || i.Price < 0))
                 {
                     TempData["ErrorMessage"] = "ข้อมูลสินค้าไม่ถูกต้อง";
                     return RedirectToAction(nameof(Sales));
@@ -103,26 +110,65 @@ namespace Chinnaphat_8272_L005.Controllers
 
                 // ตัดสต็อกสินค้าในฐานข้อมูล
                 var updatedItemsSummary = new List<string>();
+                decimal posSaleAmount = 0m;
+                decimal posRentalAmount = 0m;
+                decimal authoritativeSubtotal = 0m;
                 foreach (var item in items)
                 {
                     var product = await _db.Products.FindAsync((uint)item.ProductId);
-                    if (product != null)
+                    if (product == null || (product.IsActive != true && product.IsActive != null))
                     {
-                        // ตัดสต็อก
-                        product.StockQty = Math.Max(0, product.StockQty - item.Qty);
-                        product.UpdatedAt = DateTime.Now;
-
-                        updatedItemsSummary.Add($"{product.ProductName} x{item.Qty} ({item.Price:N0} ฿)");
+                        TempData["ErrorMessage"] = "พบสินค้าที่ไม่มีอยู่หรือปิดใช้งานแล้ว กรุณาตรวจสอบตะกร้าอีกครั้ง";
+                        return RedirectToAction(nameof(Sales));
                     }
+                    if (item.Qty > product.StockQty)
+                    {
+                        TempData["ErrorMessage"] = $"สินค้า {product.ProductName} มีสต็อกไม่พอ (เหลือ {product.StockQty})";
+                        return RedirectToAction(nameof(Sales));
+                    }
+
+                    product.StockQty -= item.Qty;
+                    product.UpdatedAt = DateTime.Now;
+                    var lineTotal = product.Price * item.Qty;
+                    authoritativeSubtotal += lineTotal;
+                    updatedItemsSummary.Add($"{product.ProductName} x{item.Qty} ({product.Price:N0} ฿)");
+                    if (product.ProductType == "RENT") posRentalAmount += lineTotal;
+                    else posSaleAmount += lineTotal;
                 }
 
+                if (discount > authoritativeSubtotal)
+                {
+                    TempData["ErrorMessage"] = "ส่วนลดมากกว่ายอดสินค้า ไม่สามารถบันทึกการขายได้";
+                    return RedirectToAction(nameof(Sales));
+                }
+
+                var now = DateTime.Now;
+                string receiptSuffix = Guid.NewGuid().ToString("N")[..8];
+                string receiptCode = $"POS-{now:yyyyMMddHHmmss}-{receiptSuffix}";
+                uint.TryParse(HttpContext.Session.GetString("UserId") ?? Request.Cookies["cb_user_id"], out var salesStaffId);
+                decimal paidTotal = authoritativeSubtotal - discount;
+                _db.PosSaleTransactions.Add(new PosSaleTransaction
+                {
+                    ReceiptCode = receiptCode,
+                    CustomerName = string.IsNullOrWhiteSpace(customerName) ? "ลูกค้าทั่วไป (Walk-in)" : customerName.Trim()[..Math.Min(customerName.Trim().Length, 150)],
+                    CustomerPhone = string.IsNullOrWhiteSpace(customerPhone) ? null : customerPhone.Trim()[..Math.Min(customerPhone.Trim().Length, 20)],
+                    ItemsSummary = string.Join(" · ", updatedItemsSummary),
+                    SaleAmount = posSaleAmount,
+                    RentalAmount = posRentalAmount,
+                    DiscountAmount = discount,
+                    NetTotal = paidTotal,
+                    PaymentMethod = paymentMethod,
+                    PaymentStatus = "PAID",
+                    PaidAt = now,
+                    CreatedBy = salesStaffId,
+                    CreatedAt = now
+                });
                 await _db.SaveChangesAsync();
 
-                string receiptCode = "POS-" + DateTime.Now.ToString("yyyyMMddHHmmss");
-                TempData["SuccessMessage"] = $"✓ บันทึกการขายรหัส {receiptCode} สำเร็จ! ยอดสุทธิ {netTotal:N0} บาท (ตัดสต็อกสินค้าในฐานข้อมูลเรียบร้อยแล้ว)";
+                TempData["SuccessMessage"] = $"✓ บันทึกการขายรหัส {receiptCode} สำเร็จ! ยอดสุทธิ {paidTotal:N0} บาท (ตัดสต็อกสินค้าในฐานข้อมูลเรียบร้อยแล้ว)";
                 TempData["LastReceiptCode"] = receiptCode;
                 TempData["LastCustomerName"] = string.IsNullOrWhiteSpace(customerName) ? "ลูกค้าทั่วไป (Walk-in)" : customerName;
-                TempData["LastNetTotal"] = netTotal.ToString("N0");
+                TempData["LastNetTotal"] = paidTotal.ToString("N0");
                 TempData["LastPaymentMethod"] = paymentMethod == "QR" ? "โอนเงิน QR Code" : "เงินสด (Cash)";
                 TempData["LastSummary"] = string.Join(", ", updatedItemsSummary);
             }

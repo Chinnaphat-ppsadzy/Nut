@@ -540,20 +540,28 @@ namespace Chinnaphat_8272_L005.Controllers
                     .OrderBy(q => q.PaidAt)
                     .ToListAsync();
 
+                var dayStart = targetDate.ToDateTime(TimeOnly.MinValue);
+                var nextDayStart = targetDate.AddDays(1).ToDateTime(TimeOnly.MinValue);
+                var dailyPosSales = await _db.PosSaleTransactions
+                    .Where(s => s.PaymentStatus == "PAID" && s.PaidAt >= dayStart && s.PaidAt < nextDayStart)
+                    .OrderBy(s => s.PaidAt)
+                    .ToListAsync();
+
                 decimal totalCourt = dailyBookings.Sum(b => b.CourtAmount) + dailyWalkIns.Sum(q => q.CourtFee);
-                decimal totalSale = dailyBookings.Sum(b => b.SaleAmount);
-                decimal totalRent = dailyBookings.Sum(b => b.RentalAmount);
-                decimal totalDiscount = dailyBookings.Sum(b => b.DiscountAmount);
-                decimal netTotal = dailyBookings.Sum(b => b.NetAmount) + dailyWalkIns.Sum(q => q.CourtFee);
+                decimal totalSale = dailyBookings.Sum(b => b.SaleAmount) + dailyPosSales.Sum(s => s.SaleAmount);
+                decimal totalRent = dailyBookings.Sum(b => b.RentalAmount) + dailyPosSales.Sum(s => s.RentalAmount);
+                decimal totalDiscount = dailyBookings.Sum(b => b.DiscountAmount) + dailyPosSales.Sum(s => s.DiscountAmount);
+                decimal netTotal = dailyBookings.Sum(b => b.NetAmount) + dailyWalkIns.Sum(q => q.CourtFee) + dailyPosSales.Sum(s => s.NetTotal);
 
                 ViewBag.TotalCourt = totalCourt;
                 ViewBag.TotalSale = totalSale;
                 ViewBag.TotalRent = totalRent;
                 ViewBag.TotalDiscount = totalDiscount;
                 ViewBag.NetTotal = netTotal;
-                ViewBag.TransactionsCount = dailyBookings.Count + dailyWalkIns.Count;
+                ViewBag.TransactionsCount = dailyBookings.Count + dailyWalkIns.Count + dailyPosSales.Count;
                 ViewBag.WalkInPayments = dailyWalkIns;
                 ViewBag.WalkInTotal = dailyWalkIns.Sum(q => q.CourtFee);
+                ViewBag.PosSales = dailyPosSales;
 
                 return View(dailyBookings);
             }
@@ -577,25 +585,34 @@ namespace Chinnaphat_8272_L005.Controllers
                     .OrderBy(q => q.QueueDate).ThenBy(q => q.PaidAt)
                     .ToListAsync();
 
+                var monthStartDate = startMonth.ToDateTime(TimeOnly.MinValue);
+                var monthEndExclusive = endMonth.AddDays(1).ToDateTime(TimeOnly.MinValue);
+                var monthlyPosSales = await _db.PosSaleTransactions
+                    .Where(s => s.PaymentStatus == "PAID" && s.PaidAt >= monthStartDate && s.PaidAt < monthEndExclusive)
+                    .OrderBy(s => s.PaidAt)
+                    .ToListAsync();
+
                 decimal totalCourt = monthlyBookings.Sum(b => b.CourtAmount) + monthlyWalkIns.Sum(q => q.CourtFee);
-                decimal totalSale = monthlyBookings.Sum(b => b.SaleAmount);
-                decimal totalRent = monthlyBookings.Sum(b => b.RentalAmount);
-                decimal totalDiscount = monthlyBookings.Sum(b => b.DiscountAmount);
-                decimal netTotal = monthlyBookings.Sum(b => b.NetAmount) + monthlyWalkIns.Sum(q => q.CourtFee);
+                decimal totalSale = monthlyBookings.Sum(b => b.SaleAmount) + monthlyPosSales.Sum(s => s.SaleAmount);
+                decimal totalRent = monthlyBookings.Sum(b => b.RentalAmount) + monthlyPosSales.Sum(s => s.RentalAmount);
+                decimal totalDiscount = monthlyBookings.Sum(b => b.DiscountAmount) + monthlyPosSales.Sum(s => s.DiscountAmount);
+                decimal netTotal = monthlyBookings.Sum(b => b.NetAmount) + monthlyWalkIns.Sum(q => q.CourtFee) + monthlyPosSales.Sum(s => s.NetTotal);
 
                 ViewBag.TotalCourt = totalCourt;
                 ViewBag.TotalSale = totalSale;
                 ViewBag.TotalRent = totalRent;
                 ViewBag.TotalDiscount = totalDiscount;
                 ViewBag.NetTotal = netTotal;
-                ViewBag.TransactionsCount = monthlyBookings.Count + monthlyWalkIns.Count;
+                ViewBag.TransactionsCount = monthlyBookings.Count + monthlyWalkIns.Count + monthlyPosSales.Count;
                 ViewBag.WalkInPayments = monthlyWalkIns;
                 ViewBag.WalkInTotal = monthlyWalkIns.Sum(q => q.CourtFee);
+                ViewBag.PosSales = monthlyPosSales;
 
                 // Group by Day for chart/summary
                 var dailyGroups = monthlyBookings
                     .Select(b => new { Day = b.PlayDate.Day, Court = b.CourtAmount, Sale = b.SaleAmount, Rent = b.RentalAmount, Net = b.NetAmount, Count = 1 })
                     .Concat(monthlyWalkIns.Select(q => new { Day = q.QueueDate.Day, Court = q.CourtFee, Sale = 0m, Rent = 0m, Net = q.CourtFee, Count = 1 }))
+                    .Concat(monthlyPosSales.Select(s => new { Day = s.PaidAt.Day, Court = 0m, Sale = s.SaleAmount, Rent = s.RentalAmount, Net = s.NetTotal, Count = 1 }))
                     .GroupBy(x => x.Day)
                     .Select(g => new { Day = g.Key, Court = g.Sum(x => x.Court), Sale = g.Sum(x => x.Sale), Rent = g.Sum(x => x.Rent), Net = g.Sum(x => x.Net), Count = g.Sum(x => x.Count) })
                     .OrderBy(g => g.Day)

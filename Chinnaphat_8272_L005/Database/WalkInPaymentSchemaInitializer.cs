@@ -45,6 +45,28 @@ public static class WalkInPaymentSchemaInitializer
             await using var updateStatus = connection.CreateCommand();
             updateStatus.CommandText = "ALTER TABLE walk_in_queues MODIFY COLUMN payment_status ENUM('UNPAID','PENDING_VERIFY','REJECTED','PAID') NOT NULL DEFAULT 'UNPAID'";
             await updateStatus.ExecuteNonQueryAsync();
+
+            await using var createPosSales = connection.CreateCommand();
+            createPosSales.CommandText = @"CREATE TABLE IF NOT EXISTS pos_sale_transactions (
+                sale_id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+                receipt_code VARCHAR(40) NOT NULL,
+                customer_name VARCHAR(150) NOT NULL,
+                customer_phone VARCHAR(20) NULL,
+                items_summary TEXT NOT NULL,
+                sale_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+                rental_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+                discount_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+                net_total DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+                payment_method ENUM('CASH','QR') NOT NULL,
+                payment_status ENUM('PAID','VOID') NOT NULL DEFAULT 'PAID',
+                paid_at DATETIME NOT NULL,
+                created_by INT UNSIGNED NOT NULL,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (sale_id),
+                UNIQUE KEY uq_pos_sale_receipt (receipt_code),
+                KEY ix_pos_sale_paid_at (paid_at)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+            await createPosSales.ExecuteNonQueryAsync();
         }
         finally
         {

@@ -1061,6 +1061,7 @@ public class HomeController : Controller
         // 3. Bookings
         var allBookings = await _db.Bookings
             .Include(b => b.User)
+            .Include(b => b.Payments)
             .Include(b => b.BookingSlots).ThenInclude(bs => bs.Court)
             .ToListAsync();
 
@@ -1069,9 +1070,22 @@ public class HomeController : Controller
         vm.PendingBookings = allBookings.Count(b => b.Status == "PENDING_VERIFY");
 
         // 4. Revenue
-        var confirmedBookings = allBookings.Where(b => b.Status == "CONFIRMED" || b.Status == "CHECKED_IN" || b.Status == "COMPLETED").ToList();
-        vm.TotalRevenue = confirmedBookings.Sum(b => b.NetAmount);
-        vm.RevenueThisMonth = confirmedBookings.Where(b => b.PlayDate >= firstDayOfMonthDateOnly).Sum(b => b.NetAmount);
+        var confirmedBookings = allBookings
+            .Where(b => (b.Status == "CONFIRMED" || b.Status == "CHECKED_IN" || b.Status == "COMPLETED" || b.Status == "IN_USE")
+                && b.Payments.Any(p => p.Status == "APPROVED"))
+            .ToList();
+        var paidWalkIns = await _db.WalkInQueues.Where(q => q.PaymentStatus == "PAID").ToListAsync();
+        var paidPosSales = await _db.PosSaleTransactions.Where(s => s.PaymentStatus == "PAID").ToListAsync();
+
+        vm.ApprovedBookingRevenue = confirmedBookings.Sum(b => b.NetAmount);
+        vm.PaidWalkInRevenue = paidWalkIns.Sum(q => q.CourtFee);
+        vm.PosSalesRevenue = paidPosSales.Sum(s => s.NetTotal);
+        vm.TotalRevenue = vm.ApprovedBookingRevenue + vm.PaidWalkInRevenue + vm.PosSalesRevenue;
+        vm.RevenueThisMonth = confirmedBookings
+            .Where(b => (b.ConfirmedAt ?? b.UpdatedAt) >= firstDayOfMonth)
+            .Sum(b => b.NetAmount)
+            + paidWalkIns.Where(q => q.PaidAt >= firstDayOfMonth).Sum(q => q.CourtFee)
+            + paidPosSales.Where(s => s.PaidAt >= firstDayOfMonth).Sum(s => s.NetTotal);
 
         // 5. Additional Metrics
         vm.ActivePromotions = await _db.Promotions.CountAsync(p => p.IsActive == true);

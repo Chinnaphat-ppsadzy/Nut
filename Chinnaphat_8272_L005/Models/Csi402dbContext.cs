@@ -68,6 +68,8 @@ public partial class Csi402dbContext : DbContext
 
     public virtual DbSet<WalkInQueue> WalkInQueues { get; set; }
 
+    public virtual DbSet<PosSaleTransaction> PosSaleTransactions { get; set; }
+
     public virtual DbSet<Labstudent> Labstudents { get; set; }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
@@ -1488,6 +1490,28 @@ public partial class Csi402dbContext : DbContext
             entity.HasOne(d => d.Slot).WithMany(p => p.WalkInQueues)
                 .HasForeignKey(d => d.SlotId)
                 .HasConstraintName("fk_walkin_slot");
+        });
+
+        modelBuilder.Entity<PosSaleTransaction>(entity =>
+        {
+            entity.HasKey(e => e.SaleId).HasName("PRIMARY");
+            entity.ToTable("pos_sale_transactions");
+            entity.HasIndex(e => e.ReceiptCode, "uq_pos_sale_receipt").IsUnique();
+            entity.HasIndex(e => e.PaidAt, "ix_pos_sale_paid_at");
+            entity.Property(e => e.SaleId).HasColumnName("sale_id");
+            entity.Property(e => e.ReceiptCode).HasMaxLength(40).HasColumnName("receipt_code");
+            entity.Property(e => e.CustomerName).HasMaxLength(150).HasColumnName("customer_name");
+            entity.Property(e => e.CustomerPhone).HasMaxLength(20).HasColumnName("customer_phone");
+            entity.Property(e => e.ItemsSummary).HasColumnType("text").HasColumnName("items_summary");
+            entity.Property(e => e.SaleAmount).HasPrecision(10, 2).HasColumnName("sale_amount");
+            entity.Property(e => e.RentalAmount).HasPrecision(10, 2).HasColumnName("rental_amount");
+            entity.Property(e => e.DiscountAmount).HasPrecision(10, 2).HasColumnName("discount_amount");
+            entity.Property(e => e.NetTotal).HasPrecision(10, 2).HasColumnName("net_total");
+            entity.Property(e => e.PaymentMethod).HasColumnType("enum('CASH','QR')").HasColumnName("payment_method");
+            entity.Property(e => e.PaymentStatus).HasDefaultValueSql("'PAID'").HasColumnType("enum('PAID','VOID')").HasColumnName("payment_status");
+            entity.Property(e => e.PaidAt).HasColumnType("datetime").HasColumnName("paid_at");
+            entity.Property(e => e.CreatedBy).HasColumnName("created_by");
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP").HasColumnType("datetime").HasColumnName("created_at");
         });
 
         OnModelCreatingPartial(modelBuilder);

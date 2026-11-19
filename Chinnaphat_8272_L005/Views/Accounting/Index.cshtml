@@ -1,4 +1,5 @@
 @model List<Chinnaphat_8272_L005.Models.Booking>
+@using Chinnaphat_8272_L005.Models
 @{
     Layout = "_AccountingLayout";
     ViewData["Title"] = "ตรวจสอบสลิปโอนเงิน & อนุมัติคิวจอง";
@@ -10,6 +11,7 @@
     int confirmedCount = ViewBag.ConfirmedCount ?? 0;
     int rejectedCount = ViewBag.RejectedCount ?? 0;
     int totalCount = ViewBag.TotalCount ?? 0;
+    var walkInSlips = ViewBag.WalkInPendingPayments as List<WalkInQueue> ?? new();
 }
 
 <style>
@@ -96,6 +98,42 @@
     </div>
 </div>
 
+<div class="card border-0 shadow-sm mb-4 rounded-4 overflow-hidden">
+    <div class="p-3 bg-white border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <h5 class="fw-bold mb-0"><i class="bi bi-qr-code-scan text-primary me-2"></i>สลิปชำระ Walk-in รอตรวจสอบ</h5>
+        <span class="badge bg-warning-subtle text-dark">@walkInSlips.Count รายการ</span>
+    </div>
+    @if (walkInSlips.Any())
+    {
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light"><tr><th>สลิป</th><th>คิว / ลูกค้า</th><th>คอร์ทและเวลา</th><th>เบอร์โทร</th><th>ยอดโอน</th><th class="text-end">ตรวจสอบ</th></tr></thead>
+                <tbody>
+                @foreach (var q in walkInSlips)
+                {
+                    var slipUrl = Url.Action("WalkInSlip", "Accounting", new { queueId = q.QueueId });
+                    <tr>
+                        <td><img src="@slipUrl" alt="สลิป Walk-in" class="slip-thumbnail" onclick="viewFullSlipModal('@slipUrl', 'W-@q.QueueNo.ToString("D2")', '@q.CourtFee.ToString("N2")', '@q.CustomerName')" /></td>
+                        <td><strong class="font-monospace text-primary">W-@q.QueueNo.ToString("D2")</strong><span class="d-block fw-semibold">@q.CustomerName</span></td>
+                        <td>@(q.Court?.CourtName ?? "ยังไม่ระบุคอร์ท")<small class="d-block text-muted">@(q.Slot == null ? "รอบที่ว่าง" : $"{q.Slot.StartTime:HH:mm} - {q.Slot.EndTime:HH:mm}")</small></td>
+                        <td>@(q.Phone ?? "-")</td>
+                        <td class="fw-bold text-success">@q.CourtFee.ToString("N2") ฿</td>
+                        <td class="text-end text-nowrap">
+                            <button type="button" class="btn btn-sm btn-success" onclick="reviewWalkInSlip(@q.QueueId, true)"><i class="bi bi-check-circle me-1"></i>อนุมัติ</button>
+                            <button type="button" class="btn btn-sm btn-outline-danger" onclick="reviewWalkInSlip(@q.QueueId, false)"><i class="bi bi-x-circle me-1"></i>ปฏิเสธ</button>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+    else
+    {
+        <div class="p-4 text-center text-muted"><i class="bi bi-check-circle text-success me-1"></i>ไม่มีสลิป Walk-in ที่รอตรวจสอบ</div>
+    }
+</div>
+
 <!-- ============================================================
      TABLE: รายการสลิปโอนเงินและการจอง
      ============================================================ -->
@@ -126,7 +164,7 @@
                     @foreach (var b in Model)
                     {
                         var payment = b.Payments.OrderByDescending(p => p.PaymentId).FirstOrDefault();
-                        string? slipUrl = payment?.SlipImageUrl;
+                        string? slipUrl = payment == null ? null : Url.Action("ViewSlip", "Home", new { bookingCode = b.BookingCode });
                         bool hasSlip = !string.IsNullOrEmpty(slipUrl);
 
                         <tr>
@@ -197,7 +235,7 @@
                             <td>
                                 @switch (b.Status)
                                 {
-                                    case "PENDING_VERIFICATION":
+                                    case "PENDING_VERIFY":
                                         <span class="badge bg-warning text-dark px-2 py-1">
                                             <i class="bi bi-hourglass-split me-1"></i> รอตรวจสลิป
                                         </span>
@@ -218,7 +256,7 @@
                                             เสร็จสิ้นแล้ว
                                         </span>
                                         break;
-                                    case "SLIP_REJECTED":
+                                    case "REJECTED":
                                         <span class="badge bg-danger px-2 py-1" title="@b.CancelReason">
                                             <i class="bi bi-x-circle-fill me-1"></i> สลิปไม่ผ่าน
                                         </span>
@@ -233,7 +271,7 @@
 
                             <!-- ปุ่มดำเนินการ -->
                             <td class="text-center">
-                                @if (b.Status == "PENDING_VERIFICATION")
+                                @if (b.Status == "PENDING_VERIFY")
                                 {
                                     <div class="d-flex justify-content-center gap-1">
                                         <button type="button" class="btn btn-sm btn-success fw-bold px-3 py-1 shadow-sm" style="background:linear-gradient(135deg, #1a472a, #2d6a4f); border:none; border-radius:8px;" onclick="approveBookingModal(@b.BookingId, '@b.BookingCode', '@b.NetAmount.ToString("N2")')">
@@ -258,7 +296,7 @@
                                         <span class="text-success small fw-semibold"><i class="bi bi-check-all me-1"></i> อนุมัติแล้ว</span>
                                     }
                                 }
-                                else if (b.Status == "SLIP_REJECTED")
+                                else if (b.Status == "REJECTED")
                                 {
                                     <small class="text-danger d-block">@b.CancelReason</small>
                                 }
@@ -314,7 +352,12 @@
 </div>
 
 @section Scripts {
+    @Html.AntiForgeryToken()
     <script>
+        function antiforgeryToken() {
+            return document.querySelector('input[name="__RequestVerificationToken"]')?.value || '';
+        }
+
         function viewFullSlipModal(url, code, amount, customer) {
             document.getElementById('modalSlipImg').src = url;
             document.getElementById('modalSlipCode').innerText = code;
@@ -328,8 +371,8 @@
 
             fetch('/Accounting/ApproveBooking', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: `bookingId=${bookingId}`
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'RequestVerificationToken': antiforgeryToken() },
+                body: `bookingId=${bookingId}&__RequestVerificationToken=${encodeURIComponent(antiforgeryToken())}`
             })
             .then(res => res.json())
             .then(data => {
@@ -348,8 +391,8 @@
             if (reason) {
                 fetch('/Accounting/RejectSlip', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: `bookingId=${bookingId}&reason=${encodeURIComponent(reason)}`
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'RequestVerificationToken': antiforgeryToken() },
+                    body: `bookingId=${bookingId}&reason=${encodeURIComponent(reason)}&__RequestVerificationToken=${encodeURIComponent(antiforgeryToken())}`
                 })
                 .then(res => res.json())
                 .then(data => {
@@ -362,6 +405,22 @@
                 })
                 .catch(err => alert('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้: ' + err));
             }
+        }
+
+        function reviewWalkInSlip(queueId, approve) {
+            const reason = approve ? '' : (prompt('ระบุเหตุผลที่ปฏิเสธสลิป (ลูกค้าจะสามารถส่งใหม่ได้):', 'ยอดเงินหรือข้อมูลสลิปไม่ถูกต้อง') || '');
+            if (!approve && !reason) return;
+            const action = approve ? 'ApproveWalkInSlip' : 'RejectWalkInSlip';
+            const message = approve ? 'ยืนยันว่าได้ตรวจยอดและอนุมัติสลิป Walk-in แล้วหรือไม่?' : 'ยืนยันปฏิเสธสลิปนี้หรือไม่?';
+            if (!confirm(message)) return;
+            fetch(`/Accounting/${action}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'RequestVerificationToken': antiforgeryToken() },
+                body: `queueId=${queueId}&reason=${encodeURIComponent(reason)}&__RequestVerificationToken=${encodeURIComponent(antiforgeryToken())}`
+            }).then(res => res.json()).then(data => {
+                alert(data.message || (data.success ? 'บันทึกสำเร็จ' : 'ทำรายการไม่สำเร็จ'));
+                if (data.success) window.location.reload();
+            }).catch(() => alert('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ กรุณาลองใหม่'));
         }
     </script>
 }

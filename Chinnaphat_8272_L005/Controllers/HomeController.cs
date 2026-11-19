@@ -6,6 +6,7 @@ using System.ComponentModel.Design;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 using System.IO;
+using Chinnaphat_8272_L005.Helpers;
 
 namespace Chinnaphat_8272_L005.Controllers;
 
@@ -101,7 +102,7 @@ public class HomeController : Controller
 
     public IActionResult Index()
     {
-        return RedirectToAction("Customer", "Home");
+        return RedirectToAction(nameof(Customer));
     }
 
     public IActionResult Privacy()
@@ -116,10 +117,11 @@ public class HomeController : Controller
         ViewBag.Section = sectionLower;
         ViewData["Title"] = sectionLower switch
         {
-            "booking"  => "จองสนามแบดมินตัน",
-            "product"  => "ซื้ออุปกรณ์ & เช่าอุปกรณ์",
-            "tracking" => "ดูสถานะการจอง",
-            _          => "หน้าหลัก - ระบบจองและซื้ออุปกรณ์"
+            "booking"    => "จองสนามแบดมินตัน",
+            "product"    => "ซื้ออุปกรณ์ & เช่าอุปกรณ์",
+            "tracking"   => "ติดตามสถานะการจอง",
+            "mybookings" => "การจองของฉัน",
+            _            => "หน้าหลัก - ระบบจองและซื้ออุปกรณ์"
         };
         string selectedDate = string.IsNullOrWhiteSpace(date)
             ? DateTime.Today.ToString("yyyy-MM-dd")
@@ -143,10 +145,16 @@ public class HomeController : Controller
 
             // ดึงโปรโมชั่นที่เปิดใช้งานอยู่จากฐานข้อมูลหลังบ้าน
             var activePromos = await _db.Promotions
+                                        .Include(p => p.PromotionRules)
                                         .Where(p => p.IsActive == true)
                                         .OrderBy(p => p.Priority)
                                         .ToListAsync();
             ViewBag.Promotions = activePromos;
+
+            string? customerId = HttpContext.Session.GetString("UserId");
+            ViewBag.IsFirstCourtBooking = uint.TryParse(customerId, out var customerUid) &&
+                !await _db.BookingSlots.AnyAsync(bs => bs.Booking.UserId == customerUid &&
+                    bs.Booking.Status != "CANCELLED" && bs.Booking.Status != "REJECTED" && bs.Booking.Status != "EXPIRED");
 
             // ดึงรายการสินค้าและอุปกรณ์สำหรับซื้อ/เช่าจากฐานข้อมูล
             var products = await _db.Products
@@ -183,91 +191,96 @@ public class HomeController : Controller
                 }
             }
 
-            // ดึงประวัติการจองและติดตามสถานะ (My Bookings)
+            // ดึงประวัติการจองของฉัน (My Bookings) - เฉพาะสมาชิกที่เข้าสู่ระบบเท่านั้น
+            // ในโหมด Guest จะไม่สามารถดูการจองของคนอื่นได้โดยเด็ดขาด
             var myBookingsList = new List<BookingTrackItem>();
-            var bookingsQuery = _db.Bookings
-                .Include(b => b.BookingSlots).ThenInclude(bs => bs.Court)
-                .Include(b => b.BookingSlots).ThenInclude(bs => bs.Slot)
-                .Include(b => b.BookingItems).ThenInclude(bi => bi.Product)
-                .Include(b => b.Payments)
-                .Include(b => b.User)
-                .AsQueryable();
+            uint lUid = 0;
+            bool isUserLoggedIn = !string.IsNullOrEmpty(loggedInUidStr) && uint.TryParse(loggedInUidStr, out lUid);
 
-            if (!string.IsNullOrEmpty(loggedInUidStr) && uint.TryParse(loggedInUidStr, out uint lUid))
+            if (isUserLoggedIn)
             {
-                // ถ้าล็อกอินอยู่ ให้แสดงการจองของผู้ใช้นั้นโดยเฉพาะ
-                bookingsQuery = bookingsQuery.Where(b => b.UserId == lUid);
+                var rawBookings = await _db.Bookings
+                    .Include(b => b.BookingSlots).ThenInclude(bs => bs.Court)
+                    .Include(b => b.BookingSlots).ThenInclude(bs => bs.Slot)
+                    .Include(b => b.BookingItems).ThenInclude(bi => bi.Product)
+                    .Include(b => b.Payments)
+                    .Include(b => b.User)
+                    .Where(b => b.UserId == lUid)
+                    .OrderByDescending(b => b.CreatedAt)
+                    .Take(50)
+                    .ToListAsync();
+
+                foreach (var b in rawBookings)
+                {
+                    bool hasCourtBooking = b.BookingSlots.Any();
+                    var item = new BookingTrackItem
+                    {
+                        BookingId = b.BookingId,
+                        BookingCode = b.BookingCode,
+                        PlayDate = b.PlayDate.ToString("yyyy-MM-dd"),
+                        CustomerName = b.User?.FullName ?? "คุณลูกค้า",
+                        CustomerPhone = b.User?.Phone ?? "-",
+                        CourtAmount = b.CourtAmount,
+                        SaleAmount = b.SaleAmount,
+                        RentalAmount = b.RentalAmount,
+                        DiscountAmount = b.DiscountAmount,
+                        NetAmount = b.NetAmount,
+                        Status = b.Status,
+                        CreatedAt = b.CreatedAt,
+                        SlipImageUrl = b.Payments.Any(p => !string.IsNullOrEmpty(p.SlipImageUrl))
+                            ? Url.Action(nameof(ViewSlip), new { bookingCode = b.BookingCode }) : null
+                    };
+
+                    switch (b.Status?.ToUpper())
+                    {
+                        case "PENDING_VERIFY":
+                            item.StatusText = "รอฝ่ายบัญชีตรวจสอบสลิป";
+                            item.StatusBadgeClass = "bg-warning text-dark";
+                            break;
+                        case "CONFIRMED":
+                            item.StatusText = hasCourtBooking
+                                ? "อนุมัติการชำระเงินแล้ว (ยืนยันคิวสนามเรียบร้อย)"
+                                : "อนุมัติการชำระเงินแล้ว (รอรับสินค้า/อุปกรณ์)";
+                            item.StatusBadgeClass = "bg-success text-white";
+                            break;
+                        case "CHECKED_IN":
+                            item.StatusText = "เช็คอินเข้าสนามแล้ว";
+                            item.StatusBadgeClass = "bg-primary text-white";
+                            break;
+                        case "COMPLETED":
+                            item.StatusText = "การใช้บริการเสร็จสิ้น";
+                            item.StatusBadgeClass = "bg-secondary text-white";
+                            break;
+                        case "CANCELLED":
+                            item.StatusText = "ยกเลิกการจอง";
+                            item.StatusBadgeClass = "bg-danger text-white";
+                            break;
+                        default:
+                            item.StatusText = "รอชำระเงิน";
+                            item.StatusBadgeClass = "bg-info text-dark";
+                            break;
+                    }
+
+                    foreach (var s in b.BookingSlots)
+                    {
+                        var courtName = s.Court?.CourtName ?? $"Court {s.CourtId}";
+                        var timeRange = s.Slot != null ? $"{s.Slot.StartTime:HH:mm} - {s.Slot.EndTime:HH:mm}" : $"Slot #{s.SlotId}";
+                        item.CourtSlots.Add($"{courtName} ({timeRange})");
+                    }
+
+                    foreach (var itm in b.BookingItems)
+                    {
+                        var pName = itm.Product?.ProductName ?? $"สินค้า #{itm.ProductId}";
+                        var kind = itm.ItemType == "RENT" ? "[เช่า]" : "[ซื้อ]";
+                        item.ItemsSummary.Add($"{kind} {pName} x {itm.Quantity}");
+                    }
+
+                    myBookingsList.Add(item);
+                }
             }
-
-            var rawBookings = await bookingsQuery
-                .OrderByDescending(b => b.CreatedAt)
-                .Take(20)
-                .ToListAsync();
-
-            foreach (var b in rawBookings)
-            {
-                var item = new BookingTrackItem
-                {
-                    BookingId = b.BookingId,
-                    BookingCode = b.BookingCode,
-                    PlayDate = b.PlayDate.ToString("yyyy-MM-dd"),
-                    CustomerName = b.User?.FullName ?? "คุณลูกค้า",
-                    CustomerPhone = b.User?.Phone ?? "-",
-                    CourtAmount = b.CourtAmount,
-                    SaleAmount = b.SaleAmount,
-                    RentalAmount = b.RentalAmount,
-                    DiscountAmount = b.DiscountAmount,
-                    NetAmount = b.NetAmount,
-                    Status = b.Status,
-                    CreatedAt = b.CreatedAt,
-                    SlipImageUrl = b.Payments.OrderByDescending(p => p.PaymentId).FirstOrDefault()?.SlipImageUrl
-                };
-
-                switch (b.Status?.ToUpper())
-                {
-                    case "PENDING_VERIFICATION":
-                        item.StatusText = "รอฝ่ายบัญชีตรวจสอบสลิป";
-                        item.StatusBadgeClass = "bg-warning text-dark";
-                        break;
-                    case "CONFIRMED":
-                        item.StatusText = "ยืนยันคิวแล้ว (พร้อมใช้สนาม)";
-                        item.StatusBadgeClass = "bg-success text-white";
-                        break;
-                    case "CHECKED_IN":
-                        item.StatusText = "เช็คอินเข้าสนามแล้ว";
-                        item.StatusBadgeClass = "bg-primary text-white";
-                        break;
-                    case "COMPLETED":
-                        item.StatusText = "การใช้บริการเสร็จสิ้น";
-                        item.StatusBadgeClass = "bg-secondary text-white";
-                        break;
-                    case "CANCELLED":
-                        item.StatusText = "ยกเลิกการจอง";
-                        item.StatusBadgeClass = "bg-danger text-white";
-                        break;
-                    default:
-                        item.StatusText = "รอชำระเงิน";
-                        item.StatusBadgeClass = "bg-info text-dark";
-                        break;
-                }
-
-                foreach (var s in b.BookingSlots)
-                {
-                    var courtName = s.Court?.CourtName ?? $"Court {s.CourtId}";
-                    var timeRange = s.Slot != null ? $"{s.Slot.StartTime:HH:mm} - {s.Slot.EndTime:HH:mm}" : $"Slot #{s.SlotId}";
-                    item.CourtSlots.Add($"{courtName} ({timeRange})");
-                }
-
-                foreach (var itm in b.BookingItems)
-                {
-                    var pName = itm.Product?.ProductName ?? $"สินค้า #{itm.ProductId}";
-                    var kind = itm.ItemType == "RENT" ? "[เช่า]" : "[ซื้อ]";
-                    item.ItemsSummary.Add($"{kind} {pName} x {itm.Quantity}");
-                }
-
-                myBookingsList.Add(item);
-            }
+            // ถ้าเป็น Guest -> myBookingsList ว่างเปล่า ไม่ดึงข้อมูลการจองของคนอื่น
             ViewBag.MyBookings = myBookingsList;
+            ViewBag.IsUserLoggedIn = isUserLoggedIn;
         }
         catch
         {
@@ -285,6 +298,7 @@ public class HomeController : Controller
     // CUSTOMER: บันทึกการจองคอร์ท + สั่งซื้อ/เช่าอุปกรณ์ + อัปโหลดสลิป
     // ============================================================
     [HttpPost]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> SubmitBooking(
         string customerName,
         string customerPhone,
@@ -303,20 +317,22 @@ public class HomeController : Controller
 
             if (!DateOnly.TryParse(playDate, out DateOnly targetPlayDate))
             {
-                targetPlayDate = DateOnly.FromDateTime(DateTime.Today);
+                return Json(new { success = false, message = "วันที่เล่นไม่ถูกต้อง กรุณาเลือกวันที่ใหม่" });
             }
+            if (targetPlayDate < DateOnly.FromDateTime(DateTime.Today))
+                return Json(new { success = false, message = "ไม่สามารถจองย้อนหลังได้" });
 
             // 1. ตรวจสอบสิทธิ์ผู้ใช้งาน (Guest ไม่สามารถจองหรือชำระเงินได้ ต้องเข้าสู่ระบบด้วยบัญชี Customer ก่อน)
-            string? loggedInUidStr = HttpContext.Session.GetString("UserId") ?? Request.Cookies["cb_user_id"];
+            string? loggedInUidStr = HttpContext.Session.GetString("UserId");
             if (string.IsNullOrEmpty(loggedInUidStr) || !uint.TryParse(loggedInUidStr, out uint lUid))
             {
                 return Json(new { success = false, requireLogin = true, message = "ผู้เยี่ยมชม (Guest) ไม่สามารถทำการจองหรือชำระเงินได้ กรุณาเข้าสู่ระบบด้วยบัญชีสมาชิกก่อนทำรายการ" });
             }
 
-            User? user = await _db.Users.FindAsync(lUid);
-            if (user == null)
+            User? user = await _db.Users.Include(u => u.Role).FirstOrDefaultAsync(u => u.UserId == lUid);
+            if (user == null || user.Role?.RoleCode != "CUSTOMER" || (user.Status ?? "").Equals("inactive", StringComparison.OrdinalIgnoreCase))
             {
-                return Json(new { success = false, requireLogin = true, message = "ไม่พบบัญชีผู้ใช้งานในระบบ กรุณาเข้าสู่ระบบใหม่อีกครั้ง" });
+                return Json(new { success = false, requireLogin = true, message = "บัญชีนี้ไม่มีสิทธิ์จอง กรุณาเข้าสู่ระบบด้วยบัญชีสมาชิก" });
             }
 
             // 2. Parse รายการช่วงเวลาของสนามที่เลือก
@@ -338,6 +354,107 @@ public class HomeController : Controller
                 return Json(new { success = false, message = "กรุณาเลือกช่วงเวลาคอร์ท หรือสินค้า/อุปกรณ์อย่างน้อย 1 รายการ" });
             }
 
+            if (slotsList.Any(s => s.CourtId <= 0 || s.CourtId > ushort.MaxValue || s.SlotId <= 0 || s.SlotId > byte.MaxValue) ||
+                slotsList.GroupBy(s => $"{s.CourtId}_{s.SlotId}").Any(g => g.Count() > 1) ||
+                cartList.Any(i => i.ProductId <= 0 || i.Qty <= 0 || (i.Type != "SALE" && i.Type != "RENT")))
+            {
+                return Json(new { success = false, message = "ข้อมูลคอร์ทหรือสินค้าไม่ถูกต้อง กรุณาเลือกใหม่" });
+            }
+
+            // Prices and item metadata must come from the database, never from browser payloads.
+            var selectedCourtIds = slotsList.Select(s => (ushort)s.CourtId).Distinct().ToList();
+            var selectedSlotIds = slotsList.Select(s => (byte)s.SlotId).Distinct().ToList();
+            var courtsById = await _db.Courts
+                .Where(c => selectedCourtIds.Contains(c.CourtId) && c.Status == "AVAILABLE")
+                .ToDictionaryAsync(c => c.CourtId);
+            var slotsById = await _db.TimeSlots
+                .Where(s => selectedSlotIds.Contains(s.SlotId) && (s.IsActive == true || s.IsActive == null))
+                .ToDictionaryAsync(s => s.SlotId);
+            if (slotsList.Any(s => !courtsById.ContainsKey((ushort)s.CourtId) || !slotsById.ContainsKey((byte)s.SlotId)))
+            {
+                return Json(new { success = false, message = "คอร์ทหรือช่วงเวลาที่เลือกไม่พร้อมให้จองแล้ว" });
+            }
+
+            var productIds = cartList.Select(i => (uint)i.ProductId).Distinct().ToList();
+            var productsById = await _db.Products.Include(p => p.Category)
+                .Where(p => productIds.Contains(p.ProductId) && (p.IsActive == true || p.IsActive == null))
+                .ToDictionaryAsync(p => p.ProductId);
+            if (cartList.Any(i => !productsById.ContainsKey((uint)i.ProductId)))
+            {
+                return Json(new { success = false, message = "มีสินค้าที่ปิดขายหรือไม่พบในระบบ กรุณาตรวจสอบตะกร้า" });
+            }
+
+            foreach (var item in cartList)
+            {
+                var product = productsById[(uint)item.ProductId];
+                if (!string.Equals(item.Type, product.ProductType, StringComparison.OrdinalIgnoreCase))
+                    return Json(new { success = false, message = "ประเภทสินค้าในตะกร้าไม่ตรงกับข้อมูลระบบ กรุณาโหลดหน้าใหม่" });
+                item.Price = product.Price;
+                item.ProductName = product.ProductName;
+                item.CategoryCode = product.Category?.CategoryCode ?? string.Empty;
+            }
+
+            foreach (var selected in slotsList)
+            {
+                var court = courtsById[(ushort)selected.CourtId];
+                var timeSlot = slotsById[(byte)selected.SlotId];
+                var durationHours = (decimal)(timeSlot.EndTime.ToTimeSpan() - timeSlot.StartTime.ToTimeSpan()).TotalMinutes / 60m;
+                if (durationHours <= 0)
+                    return Json(new { success = false, message = "ช่วงเวลาคอร์ทไม่ถูกต้อง" });
+                selected.Price = Math.Round(court.PricePerHour * durationHours, 2);
+            }
+
+            await using var transaction = await _db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
+
+            var occupiedSlots = await _db.BookingSlots
+                .Where(bs => bs.PlayDate == targetPlayDate && bs.LockKey == 1 &&
+                    selectedCourtIds.Contains(bs.CourtId) && selectedSlotIds.Contains(bs.SlotId) &&
+                    bs.Booking.Status != "CANCELLED" && bs.Booking.Status != "REJECTED" && bs.Booking.Status != "EXPIRED")
+                .Select(bs => new { bs.CourtId, bs.SlotId })
+                .ToListAsync();
+            if (slotsList.Any(s => occupiedSlots.Any(o => o.CourtId == s.CourtId && o.SlotId == s.SlotId)))
+                return Json(new { success = false, message = "ช่วงเวลาบางรายการถูกจองไปแล้ว กรุณาเลือกช่วงเวลาใหม่" });
+
+            var playDayStart = targetPlayDate.ToDateTime(TimeOnly.MinValue);
+            var playDayEnd = targetPlayDate.AddDays(1).ToDateTime(TimeOnly.MinValue);
+            var courtBlocks = await _db.CourtBlocks
+                .Where(b => selectedCourtIds.Contains(b.CourtId) && b.BlockStart < playDayEnd && b.BlockEnd > playDayStart)
+                .ToListAsync();
+            bool selectedBlockedSlot = slotsList.Any(selection =>
+            {
+                var slot = slotsById[(byte)selection.SlotId];
+                var slotStart = targetPlayDate.ToDateTime(slot.StartTime);
+                var slotEnd = targetPlayDate.ToDateTime(slot.EndTime);
+                return courtBlocks.Any(block => block.CourtId == selection.CourtId &&
+                    block.BlockStart < slotEnd && block.BlockEnd > slotStart);
+            });
+            if (selectedBlockedSlot)
+                return Json(new { success = false, message = "ช่วงเวลาที่เลือกถูกล็อกเพื่อซ่อมบำรุง กรุณาเลือกเวลาอื่น" });
+
+            var walkInSlots = await _db.WalkInQueues
+            .Where(q => q.QueueDate == targetPlayDate && q.Status != "CANCELLED" &&
+                    q.CourtId.HasValue && q.SlotId.HasValue && selectedCourtIds.Contains(q.CourtId.Value) &&
+                    selectedSlotIds.Contains(q.SlotId.Value))
+                .Select(q => new { CourtId = q.CourtId!.Value, SlotId = q.SlotId!.Value })
+                .ToListAsync();
+            if (slotsList.Any(s => walkInSlots.Any(w => w.CourtId == s.CourtId && w.SlotId == s.SlotId)))
+                return Json(new { success = false, message = "ช่วงเวลานี้ถูกจัดให้คิว Walk-in แล้ว กรุณาเลือกเวลาอื่น" });
+
+            foreach (var grouped in cartList.Where(i => i.Type == "SALE").GroupBy(i => (uint)i.ProductId))
+            {
+                if (productsById[grouped.Key].StockQty < grouped.Sum(i => i.Qty))
+                    return Json(new { success = false, message = $"สินค้า {productsById[grouped.Key].ProductName} มีจำนวนไม่เพียงพอ" });
+            }
+            foreach (var grouped in cartList.Where(i => i.Type == "RENT").GroupBy(i => (uint)i.ProductId))
+            {
+                var reservedQty = await _db.BookingItems
+                    .Where(i => i.ProductId == grouped.Key && i.ItemType == "RENT" && i.Booking.PlayDate == targetPlayDate &&
+                        (i.Booking.Status == "PENDING_PAYMENT" || i.Booking.Status == "PENDING_VERIFY" || i.Booking.Status == "CONFIRMED"))
+                    .SumAsync(i => (int?)i.Quantity) ?? 0;
+                if (productsById[grouped.Key].StockQty - reservedQty < grouped.Sum(i => i.Qty))
+                    return Json(new { success = false, message = $"อุปกรณ์ {productsById[grouped.Key].ProductName} มีจำนวนให้เช่าไม่เพียงพอในวันที่เลือก" });
+            }
+
             // 4. คำนวณราคาและส่วนลดโปรโมชั่นอัตโนมัติ
             decimal courtAmount = slotsList.Sum(s => s.Price);
             decimal saleAmount = 0m;
@@ -353,65 +470,106 @@ public class HomeController : Controller
                 else saleAmount += itemSubtotal;
             }
 
-            // --- โปรโมชั่นที่ 1: Time-based Court Discount (ช่วง Off-Peak 09:00 - 15:00 วันธรรมดา ลด 20%) ---
+            var activePromotions = await _db.Promotions.Include(p => p.PromotionRules)
+                .Where(p => p.IsActive == true && (p.StartDate == null || p.StartDate <= targetPlayDate) && (p.EndDate == null || p.EndDate >= targetPlayDate))
+                .ToListAsync();
+            Promotion? GetPromotion(string type) => activePromotions.FirstOrDefault(p => p.PromoType == type);
+            var appliedPromotionAmounts = new List<(Promotion Promotion, decimal Amount)>();
+            bool CanApplyPromotion(Promotion promotion) =>
+                !appliedPromotionAmounts.Any(x => x.Promotion.IsStackable == false) &&
+                (promotion.IsStackable != false || appliedPromotionAmounts.Count == 0);
+
+            // --- โปรโมชั่นที่ 1: Time-based Court Discount ---
+            var timePromotion = GetPromotion("TIME_BASED");
             var dayOfWeek = targetPlayDate.DayOfWeek;
             bool isWeekday = dayOfWeek >= DayOfWeek.Monday && dayOfWeek <= DayOfWeek.Friday;
             decimal courtDiscount = 0m;
-            if (isWeekday)
+            if (timePromotion != null && CanApplyPromotion(timePromotion) && isWeekday && timePromotion.TimeStart.HasValue && timePromotion.TimeEnd.HasValue)
             {
                 foreach (var s in slotsList)
                 {
-                    // Slot 2 (09:00) ถึง Slot 7 (14:00-15:00)
-                    if (s.SlotId >= 2 && s.SlotId <= 7)
+                    var selectedTime = slotsById[(byte)s.SlotId];
+                    if (selectedTime.StartTime >= timePromotion.TimeStart.Value && selectedTime.EndTime <= timePromotion.TimeEnd.Value)
                     {
-                        courtDiscount += Math.Round(s.Price * 0.20m, 2);
+                        courtDiscount += Math.Round(s.Price * timePromotion.DiscountValue / 100m, 2);
                     }
                 }
                 if (courtDiscount > 0)
                 {
                     totalDiscounts += courtDiscount;
-                    appliedPromoNames.Add($"โปรฯ เช่าสนามช่วง Off-Peak 09:00-15:00 (ลด 20% รวม {courtDiscount:N0} ฿)");
+                    appliedPromotionAmounts.Add((timePromotion, courtDiscount));
+                    appliedPromoNames.Add($"{timePromotion.PromoName} (ลด {timePromotion.DiscountValue:N0}% รวม {courtDiscount:N2} ฿)");
                 }
             }
 
             // --- โปรโมชั่นที่ 2: Volume-based Shuttlecock Sale (ซื้อลูกแบดตั้งแต่ 2 หลอดขึ้นไป หลอดที่ 2 ลด 50%) ---
-            var shuttleItems = cartList.Where(i => i.Type == "SALE" && (i.CategoryCode == "SHUTTLECOCK" || i.ProductName.Contains("ลูกแบด"))).ToList();
+            var volumePromotion = GetPromotion("VOLUME_SALE");
+            var volumeCondition = volumePromotion?.PromotionRules.FirstOrDefault(r => r.RuleKind == "CONDITION");
+            var volumeReward = volumePromotion?.PromotionRules.FirstOrDefault(r => r.RuleKind == "REWARD");
+            var shuttleItems = cartList.Where(i => i.Type == "SALE" && (volumeCondition?.CategoryId == null || productsById[(uint)i.ProductId].CategoryId == volumeCondition.CategoryId)).ToList();
             int totalShuttleQty = shuttleItems.Sum(i => i.Qty);
-            if (totalShuttleQty >= 2)
+            int volumeRequiredQty = (int)(volumeCondition?.RequiredQty ?? 2);
+            int volumeNthItem = (int)(volumeReward?.NthItem ?? 2);
+            if (volumePromotion != null && CanApplyPromotion(volumePromotion) && totalShuttleQty >= volumeRequiredQty && volumeNthItem > 0)
             {
-                var shuttlePrice = shuttleItems.First().Price;
-                decimal shuttleDiscount = Math.Round(shuttlePrice * 0.50m, 2);
+                var unitPrices = shuttleItems.SelectMany(i => Enumerable.Repeat(i.Price, i.Qty)).OrderBy(p => p).ToList();
+                decimal shuttleDiscount = unitPrices.Count >= volumeNthItem
+                    ? Math.Round(unitPrices[volumeNthItem - 1] * volumePromotion.DiscountValue / 100m, 2) : 0m;
                 totalDiscounts += shuttleDiscount;
-                appliedPromoNames.Add($"โปรฯ ซื้อลูกแบดหลอดที่ 2 ลด 50% (ลด {shuttleDiscount:N0} ฿)");
+                if (shuttleDiscount > 0)
+                {
+                    appliedPromotionAmounts.Add((volumePromotion, shuttleDiscount));
+                    appliedPromoNames.Add($"{volumePromotion.PromoName} (ลด {volumePromotion.DiscountValue:N0}% รวม {shuttleDiscount:N2} ฿)");
+                }
             }
 
-            // --- โปรโมชั่นที่ 3: Bundle Rental (เช่าไม้ 2 ไม้ + รองเท้า 2 คู่ ลดค่าเช่าอุปกรณ์เซ็ตนี้ 20%) ---
-            int racketRentalQty = cartList.Where(i => i.Type == "RENT" && (i.CategoryCode == "RACKET" || i.ProductName.Contains("ไม้แบด"))).Sum(i => i.Qty);
-            int shoesRentalQty = cartList.Where(i => i.Type == "RENT" && (i.CategoryCode == "SHOES" || i.ProductName.Contains("รองเท้า"))).Sum(i => i.Qty);
-            if (racketRentalQty >= 2 && shoesRentalQty >= 2)
+            // --- โปรโมชั่นที่ 3: Bundle Rental ---
+            var bundlePromotion = GetPromotion("BUNDLE_RENTAL");
+            var bundleConditions = bundlePromotion?.PromotionRules.Where(r => r.RuleKind == "CONDITION" && r.CategoryId.HasValue).ToList() ?? new List<PromotionRule>();
+            bool bundleEligible = bundlePromotion != null && CanApplyPromotion(bundlePromotion) && bundleConditions.Count >= 2 && bundleConditions.All(rule =>
+                cartList.Where(i => i.Type == "RENT" && productsById[(uint)i.ProductId].CategoryId == rule.CategoryId).Sum(i => i.Qty) >= rule.RequiredQty);
+            if (bundleEligible)
             {
-                decimal equipmentRentalSubtotal = cartList.Where(i => i.Type == "RENT" && (i.CategoryCode == "RACKET" || i.CategoryCode == "SHOES")).Sum(i => i.Price * i.Qty);
-                decimal bundleDiscount = Math.Round(equipmentRentalSubtotal * 0.20m, 2);
+                var bundleCategoryIds = bundleConditions.Select(r => r.CategoryId!.Value).ToHashSet();
+                decimal equipmentRentalSubtotal = cartList.Where(i => i.Type == "RENT" && bundleCategoryIds.Contains(productsById[(uint)i.ProductId].CategoryId)).Sum(i => i.Price * i.Qty);
+                decimal bundleDiscount = Math.Round(equipmentRentalSubtotal * bundlePromotion!.DiscountValue / 100m, 2);
                 totalDiscounts += bundleDiscount;
-                appliedPromoNames.Add($"โปรฯ ส่งเสริมการเช่า Bundle ไม้+รองเท้า (ลด 20% รวม {bundleDiscount:N0} ฿)");
+                appliedPromotionAmounts.Add((bundlePromotion, bundleDiscount));
+                appliedPromoNames.Add($"{bundlePromotion.PromoName} (ลด {bundlePromotion.DiscountValue:N0}% รวม {bundleDiscount:N2} ฿)");
             }
             // --- โปรโมชั่นที่ 4: Cross-selling (ซื้อลูกแบด 1 หลอด + เช่าไม้ 2 ไม้ -> เช่ารองเท้าฟรี 1 คู่) ---
-            else if (totalShuttleQty >= 1 && racketRentalQty >= 2 && shoesRentalQty >= 1)
+            var crossPromotion = GetPromotion("CROSS_SELL");
+            var crossConditions = crossPromotion?.PromotionRules.Where(r => r.RuleKind == "CONDITION" && r.CategoryId.HasValue).ToList() ?? new List<PromotionRule>();
+            var crossReward = crossPromotion?.PromotionRules.FirstOrDefault(r => r.RuleKind == "REWARD" && r.CategoryId.HasValue);
+            bool crossEligible = crossPromotion != null && CanApplyPromotion(crossPromotion) && crossReward != null && crossConditions.Count > 0 && crossConditions.All(rule =>
+                cartList.Where(i => (rule.TargetType == "SALE_ITEM" ? i.Type == "SALE" : i.Type == "RENT") && productsById[(uint)i.ProductId].CategoryId == rule.CategoryId).Sum(i => i.Qty) >= rule.RequiredQty);
+            if (crossEligible)
             {
-                var shoeItem = cartList.FirstOrDefault(i => i.Type == "RENT" && (i.CategoryCode == "SHOES" || i.ProductName.Contains("รองเท้า")));
-                decimal freeShoeDiscount = shoeItem != null ? shoeItem.Price : 50m;
-                totalDiscounts += freeShoeDiscount;
-                appliedPromoNames.Add($"โปรฯ ซื้อคู่เช่า (แถมสิทธิ์เช่ารองเท้าฟรี 1 คู่ มูลค่า {freeShoeDiscount:N0} ฿)");
+                var rewardItems = cartList.Where(i => i.Type == "RENT" && productsById[(uint)i.ProductId].CategoryId == crossReward!.CategoryId).ToList();
+                int configuredFreeQty = Math.Max(1, (int)crossPromotion!.DiscountValue);
+                int freeQty = Math.Min(configuredFreeQty, rewardItems.Sum(i => i.Qty));
+                decimal freeItemDiscount = rewardItems.SelectMany(i => Enumerable.Repeat(i.Price, i.Qty)).OrderByDescending(p => p).Take(freeQty).Sum();
+                totalDiscounts += freeItemDiscount;
+                appliedPromotionAmounts.Add((crossPromotion, freeItemDiscount));
+                appliedPromoNames.Add($"{crossPromotion.PromoName} (รับฟรี {freeQty} ชิ้น มูลค่า {freeItemDiscount:N2} ฿)");
             }
 
             // --- โปรโมชั่นที่ 5: Total Bill Discount (ยอดรวม >= 600 บาท ลดท้ายบิล 100 บาท) ---
             decimal currentSubtotal = (courtAmount + saleAmount + rentalAmount) - totalDiscounts;
-            bool isFirstBooking = !user.HasBooked;
-            bool promoCodeMatch = !string.IsNullOrWhiteSpace(promoCode) && promoCode.Trim().ToUpper() == "NEW_MEMBER_100";
-            if (currentSubtotal >= 600 && (isFirstBooking || promoCodeMatch))
+            var totalBillPromotion = GetPromotion("TOTAL_BILL");
+            bool isFirstBooking = !await _db.BookingSlots.AnyAsync(bs => bs.Booking.UserId == user.UserId &&
+                bs.Booking.Status != "CANCELLED" && bs.Booking.Status != "REJECTED" && bs.Booking.Status != "EXPIRED");
+            decimal minimumBill = totalBillPromotion?.MinBillAmount ?? 600m;
+            bool promoCodeMatch = string.IsNullOrWhiteSpace(promoCode) ||
+                promoCode.Trim().Equals(totalBillPromotion?.PromoCode, StringComparison.OrdinalIgnoreCase) ||
+                promoCode.Trim().Equals("PROMO_TOTAL", StringComparison.OrdinalIgnoreCase) ||
+                promoCode.Trim().Equals("NEW_MEMBER_100", StringComparison.OrdinalIgnoreCase);
+            if (totalBillPromotion != null && CanApplyPromotion(totalBillPromotion) && slotsList.Count > 0 && currentSubtotal >= minimumBill && promoCodeMatch && (!totalBillPromotion.FirstBookingOnly || isFirstBooking))
             {
-                totalDiscounts += 100m;
-                appliedPromoNames.Add("โปรฯ ส่วนลดสมาชิกใหม่/ยอดรวมบิล 600 บาทขึ้นไป (ลด 100 ฿)");
+                decimal totalBillDiscount = Math.Min(totalBillPromotion.DiscountValue, currentSubtotal);
+                totalDiscounts += totalBillDiscount;
+                appliedPromotionAmounts.Add((totalBillPromotion, totalBillDiscount));
+                appliedPromoNames.Add($"{totalBillPromotion.PromoName} (ลด {totalBillDiscount:N2} ฿)");
             }
 
             decimal netAmount = Math.Max(0m, (courtAmount + saleAmount + rentalAmount) - totalDiscounts);
@@ -420,20 +578,31 @@ public class HomeController : Controller
             string? slipUrl = null;
             if (slipFile != null && slipFile.Length > 0)
             {
+                var extension = await GetSlipImageExtensionAsync(slipFile);
+                if (extension == null)
+                    return Json(new { success = false, message = "ไฟล์สลิปต้องเป็นภาพ JPG, PNG หรือ WEBP ขนาดไม่เกิน 5 MB" });
+
                 var uploadsFolder = Path.Combine(_env.WebRootPath, "uploads", "slips");
                 if (!Directory.Exists(uploadsFolder))
                 {
                     Directory.CreateDirectory(uploadsFolder);
                 }
-                var ext = Path.GetExtension(slipFile.FileName);
-                if (string.IsNullOrEmpty(ext)) ext = ".jpg";
-                var safeFileName = $"slip_{DateTime.Now:yyyyMMdd_HHmmss}_{Guid.NewGuid().ToString("N")[..6]}{ext}";
+                var safeFileName = $"slip_{DateTime.Now:yyyyMMdd_HHmmss}_{Guid.NewGuid().ToString("N")[..12]}{extension}";
                 var filePath = Path.Combine(uploadsFolder, safeFileName);
                 using (var stream = new FileStream(filePath, FileMode.Create))
                 {
                     await slipFile.CopyToAsync(stream);
                 }
                 slipUrl = $"/uploads/slips/{safeFileName}";
+            }
+
+            foreach (var grouped in cartList.Where(i => i.Type == "SALE").GroupBy(i => (uint)i.ProductId))
+            {
+                var quantity = grouped.Sum(i => i.Qty);
+                var changedRows = await _db.Database.ExecuteSqlInterpolatedAsync(
+                    $"UPDATE products SET stock_qty = stock_qty - {quantity}, updated_at = CURRENT_TIMESTAMP WHERE product_id = {grouped.Key} AND stock_qty >= {quantity} AND (is_active = 1 OR is_active IS NULL)");
+                if (changedRows != 1)
+                    return Json(new { success = false, message = $"สินค้า {productsById[grouped.Key].ProductName} มีจำนวนไม่เพียงพอแล้ว กรุณาตรวจตะกร้าอีกครั้ง" });
             }
 
             // 6. บันทึก Booking Header ลงตาราง bookings
@@ -451,12 +620,23 @@ public class HomeController : Controller
                 RentalAmount = rentalAmount,
                 DiscountAmount = totalDiscounts,
                 NetAmount = netAmount,
-                Status = !string.IsNullOrEmpty(slipUrl) ? "PENDING_VERIFICATION" : "PENDING_PAYMENT",
+                Status = !string.IsNullOrEmpty(slipUrl) ? "PENDING_VERIFY" : "PENDING_PAYMENT",
                 CreatedAt = DateTime.Now,
                 UpdatedAt = DateTime.Now
             };
             _db.Bookings.Add(booking);
             await _db.SaveChangesAsync();
+
+            foreach (var (promotion, amount) in appliedPromotionAmounts.Where(x => x.Amount > 0))
+            {
+                _db.BookingPromotions.Add(new BookingPromotion
+                {
+                    BookingId = booking.BookingId,
+                    PromotionId = promotion.PromotionId,
+                    DiscountAmount = amount,
+                    Detail = promotion.PromoName
+                });
+            }
 
             // 7. บันทึก BookingSlots
             foreach (var s in slotsList)
@@ -490,16 +670,6 @@ public class HomeController : Controller
                 };
                 _db.BookingItems.Add(bItem);
 
-                // ตัดสต็อกสินค้าในกรณีที่เป็นสินค้าขาย (SALE)
-                if (itm.Type == "SALE")
-                {
-                    var prod = await _db.Products.FindAsync((uint)itm.ProductId);
-                    if (prod != null)
-                    {
-                        prod.StockQty = Math.Max(0, prod.StockQty - itm.Qty);
-                        prod.UpdatedAt = DateTime.Now;
-                    }
-                }
             }
 
             // 9. บันทึก Payment
@@ -517,10 +687,11 @@ public class HomeController : Controller
             }
 
             // อัปเดตสถานะ HasBooked ของผู้ใช้
-            user.HasBooked = true;
+            if (slotsList.Count > 0) user.HasBooked = true;
             user.UpdatedAt = DateTime.Now;
 
             await _db.SaveChangesAsync();
+            await transaction.CommitAsync();
 
             return Json(new
             {
@@ -532,7 +703,7 @@ public class HomeController : Controller
                 appliedPromos = appliedPromoNames,
                 status = booking.Status,
                 statusText = !string.IsNullOrEmpty(slipUrl) ? "รอฝ่ายบัญชีตรวจสอบสลิป" : "รอชำระเงิน",
-                slipUrl = slipUrl,
+                slipUrl = string.IsNullOrEmpty(slipUrl) ? null : Url.Action(nameof(ViewSlip), new { bookingCode = booking.BookingCode }),
                 message = "บันทึกการจองและคำนวณส่วนลดโปรโมชั่นสำเร็จเรียบร้อย!"
             });
         }
@@ -568,20 +739,26 @@ public class HomeController : Controller
             return Json(new { success = false, message = $"ไม่พบข้อมูลการจองสำหรับ '{code}'" });
         }
 
+        if (!uint.TryParse(HttpContext.Session.GetString("UserId"), out var trackingUserId) || b.UserId != trackingUserId)
+            return Json(new { success = false, requireLogin = true, message = "กรุณาเข้าสู่ระบบด้วยบัญชีเจ้าของรายการเพื่อดูรายละเอียดและสถานะ" });
+
         int step = 1; // 1: ยื่นจอง, 2: แนบสลิป, 3: บัญชียืนยัน, 4: เช็คอินเข้าสนาม
+        bool hasCourtBooking = b.BookingSlots.Any();
         string statusText = "รอชำระเงิน";
         string badgeClass = "bg-warning text-dark";
 
         switch (b.Status?.ToUpper())
         {
-            case "PENDING_VERIFICATION":
+            case "PENDING_VERIFY":
                 step = 2;
                 statusText = "รอฝ่ายบัญชีตรวจสอบสลิป";
                 badgeClass = "bg-warning text-dark";
                 break;
             case "CONFIRMED":
                 step = 3;
-                statusText = "ฝ่ายบัญชีอนุมัติแล้ว (คิวยืนยันเรียบร้อย)";
+                statusText = hasCourtBooking
+                    ? "อนุมัติการชำระเงินแล้ว (ยืนยันคิวสนามเรียบร้อย)"
+                    : "อนุมัติการชำระเงินแล้ว (รอรับสินค้า/อุปกรณ์)";
                 badgeClass = "bg-success text-white";
                 break;
             case "CHECKED_IN":
@@ -608,24 +785,32 @@ public class HomeController : Controller
 
         var latestPayment = b.Payments.OrderByDescending(p => p.PaymentId).FirstOrDefault();
 
+        // Privacy masking: ถ้าผู้ค้นหาไม่ใช่เจ้าของการจอง จะปิดบังข้อมูลส่วนตัว
+        bool isOwner = true;
+
+        string displayName = b.User?.FullName ?? "คุณลูกค้า";
+        string displayPhone = b.User?.Phone ?? "-";
         return Json(new
         {
             success = true,
             bookingCode = b.BookingCode,
             playDate = b.PlayDate.ToString("dd/MM/yyyy"),
-            customerName = b.User?.FullName ?? "คุณลูกค้า",
-            customerPhone = b.User?.Phone ?? "-",
+            customerName = displayName,
+            customerPhone = displayPhone,
             courtAmount = b.CourtAmount,
             saleAmount = b.SaleAmount,
             rentalAmount = b.RentalAmount,
             discountAmount = b.DiscountAmount,
             netAmount = b.NetAmount,
             status = b.Status,
+            hasCourtBooking = hasCourtBooking,
             statusText = statusText,
             badgeClass = badgeClass,
             step = step,
-            slipUrl = latestPayment?.SlipImageUrl,
+            slipUrl = latestPayment == null || string.IsNullOrEmpty(latestPayment.SlipImageUrl)
+                ? null : Url.Action(nameof(ViewSlip), new { bookingCode = b.BookingCode }),
             createdAt = b.CreatedAt.ToString("dd/MM/yyyy HH:mm"),
+            isOwner = isOwner,
             courts = b.BookingSlots.Select(s => new {
                 courtName = s.Court?.CourtName ?? $"Court {s.CourtId}",
                 timeRange = s.Slot != null ? $"{s.Slot.StartTime:HH:mm} - {s.Slot.EndTime:HH:mm}" : $"Slot #{s.SlotId}",
@@ -641,15 +826,64 @@ public class HomeController : Controller
         });
     }
 
+    [HttpGet]
+    public async Task<IActionResult> ViewSlip(string bookingCode)
+    {
+        if (!uint.TryParse(HttpContext.Session.GetString("UserId"), out var currentUserId))
+            return Unauthorized();
+
+        var booking = await _db.Bookings.Include(b => b.Payments)
+            .FirstOrDefaultAsync(b => b.BookingCode == bookingCode);
+        if (booking == null) return NotFound();
+
+        var user = await _db.Users.Include(u => u.Role).FirstOrDefaultAsync(u => u.UserId == currentUserId);
+        bool isOwner = booking.UserId == currentUserId;
+        bool isAuthorizedStaff = user?.Role?.RoleCode is "ACCOUNTING" or "ADMIN";
+        if (!isOwner && !isAuthorizedStaff) return Forbid();
+
+        var slipPath = booking.Payments.OrderByDescending(p => p.PaymentId)
+            .Select(p => p.SlipImageUrl).FirstOrDefault(path => !string.IsNullOrWhiteSpace(path));
+        if (string.IsNullOrWhiteSpace(slipPath)) return NotFound();
+
+        var extension = Path.GetExtension(slipPath).ToLowerInvariant();
+        var contentType = extension switch
+        {
+            ".jpg" or ".jpeg" => "image/jpeg",
+            ".png" => "image/png",
+            ".webp" => "image/webp",
+            _ => null
+        };
+        if (contentType == null) return NotFound();
+
+        var fileName = Path.GetFileName(slipPath);
+        var fullPath = Path.Combine(_env.WebRootPath, "uploads", "slips", fileName);
+        if (!System.IO.File.Exists(fullPath)) return NotFound();
+
+        Response.Headers.CacheControl = "no-store, private";
+        return PhysicalFile(fullPath, contentType);
+    }
+
     // ============================================================
     // CUSTOMER: อัปโหลดสลิปเพิ่มเติมสำหรับรายการจองที่มีอยู่แล้ว
     // ============================================================
     [HttpPost]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> UploadBookingSlip(string bookingCode, IFormFile slipFile)
     {
+        if (!uint.TryParse(HttpContext.Session.GetString("UserId"), out var currentUserId))
+        {
+            return Json(new { success = false, requireLogin = true, message = "กรุณาเข้าสู่ระบบก่อนแนบสลิป" });
+        }
+
         if (slipFile == null || slipFile.Length == 0)
         {
             return Json(new { success = false, message = "กรุณาเลือกไฟล์สลิปโอนเงิน" });
+        }
+
+        var extension = await GetSlipImageExtensionAsync(slipFile);
+        if (extension == null)
+        {
+            return Json(new { success = false, message = "รองรับไฟล์ภาพ JPG, PNG หรือ WEBP ขนาดไม่เกิน 5 MB" });
         }
 
         var b = await _db.Bookings
@@ -661,11 +895,14 @@ public class HomeController : Controller
             return Json(new { success = false, message = "ไม่พบรายการจองนี้ในระบบ" });
         }
 
+        if (b.UserId != currentUserId)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden);
+        }
+
         var uploadsFolder = Path.Combine(_env.WebRootPath, "uploads", "slips");
         if (!Directory.Exists(uploadsFolder)) Directory.CreateDirectory(uploadsFolder);
-        var ext = Path.GetExtension(slipFile.FileName);
-        if (string.IsNullOrEmpty(ext)) ext = ".jpg";
-        var safeName = $"slip_{b.BookingCode}_{DateTime.Now:yyyyMMdd_HHmmss}_{Guid.NewGuid().ToString("N")[..4]}{ext}";
+        var safeName = $"slip_{b.BookingCode}_{DateTime.Now:yyyyMMdd_HHmmss}_{Guid.NewGuid().ToString("N")[..12]}{extension}";
         var path = Path.Combine(uploadsFolder, safeName);
         using (var stream = new FileStream(path, FileMode.Create))
         {
@@ -694,11 +931,26 @@ public class HomeController : Controller
             _db.Payments.Add(payment);
         }
 
-        b.Status = "PENDING_VERIFICATION";
+        b.Status = "PENDING_VERIFY";
         b.UpdatedAt = DateTime.Now;
         await _db.SaveChangesAsync();
 
-        return Json(new { success = true, message = "อัปโหลดสลิปเรียบร้อย! ส่งเรื่องให้ฝ่ายบัญชีตรวจสอบแล้ว", slipUrl });
+        return Json(new { success = true, message = "อัปโหลดสลิปเรียบร้อย! ส่งเรื่องให้ฝ่ายบัญชีตรวจสอบแล้ว", slipUrl = Url.Action(nameof(ViewSlip), new { bookingCode = b.BookingCode }) });
+    }
+
+    private static async Task<string?> GetSlipImageExtensionAsync(IFormFile file)
+    {
+        if (file.Length <= 0 || file.Length > 5 * 1024 * 1024) return null;
+
+        var header = new byte[12];
+        await using var stream = file.OpenReadStream();
+        var read = await stream.ReadAsync(header.AsMemory(0, header.Length));
+
+        if (read >= 3 && header[0] == 0xFF && header[1] == 0xD8 && header[2] == 0xFF) return ".jpg";
+        if (read >= 8 && header.AsSpan(0, 8).SequenceEqual(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A })) return ".png";
+        if (read >= 12 && header[0] == 'R' && header[1] == 'I' && header[2] == 'F' && header[3] == 'F' &&
+            header[8] == 'W' && header[9] == 'E' && header[10] == 'B' && header[11] == 'P') return ".webp";
+        return null;
     }
 
     // ============================================================
@@ -718,8 +970,49 @@ public class HomeController : Controller
                               .Select(bs => $"{bs.CourtId}_{bs.SlotId}")
                               .Distinct()
                               .ToListAsync();
+        var walkInBooked = await _db.WalkInQueues
+            .Where(q => q.QueueDate == targetDate && q.Status != "CANCELLED" &&
+                q.CourtId.HasValue && q.SlotId.HasValue)
+            .Select(q => $"{q.CourtId}_{q.SlotId}")
+            .ToListAsync();
+        booked.AddRange(walkInBooked);
 
-        return Json(new { success = true, bookedSlots = booked });
+        var dayStart = targetDate.ToDateTime(TimeOnly.MinValue);
+        var dayEnd = targetDate.AddDays(1).ToDateTime(TimeOnly.MinValue);
+        var closedCourtIds = await _db.Courts
+            .Where(c => c.Status != "AVAILABLE")
+            .Select(c => c.CourtId)
+            .ToListAsync();
+        if (closedCourtIds.Count > 0)
+        {
+            var activeSlotIds = await _db.TimeSlots
+                .Where(s => s.IsActive == true || s.IsActive == null)
+                .Select(s => s.SlotId)
+                .ToListAsync();
+            foreach (var courtId in closedCourtIds)
+            foreach (var slotId in activeSlotIds)
+                booked.Add($"{courtId}_{slotId}");
+        }
+
+        var activeBlocks = await _db.CourtBlocks
+            .Where(b => b.BlockStart < dayEnd && b.BlockEnd > dayStart)
+            .ToListAsync();
+        if (activeBlocks.Count > 0)
+        {
+            var activeSlots = await _db.TimeSlots
+                .Where(s => s.IsActive == true || s.IsActive == null)
+                .ToListAsync();
+            foreach (var block in activeBlocks)
+            foreach (var slot in activeSlots)
+            {
+                var slotStart = targetDate.ToDateTime(slot.StartTime);
+                var slotEnd = targetDate.ToDateTime(slot.EndTime);
+                if (block.BlockStart < slotEnd && block.BlockEnd > slotStart)
+                    booked.Add($"{block.CourtId}_{slot.SlotId}");
+            }
+        }
+
+        return Json(new { success = true, bookedSlots = booked.Distinct().ToList() });
     }
 
     // Helper classes for input deserialization
@@ -742,6 +1035,7 @@ public class HomeController : Controller
         public decimal Price { get; set; }
     }
 
+    [RequireRole("ADMIN")]
     public async Task<IActionResult> Admin()
     {
         ViewData["Title"] = "แดชบอร์ดภาพรวมระบบ";
@@ -772,7 +1066,7 @@ public class HomeController : Controller
 
         vm.TotalBookings = allBookings.Count;
         vm.BookingsThisMonth = allBookings.Count(b => b.PlayDate >= firstDayOfMonthDateOnly);
-        vm.PendingBookings = allBookings.Count(b => b.Status == "PENDING_VERIFICATION");
+        vm.PendingBookings = allBookings.Count(b => b.Status == "PENDING_VERIFY");
 
         // 4. Revenue
         var confirmedBookings = allBookings.Where(b => b.Status == "CONFIRMED" || b.Status == "CHECKED_IN" || b.Status == "COMPLETED").ToList();
@@ -784,7 +1078,7 @@ public class HomeController : Controller
         var allProducts = await _db.Products.ToListAsync();
         vm.TotalProducts = allProducts.Count;
         vm.LowStockProducts = allProducts.Count(p => p.StockQty <= 5);
-        vm.PendingIssues = await _db.CourtIssues.CountAsync(i => i.Status == "PENDING" || i.Status == "IN_PROGRESS");
+        vm.PendingIssues = await _db.CourtIssues.CountAsync(i => i.Status == "OPEN" || i.Status == "IN_PROGRESS");
 
         // 6. Recent Bookings
         vm.RecentBookings = allBookings.OrderByDescending(b => b.CreatedAt).Take(5).ToList();

@@ -4,6 +4,8 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Runtime uploads are user data; adding a slip must not restart dotnet watch. -->
+    <DotNetWatchContentFiles>false</DotNetWatchContentFiles>
   </PropertyGroup>
 
   <ItemGroup>

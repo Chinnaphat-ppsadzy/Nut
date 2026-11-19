@@ -72,24 +72,6 @@
     .bg-purple    { background-color: #eadeffff !important; }
 </style>
 
-@* แสดง Success/Error Message *@
-@if (TempData["SuccessMessage"] != null)
-{
-    <div class="alert alert-success alert-dismissible fade show mb-4" role="alert" id="alertSuccess">
-        <i class="bi bi-check-circle-fill me-2"></i>
-        @TempData["SuccessMessage"]
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    </div>
-}
-@if (TempData["ErrorMessage"] != null)
-{
-    <div class="alert alert-danger alert-dismissible fade show mb-4" role="alert">
-        <i class="bi bi-exclamation-triangle-fill me-2"></i>
-        @TempData["ErrorMessage"]
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    </div>
-}
-
 @* แสดงข้อมูลผู้ใช้ที่ล็อกอินอยู่ *@
 @if (Model.IsLoggedIn && !string.IsNullOrEmpty(Model.LoggedInUsername))
 {

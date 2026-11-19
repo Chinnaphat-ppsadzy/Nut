@@ -1448,6 +1448,25 @@ public partial class Csi402dbContext : DbContext
             entity.Property(e => e.QueueNo)
                 .HasComment("เธฅเธณเธเธฑเธเธเธดเธงเธเธญเธเธงเธฑเธ")
                 .HasColumnName("queue_no");
+            entity.Property(e => e.CourtFee)
+                .HasPrecision(10, 2)
+                .HasDefaultValue(0m)
+                .HasColumnName("court_fee");
+            entity.Property(e => e.PaymentStatus)
+                .HasDefaultValueSql("'UNPAID'")
+                .HasColumnType("enum('UNPAID','PENDING_VERIFY','REJECTED','PAID')")
+                .HasColumnName("payment_status");
+            entity.Property(e => e.PaymentMethod)
+                .HasMaxLength(20)
+                .HasColumnName("payment_method");
+            entity.Property(e => e.SlipImageUrl)
+                .HasMaxLength(255)
+                .HasColumnName("slip_image_url");
+            entity.Property(e => e.PaidAt)
+                .HasColumnType("datetime")
+                .HasColumnName("paid_at");
+            entity.Property(e => e.PaidBy)
+                .HasColumnName("paid_by");
             entity.Property(e => e.SlotId)
                 .HasComment("FK -> time_slots.slot_id")
                 .HasColumnName("slot_id");

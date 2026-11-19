@@ -4,6 +4,7 @@ using Chinnaphat_8272_L005.ViewModels;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Http;
 using System.Net;
+using Chinnaphat_8272_L005.Helpers;
 
 namespace Chinnaphat_8272_L005.Controllers
 {
@@ -34,12 +35,9 @@ namespace Chinnaphat_8272_L005.Controllers
             if (ModelState.IsValid)
             {
                 // READ — ค้นหา User จากฐานข้อมูลด้วย Email และ Password
-                var user = (from u in _db.Users
-                            where u.Email == model.Email
-                               && u.PasswordHash == model.Password
-                            select u).FirstOrDefault();
-
-                if (user == null)
+                var user = _db.Users.FirstOrDefault(u => u.Email == model.Email);
+                bool passwordUpgraded = false;
+                if (user == null || !PasswordSecurity.VerifyAndUpgrade(user, model.Password, out passwordUpgraded))
                 {
                     ViewBag.ErrorMessage = "อีเมลหรือรหัสผ่านไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง";
                     ViewData["Title"] = "เข้าสู่ระบบ";
@@ -182,7 +180,7 @@ namespace Chinnaphat_8272_L005.Controllers
                 {
                     RoleId       = roleId,
                     Email        = model.Email,
-                    PasswordHash = model.Password,
+                    PasswordHash = string.Empty,
                     FullName     = $"{model.FirstName} {model.LastName}",
                     Phone        = model.Phone,
                     Status       = "active",
@@ -191,6 +189,7 @@ namespace Chinnaphat_8272_L005.Controllers
                     UpdatedAt    = DateTime.Now
                 };
 
+                newUser.PasswordHash = PasswordSecurity.Hash(newUser, model.Password);
                 _db.Users.Add(newUser);
                 _db.SaveChanges();
 
@@ -245,6 +244,7 @@ namespace Chinnaphat_8272_L005.Controllers
         // ============================================================
 
         [HttpGet]
+        [RequireRole("ADMIN")]
         public IActionResult AddUser()
         {
             ViewData["Title"] = "เพิ่มผู้ใช้งาน";
@@ -255,6 +255,7 @@ namespace Chinnaphat_8272_L005.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [RequireRole("ADMIN")]
         public IActionResult AddUser(AddUserViewModel model)
         {
             EnsureRolesExist();
@@ -291,7 +292,7 @@ namespace Chinnaphat_8272_L005.Controllers
                     {
                         RoleId       = roleId,
                         Email        = model.Email.Trim(),
-                        PasswordHash = model.Password,
+                        PasswordHash = string.Empty,
                         FullName     = $"{model.FirstName?.Trim()} {model.LastName?.Trim()}".Trim(),
                         Phone        = model.Phone?.Trim(),
                         Status       = model.IsActive ? "ACTIVE" : "INACTIVE",
@@ -300,6 +301,7 @@ namespace Chinnaphat_8272_L005.Controllers
                         UpdatedAt    = DateTime.Now
                     };
 
+                    newUser.PasswordHash = PasswordSecurity.Hash(newUser, model.Password);
                     _db.Users.Add(newUser);
                     _db.SaveChanges();
 
@@ -322,6 +324,7 @@ namespace Chinnaphat_8272_L005.Controllers
         // USER LIST — READ: ดึงรายชื่อผู้ใช้ทั้งหมดจากฐานข้อมูล
         // ============================================================
 
+        [RequireRole("ADMIN")]
         public IActionResult UserList()
         {
             ViewData["Title"] = "รายชื่อผู้ใช้งาน";
@@ -364,6 +367,7 @@ namespace Chinnaphat_8272_L005.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [RequireRole("ADMIN")]
         public async Task<IActionResult> DeleteUser(int id)
         {
             try
@@ -493,6 +497,7 @@ namespace Chinnaphat_8272_L005.Controllers
         // ============================================================
 
         [HttpGet]
+        [RequireRole("ADMIN")]
         public IActionResult EditUser(int id)
         {
             ViewData["Title"] = "แก้ไขผู้ใช้งาน";
@@ -531,6 +536,7 @@ namespace Chinnaphat_8272_L005.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [RequireRole("ADMIN")]
         public IActionResult EditUser(int id, EditUserViewModel model)
         {
             EnsureRolesExist();
@@ -562,7 +568,7 @@ namespace Chinnaphat_8272_L005.Controllers
 
                     // UPDATE Password เฉพาะเมื่อกรอกมาเท่านั้น
                     if (!string.IsNullOrEmpty(model.Password))
-                        user.PasswordHash = model.Password;
+                        user.PasswordHash = PasswordSecurity.Hash(user, model.Password);
 
                     try
                     {
@@ -707,7 +713,7 @@ namespace Chinnaphat_8272_L005.Controllers
                 string sBadge = "bg-warning text-dark";
                 switch (b.Status?.ToUpper())
                 {
-                    case "PENDING_VERIFICATION":
+                    case "PENDING_VERIFY":
                         sText = "รอฝ่ายบัญชีตรวจสอบสลิป";
                         sBadge = "bg-warning text-dark";
                         break;
@@ -742,7 +748,8 @@ namespace Chinnaphat_8272_L005.Controllers
                     Status = b.Status,
                     StatusText = sText,
                     StatusBadgeClass = sBadge,
-                    SlipImageUrl = b.Payments.OrderByDescending(p => p.PaymentId).FirstOrDefault()?.SlipImageUrl,
+                    SlipImageUrl = b.Payments.Any(p => !string.IsNullOrEmpty(p.SlipImageUrl))
+                        ? Url.Action("ViewSlip", "Home", new { bookingCode = b.BookingCode }) : null,
                     CreatedAt = b.CreatedAt
                 });
 

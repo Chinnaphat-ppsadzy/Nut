@@ -124,6 +124,13 @@
                     ดูสถานะการจอง
                 </a>
 
+                <!-- ประวัติการจองของสมาชิก -->
+                <a href="/Home/Customer?section=mybookings"
+                   class="btn @(curSection == "mybookings" ? "btn-success" : "btn-light") w-100 text-start mb-2">
+                    <i class="bi bi-journal-check me-2 text-success"></i>
+                    ประวัติการจองของฉัน
+                </a>
+
                 <!-- โปรโมชั่น -->
                 <a href="javascript:void(0)"
                    onclick="if(typeof showPromoInfo==='function'){showPromoInfo();}else{window.location.href='/Home/Customer?showpromo=1';}"
@@ -197,7 +204,6 @@
                         <span class="fw-bold text-dark fs-6">
                             @ViewData["Title"]
                         </span>
-                        <span class="badge bg-success-subtle text-success ms-2 font-monospace d-none d-sm-inline-block">หน้าระบบลูกค้า (Customer Portal)</span>
                     </div>
 
                     <div class="d-flex align-items-center gap-3">
@@ -215,9 +221,6 @@
                                 </div>
                             </a>
 
-                            <a asp-action="Logout" asp-controller="User" class="btn btn-sm btn-outline-danger px-2" title="ออกจากระบบ" style="border-radius:8px;">
-                                <i class="bi bi-box-arrow-right me-1"></i><span class="d-none d-md-inline">ออกจากระบบ</span>
-                            </a>
                         }
                         else
                         {
@@ -228,12 +231,6 @@
                                     <small class="text-muted" style="font-size:0.75rem;">ยังไม่ได้เข้าสู่ระบบ</small>
                                 </div>
                             </div>
-                            <a asp-action="Login" asp-controller="User" class="btn btn-sm btn-outline-success fw-semibold" style="border-radius:8px;">
-                                <i class="bi bi-box-arrow-in-right me-1"></i> เข้าสู่ระบบ
-                            </a>
-                            <a asp-action="Register" asp-controller="User" class="btn btn-sm btn-success fw-semibold" style="border-radius:8px;">
-                                สมัครสมาชิก
-                            </a>
                         }
                     </div>
 

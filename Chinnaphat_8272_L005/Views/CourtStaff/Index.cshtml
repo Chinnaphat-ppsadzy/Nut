@@ -1,8 +1,7 @@
 @using Chinnaphat_8272_L005.Models
-@using Chinnaphat_8272_L005.Controllers
 @{
     Layout = "_CourtStaffLayout";
-    ViewData["Title"] = "ตารางการจองประจำวัน & ควบคุมไฟ/พัดลม";
+    ViewData["Title"] = "ตารางการจองคอร์ทประจำวัน";
 
     string selectedDateStr = ViewBag.SelectedDate as string ?? DateTime.Today.ToString("yyyy-MM-dd");
     DateTime selectedDate = DateTime.TryParse(selectedDateStr, out var d) ? d : DateTime.Today;
@@ -10,8 +9,8 @@
     var courts = ViewBag.Courts as List<Court> ?? new();
     var timeSlots = ViewBag.TimeSlots as List<TimeSlot> ?? new();
     var bookings = ViewBag.BookingsToday as List<Booking> ?? new();
+    var scheduledWalkIns = ViewBag.ScheduledWalkIns as List<WalkInQueue> ?? new();
     var activeBlocks = ViewBag.ActiveBlocks as List<CourtBlock> ?? new();
-    var amenities = ViewBag.Amenities as Dictionary<ushort, CourtAmenityState> ?? new();
 
     int totalBookings = ViewBag.TotalBookingsCount ?? 0;
     int checkedInCount = ViewBag.CheckedInCount ?? 0;
@@ -24,19 +23,19 @@
 
 <style>
     .timeline-slot {
-        height: 62px;
-        min-width: 90px;
+        height: 76px;
+        min-width: 112px;
+        width: 112px;
         font-size: 0.78rem;
-        padding: 4px 6px;
+        padding: 7px 8px;
         border: 1px solid #e2e8f0;
         cursor: pointer;
         transition: all 0.15s;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
+        vertical-align: middle;
         text-align: center;
         position: relative;
+        line-height: 1.25;
+        overflow: hidden;
     }
     .timeline-slot:hover {
         filter: brightness(0.95);
@@ -65,18 +64,27 @@
         color: #64748b;
         border-color: #cbd5e1;
     }
+    .slot-walkin {
+        background-color: #cffafe;
+        color: #155e75;
+        border-color: #67e8f9;
+    }
     .slot-blocked {
         background-color: #fee2e2;
         color: #991b1b;
         border-color: #fecaca;
     }
-    .court-switch-card {
-        border-radius: 16px;
-        transition: transform 0.2s, box-shadow 0.2s;
-    }
-    .court-switch-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 10px 25px rgba(0,0,0,0.08) !important;
+    .timeline-matrix { min-width: max-content; }
+    .timeline-matrix thead th { position: sticky; top: 0; z-index: 3; white-space: nowrap; }
+    .timeline-matrix .timeline-court-cell { position: sticky; left: 0; z-index: 2; min-width: 130px; background: #fff; }
+    .timeline-matrix thead th:first-child { left: 0; z-index: 4; }
+    .timeline-slot .slot-main { display: block; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .timeline-slot .slot-meta { display: block; margin-top: 4px; font-size: .67rem; color: inherit; opacity: .82; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .timeline-slot.slot-available { cursor: pointer; }
+    .timeline-slot.slot-available .walkin-action { display: inline-flex; align-items: center; gap: 4px; margin-top: 5px; padding: 3px 8px; border: 1px solid #a7f3d0; border-radius: 999px; background: #fff; color: #087443; font-size: .68rem; font-weight: 600; }
+    .timeline-slot.slot-available:hover .walkin-action { background: #087443; color: #fff; }
+    @@media (max-width: 768px) {
+        .timeline-slot { min-width: 104px; width: 104px; height: 70px; padding: 5px; }
     }
 </style>
 
@@ -199,90 +207,6 @@
 </div>
 
 <!-- ============================================================
-     COURT AMENITIES CONTROL BOARD (แผงควบคุมไฟและพัดลมประจำคอร์ท)
-     ============================================================ -->
-<div class="card border-0 shadow-sm mb-4" style="border-radius:18px; overflow:hidden;">
-    <div class="p-3 text-white d-flex justify-content-between align-items-center flex-wrap gap-2" style="background: linear-gradient(135deg, #1a472a 0%, #2d6a4f 60%, #52b788 100%);">
-        <div>
-            <span class="badge bg-white text-success fw-bold mb-1"><i class="bi bi-lightning-charge-fill me-1"></i> Arena Automation</span>
-            <h5 class="fw-bold mb-0">แผงควบคุมระบบไฟส่องสว่าง & พัดลมระบายอากาศประจำคอร์ท</h5>
-        </div>
-        <div class="small text-white-50">
-            <i class="bi bi-info-circle me-1"></i> เมื่อกด Check-in ระบบจะเปิดไฟและพัดลมของคอร์ทนั้นอัตโนมัติ
-        </div>
-    </div>
-
-    <div class="card-body p-4 bg-light">
-        <div class="row g-3">
-            @foreach (var court in courts)
-            {
-                var state = amenities.ContainsKey(court.CourtId) ? amenities[court.CourtId] : new CourtAmenityState();
-                bool isBlocked = activeBlocks.Any(b => b.CourtId == court.CourtId);
-
-                <div class="col-md-6 col-xl-3">
-                    <div class="card border-0 shadow-sm h-100 court-switch-card bg-white" id="court_card_@court.CourtId">
-                        <div class="card-body p-3">
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <h6 class="fw-bold text-dark mb-0 d-flex align-items-center">
-                                    <span class="badge bg-dark me-2">@court.CourtName</span>
-                                    <small class="text-muted fw-normal">@court.Description</small>
-                                </h6>
-                                @if (isBlocked || court.Status == "MAINTENANCE")
-                                {
-                                    <span class="badge bg-danger-subtle text-danger border border-danger">ซ่อมบำรุง</span>
-                                }
-                                else
-                                {
-                                    <span class="badge bg-success-subtle text-success border border-success">พร้อมบริการ</span>
-                                }
-                            </div>
-
-                            <hr class="my-2 opacity-25" />
-
-                            <!-- สวิตช์ไฟส่องสว่าง (Lights) -->
-                            <div class="d-flex justify-content-between align-items-center mb-2 p-2 rounded-3 bg-light">
-                                <div class="d-flex align-items-center gap-2">
-                                    <div class="rounded-circle d-flex align-items-center justify-content-center @(state.LightsOn ? "bg-warning text-dark glow-light" : "bg-secondary text-white")" style="width:34px; height:34px; font-size:1.1rem;" id="light_icon_@court.CourtId">
-                                        <i class="bi bi-lightbulb-fill"></i>
-                                    </div>
-                                    <div>
-                                        <div class="fw-bold small lh-1">ไฟสนาม BWF</div>
-                                        <small class="text-muted" id="light_text_@court.CourtId" style="font-size:0.72rem;">
-                                            @(state.LightsOn ? "เปิดอยู่ (ON)" : "ปิด (OFF)")
-                                        </small>
-                                    </div>
-                                </div>
-                                <button type="button" class="btn btn-sm @(state.LightsOn ? "btn-warning text-dark fw-bold" : "btn-outline-secondary")" id="btn_light_@court.CourtId" onclick="toggleAmenity(@court.CourtId, 'light')">
-                                    <i class="bi bi-power me-1"></i> <span id="btn_light_text_@court.CourtId">@(state.LightsOn ? "ปิดไฟ" : "เปิดไฟ")</span>
-                                </button>
-                            </div>
-
-                            <!-- สวิตช์พัดลมระบายอากาศ (Fans) -->
-                            <div class="d-flex justify-content-between align-items-center p-2 rounded-3 bg-light">
-                                <div class="d-flex align-items-center gap-2">
-                                    <div class="rounded-circle d-flex align-items-center justify-content-center @(state.FansOn ? "bg-primary text-white glow-fan" : "bg-secondary text-white")" style="width:34px; height:34px; font-size:1.1rem;" id="fan_icon_@court.CourtId">
-                                        <i class="bi bi-fan @(state.FansOn ? "fan-spinning" : "")"></i>
-                                    </div>
-                                    <div>
-                                        <div class="fw-bold small lh-1">พัดลมระบายอากาศ</div>
-                                        <small class="text-muted" id="fan_text_@court.CourtId" style="font-size:0.72rem;">
-                                            @(state.FansOn ? "ทำงานอยู่ (ON)" : "ปิด (OFF)")
-                                        </small>
-                                    </div>
-                                </div>
-                                <button type="button" class="btn btn-sm @(state.FansOn ? "btn-primary fw-bold" : "btn-outline-secondary")" id="btn_fan_@court.CourtId" onclick="toggleAmenity(@court.CourtId, 'fan')">
-                                    <i class="bi bi-power me-1"></i> <span id="btn_fan_text_@court.CourtId">@(state.FansOn ? "ปิดพัดลม" : "เปิดพัดลม")</span>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            }
-        </div>
-    </div>
-</div>
-
-<!-- ============================================================
      DAILY TIMETABLE GRID (ตารางช่วงเวลาคอร์ทแบบ Matrix)
      ============================================================ -->
 <div class="card border-0 shadow-sm mb-4" style="border-radius:18px; overflow:hidden;">
@@ -295,12 +219,13 @@
             <span class="badge slot-confirmed px-2 py-1"><i class="bi bi-circle-fill me-1 text-warning"></i> ยืนยันแล้ว (รอเช็คอิน)</span>
             <span class="badge slot-checkedin px-2 py-1"><i class="bi bi-circle-fill me-1 text-primary"></i> เช็คอินแล้ว (กำลังเล่น)</span>
             <span class="badge slot-completed px-2 py-1"><i class="bi bi-circle-fill me-1 text-secondary"></i> เล่นเสร็จสิ้น</span>
+            <span class="badge slot-walkin px-2 py-1"><i class="bi bi-circle-fill me-1 text-info"></i> Walk-in ระบุคอร์ท/เวลาแล้ว</span>
             <span class="badge slot-blocked px-2 py-1"><i class="bi bi-circle-fill me-1 text-danger"></i> ปิดซ่อมบำรุง</span>
         </div>
     </div>
 
     <div class="table-responsive">
-        <table class="table table-bordered mb-0 align-middle">
+        <table class="table table-bordered mb-0 align-middle timeline-matrix">
             <thead class="table-dark" style="background: linear-gradient(135deg, #1a472a 0%, #2d6a4f 100%);">
                 <tr class="small text-center">
                     <th style="min-width:130px; width:130px;">สนาม / ช่วงเวลา</th>
@@ -316,7 +241,7 @@
                 @foreach (var court in courts)
                 {
                     <tr>
-                        <td class="fw-bold bg-white text-center align-middle border-end">
+                        <td class="fw-bold text-center align-middle border-end timeline-court-cell">
                             <span class="badge bg-dark fs-6 d-block mb-1">@court.CourtName</span>
                             <small class="text-muted d-block" style="font-size:0.75rem;">@court.PricePerHour.ToString("N0") ฿/ชม.</small>
                         </td>
@@ -331,8 +256,10 @@
 
                             // 2. ตรวจสอบการจอง
                             var bookedSlot = bookings
+                                .Where(b => b.Status != "CANCELLED" && b.Status != "REJECTED" && b.Status != "EXPIRED")
                                 .SelectMany(b => b.BookingSlots, (b, bs) => new { Booking = b, Slot = bs })
                                 .FirstOrDefault(x => x.Slot.CourtId == court.CourtId && x.Slot.SlotId == slot.SlotId);
+                            var walkInSlot = scheduledWalkIns.FirstOrDefault(q => q.CourtId == court.CourtId && q.SlotId == slot.SlotId);
 
                             if (block != null)
                             {
@@ -342,11 +269,25 @@
                                     <small class="text-muted text-truncate" style="font-size:0.68rem; max-width:90px;">@block.Reason</small>
                                 </td>
                             }
+                            else if (bookedSlot != null && walkInSlot != null)
+                            {
+                                <td class="timeline-slot slot-blocked" title="พบรายการจองซ้ำ: @bookedSlot.Booking.BookingCode และ Walk-in W-@walkInSlot.QueueNo.ToString("D2")">
+                                    <i class="bi bi-exclamation-triangle-fill fs-6"></i>
+                                    <div class="fw-bold">รายการชนกัน</div>
+                                    <small class="text-truncate w-100">@bookedSlot.Booking.BookingCode / W-@walkInSlot.QueueNo.ToString("D2")</small>
+                                </td>
+                            }
                             else if (bookedSlot != null)
                             {
                                 var b = bookedSlot.Booking;
                                 string slotClass = "slot-confirmed";
-                                string statusBadgeText = "ยืนยันแล้ว";
+                                string statusBadgeText = b.Status switch
+                                {
+                                    "PENDING_PAYMENT" => "รอชำระเงิน",
+                                    "PENDING_VERIFY" => "รอตรวจสลิป",
+                                    "CONFIRMED" => "ยืนยันแล้ว",
+                                    _ => "จองแล้ว"
+                                };
 
                                 if (b.Status == "CHECKED_IN" || b.Status == "IN_USE")
                                 {
@@ -359,7 +300,7 @@
                                     statusBadgeText = "เสร็จสิ้น";
                                 }
 
-                                <td class="timeline-slot @slotClass" onclick="openBookingDetailModal('@b.BookingId', '@b.BookingCode', '@(b.User?.FullName ?? "ลูกค้า")', '@(b.User?.Phone ?? "-")', '@b.Status', '@b.PlayDate.ToString("dd/MM/yyyy")', '@court.CourtName', '@slot.StartTime.ToString("HH:mm") - @slot.EndTime.ToString("HH:mm")')">
+                                <td class="timeline-slot @slotClass" title="@b.BookingCode · @(b.User?.FullName ?? "ลูกค้า") · @slot.StartTime.ToString("HH:mm")-@slot.EndTime.ToString("HH:mm")" onclick="openBookingDetailModal('@b.BookingId', '@b.BookingCode', '@(b.User?.FullName ?? "ลูกค้า")', '@(b.User?.Phone ?? "-")', '@b.Status', '@b.PlayDate.ToString("dd/MM/yyyy")', '@court.CourtName', '@slot.StartTime.ToString("HH:mm") - @slot.EndTime.ToString("HH:mm")')">
                                     <div class="fw-bold text-truncate w-100" style="font-size:0.8rem;">
                                         @(b.User?.FullName ?? "คุณลูกค้า")
                                     </div>
@@ -369,12 +310,33 @@
                                     <small class="font-monospace text-muted mt-1" style="font-size:0.65rem;">@b.BookingCode</small>
                                 </td>
                             }
+                            else if (walkInSlot != null)
+                            {
+                                string walkInStatus = walkInSlot.Status == "DONE"
+                                    ? "เสร็จสิ้น"
+                                    : walkInSlot.Status == "ASSIGNED"
+                                        ? (walkInSlot.PaymentStatus == "PAID" ? "ชำระแล้ว" : "รอชำระ")
+                                        : "รอเรียกคิว";
+                                string walkInClass = walkInSlot.Status == "DONE" ? "slot-completed" : "slot-walkin";
+                                <td class="timeline-slot @walkInClass" title="Walk-in W-@walkInSlot.QueueNo.ToString("D2") · @walkInSlot.CustomerName · @slot.StartTime.ToString("HH:mm")-@slot.EndTime.ToString("HH:mm")">
+                                    <div class="fw-bold text-truncate w-100" style="font-size:0.78rem;">@walkInSlot.CustomerName</div>
+                                    <div class="badge bg-white text-dark border mt-1" style="font-size:0.66rem;">Walk-in · @walkInStatus</div>
+                                    <small class="font-monospace text-muted mt-1" style="font-size:0.64rem;">W-@walkInSlot.QueueNo.ToString("D2") · @walkInSlot.CourtFee.ToString("N0") ฿</small>
+                                </td>
+                            }
+                            else if (court.Status != "AVAILABLE")
+                            {
+                                <td class="timeline-slot slot-blocked" title="@court.CourtName ปิดให้บริการ (@court.Status)">
+                                    <i class="bi bi-lock-fill fs-6"></i>
+                                    <div class="fw-bold">ปิดให้บริการ</div>
+                                    <small class="text-truncate w-100">@court.Status</small>
+                                </td>
+                            }
                             else
                             {
                                 <td class="timeline-slot slot-available" onclick="promptWalkInForSlot('@court.CourtId', '@court.CourtName', '@slot.SlotId', '@slot.StartTime.ToString("HH:mm") - @slot.EndTime.ToString("HH:mm")')">
-                                    <i class="bi bi-plus-circle text-success fs-6 mb-1"></i>
-                                    <div class="text-success fw-semibold" style="font-size:0.75rem;">ว่าง</div>
-                                    <small class="text-muted" style="font-size:0.65rem;">จัด Walk-in</small>
+                                    <span class="slot-main"><i class="bi bi-check-circle-fill me-1"></i>ว่าง</span>
+                                    <span class="walkin-action"><i class="bi bi-plus-circle"></i>เพิ่ม Walk-in</span>
                                 </td>
                             }
                         }
@@ -388,18 +350,19 @@
 <!-- ============================================================
      BOOKING CHECK-IN / CHECK-OUT TABLE (ตารางการจองวันนี้ & เช็คอิน)
      ============================================================ -->
+@if (bookings.Any())
+{
 <div class="card border-0 shadow-sm rounded-4 overflow-hidden bg-white mb-5">
     <div class="p-3 border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2">
         <h5 class="fw-bold mb-0 text-dark">
-            <i class="bi bi-card-checklist text-primary me-2"></i>รายการจองและสถานะ Check-in วันนี้ (@bookings.Count รายการ)
+            <i class="bi bi-card-checklist text-primary me-2"></i>รายการจองออนไลน์และสถานะ Check-in วันนี้ (@bookings.Count รายการ)
+            <small class="d-block text-muted mt-1">คิว Walk-in ที่ระบุคอร์ท/เวลาแล้ว @scheduledWalkIns.Count คิว แสดงใน Timeline ด้านบน</small>
         </h5>
         <div class="d-flex align-items-center gap-2">
             <input type="text" id="bookingSearchInput" class="form-control form-control-sm" placeholder="ค้นหาชื่อ, รหัสจอง, เบอร์โทร..." style="max-width:240px;" onkeyup="filterBookingRows()" />
         </div>
     </div>
 
-    @if (bookings.Any())
-    {
         <div class="table-responsive">
             <table class="table table-hover align-middle mb-0" id="bookingsTable">
                 <thead class="table-light">
@@ -520,16 +483,8 @@
                 </tbody>
             </table>
         </div>
-    }
-    else
-    {
-        <div class="p-5 text-center text-muted">
-            <i class="bi bi-calendar-x fs-1 d-block mb-2 text-secondary"></i>
-            <h6>ไม่มีรายการจองสำหรับวันที่เลือก</h6>
-            <small>สามารถเปลี่ยนวันที่ค้นหาด้านบน หรือกดจัดคิว Walk-in เข้าใช้คอร์ทว่างได้ทันที</small>
-        </div>
-    }
 </div>
+}
 
 <!-- ============================================================
      BOOKING DETAIL POPUP MODAL
@@ -583,60 +538,6 @@
         function setScheduleDate(d) {
             document.getElementById('scheduleDateInput').value = d;
             document.getElementById('scheduleDateInput').form.submit();
-        }
-
-        // Toggle Amenity (Lights or Fans) via AJAX
-        function toggleAmenity(courtId, type) {
-            fetch('/CourtStaff/ToggleAmenity', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: `courtId=${courtId}&amenityType=${type}`
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.success) {
-                    if (data.amenity === 'light') {
-                        const icon = document.getElementById(`light_icon_${courtId}`);
-                        const text = document.getElementById(`light_text_${courtId}`);
-                        const btn = document.getElementById(`btn_light_${courtId}`);
-                        const btnText = document.getElementById(`btn_light_text_${courtId}`);
-
-                        if (data.isOn) {
-                            icon.className = 'rounded-circle d-flex align-items-center justify-content-center bg-warning text-dark glow-light';
-                            text.innerText = 'เปิดอยู่ (ON)';
-                            btn.className = 'btn btn-sm btn-warning text-dark fw-bold';
-                            btnText.innerText = 'ปิดไฟ';
-                        } else {
-                            icon.className = 'rounded-circle d-flex align-items-center justify-content-center bg-secondary text-white';
-                            text.innerText = 'ปิด (OFF)';
-                            btn.className = 'btn btn-sm btn-outline-secondary';
-                            btnText.innerText = 'เปิดไฟ';
-                        }
-                    } else if (data.amenity === 'fan') {
-                        const icon = document.getElementById(`fan_icon_${courtId}`);
-                        const text = document.getElementById(`fan_text_${courtId}`);
-                        const btn = document.getElementById(`btn_fan_${courtId}`);
-                        const btnText = document.getElementById(`btn_fan_text_${courtId}`);
-
-                        if (data.isOn) {
-                            icon.className = 'rounded-circle d-flex align-items-center justify-content-center bg-primary text-white glow-fan';
-                            icon.querySelector('i').className = 'bi bi-fan fan-spinning';
-                            text.innerText = 'ทำงานอยู่ (ON)';
-                            btn.className = 'btn btn-sm btn-primary fw-bold';
-                            btnText.innerText = 'ปิดพัดลม';
-                        } else {
-                            icon.className = 'rounded-circle d-flex align-items-center justify-content-center bg-secondary text-white';
-                            icon.querySelector('i').className = 'bi bi-fan';
-                            text.innerText = 'ปิด (OFF)';
-                            btn.className = 'btn btn-sm btn-outline-secondary';
-                            btnText.innerText = 'เปิดพัดลม';
-                        }
-                    }
-                } else {
-                    alert('เกิดข้อผิดพลาด: ' + data.message);
-                }
-            })
-            .catch(err => alert('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้: ' + err));
         }
 
         // Check-in via AJAX
@@ -696,7 +597,7 @@
             const btnContainer = document.getElementById('modalActionButtons');
             btnContainer.innerHTML = '';
 
-            if (status === 'CONFIRMED' || status === 'PENDING_VERIFICATION') {
+            if (status === 'CONFIRMED' || status === 'PENDING_VERIFY') {
                 btnContainer.innerHTML = `
                     <button type="button" class="btn btn-success fw-bold py-2" onclick="doCheckIn(${id})">
                         <i class="bi bi-box-arrow-in-right me-1"></i> ทำการ Check-in (เปิดไฟ/พัดลม)

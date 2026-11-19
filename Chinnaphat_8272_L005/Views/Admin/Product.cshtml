@@ -131,24 +131,6 @@
     }
 </style>
 
-<!-- Alert messages -->
-@if (TempData["SuccessMessage"] != null)
-{
-    <div class="alert alert-success alert-dismissible fade show rounded-3 shadow-sm mb-4" role="alert">
-        <i class="bi bi-check-circle-fill me-2 fs-5"></i>
-        <strong>สำเร็จ:</strong> @TempData["SuccessMessage"]
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    </div>
-}
-@if (TempData["ErrorMessage"] != null)
-{
-    <div class="alert alert-danger alert-dismissible fade show rounded-3 shadow-sm mb-4" role="alert">
-        <i class="bi bi-exclamation-triangle-fill me-2 fs-5"></i>
-        <strong>ข้อผิดพลาด:</strong> @TempData["ErrorMessage"]
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    </div>
-}
-
 <!-- Header -->
 <div class="page-header-card">
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
@@ -157,54 +139,8 @@
                 <i class="bi bi-box-seam me-2"></i>จัดการสินค้าและอุปกรณ์
             </h3>
             <p class="mb-0 opacity-75 small">
-                แอดมินสามารถเพิ่ม แก้ไข ลบ รายการสินค้าขาย (ลูกแบด, เครื่องดื่ม) และอุปกรณ์เช่า (ไม้แบด, รองเท้า) ซึ่งเชื่อมต่อไปยังบทบาทที่เกี่ยวข้องโดยตรง
+                เพิ่ม แก้ไข ลบ และจัดการสต็อกสินค้าขายและอุปกรณ์เช่า
             </p>
-        </div>
-    </div>
-</div>
-
-<!-- Role Responsibilities Explainer Card -->
-<div class="card border-0 shadow-sm p-3 mb-4 rounded-4" style="background:#f8fafc; border:1px solid #e2e8f0 !important;">
-    <div class="d-flex align-items-center gap-2 mb-2">
-        <i class="bi bi-diagram-3-fill text-success fs-5"></i>
-        <h6 class="fw-bold mb-0 text-dark">บทบาทในระบบที่เกี่ยวข้องกับสินค้าและอุปกรณ์ (Relevant Roles)</h6>
-    </div>
-    <div class="row g-3 small">
-        <div class="col-md-4">
-            <div class="p-2 bg-white rounded-3 border h-100">
-                <span class="role-badge-pill role-sales mb-1">
-                    <i class="bi bi-box-seam me-1"></i>ฝ่ายซื้อ-เช่าอุปกรณ์ (Sales & Rental Staff)
-                </span>
-                <p class="text-muted mb-0" style="font-size:0.8rem; line-height:1.4;">
-                    • ตรวจสอบออเดอร์สินค้าที่ลูกค้าสั่งจองล่วงหน้า<br>
-                    • จัดเตรียมส่งมอบสินค้าขาย และตรวจรับคืนอุปกรณ์เช่า<br>
-                    • อัปเดตสต็อกหน้าร้านและบันทึกความเสียหาย
-                </p>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="p-2 bg-white rounded-3 border h-100">
-                <span class="role-badge-pill role-accounting mb-1">
-                    <i class="bi bi-calculator me-1"></i>ฝ่ายบัญชีและการเงิน (Accounting / Finance)
-                </span>
-                <p class="text-muted mb-0" style="font-size:0.8rem; line-height:1.4;">
-                    • ตรวจสอบยอดชำระและค่ามัดจำอุปกรณ์เช่า<br>
-                    • ออกใบเสร็จรับเงิน/ใบกำกับภาษีสำหรับยอดซื้อ-เช่า<br>
-                    • บันทึกคิดค่าปรับกรณีอุปกรณ์เช่าชำรุดเสียหาย
-                </p>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="p-2 bg-white rounded-3 border h-100">
-                <span class="role-badge-pill role-customer mb-1">
-                    <i class="bi bi-person me-1"></i>ลูกค้า / สมาชิก (Customer)
-                </span>
-                <p class="text-muted mb-0" style="font-size:0.8rem; line-height:1.4;">
-                    • เลือกซื้อลูกแบด/น้ำดื่ม หรือกดเช่าไม้แบด/รองเท้าลงตะกร้า<br>
-                    • ระบบจับคู่โปรโมชั่นอัตโนมัติ (เช่น หลอดที่ 2 ลด 50%, เช่าเป็นเซ็ตลด 20%)<br>
-                    • ชำระเงินและรับสินค้าเมื่อมาถึงสนาม
-                </p>
-            </div>
         </div>
     </div>
 </div>
@@ -308,7 +244,6 @@
                     <th>ชื่อสินค้า / อุปกรณ์</th>
                     <th>หมวดหมู่</th>
                     <th>ประเภท</th>
-                    <th>บทบาทที่เกี่ยวข้อง</th>
                     <th class="text-end">ราคา</th>
                     <th class="text-end">มัดจำ</th>
                     <th class="text-center">สต็อก</th>
@@ -320,7 +255,7 @@
                 @if (!Model.Any())
                 {
                     <tr id="emptyRow">
-                        <td colspan="10" class="text-center py-5 text-muted">
+                        <td colspan="9" class="text-center py-5 text-muted">
                             <i class="bi bi-box mb-2" style="font-size:2.5rem; color:#cbd5e1;"></i>
                             <div class="fw-bold">ยังไม่มีข้อมูลสินค้าหรืออุปกรณ์ในฐานข้อมูล</div>
                             <small class="text-muted">คลิกปุ่ม "เพิ่มสินค้า/อุปกรณ์ใหม่" ด้านบนเพื่อเริ่มต้นสร้างรายการ</small>
@@ -362,23 +297,6 @@
                                         <i class="bi bi-arrow-repeat"></i> เช่า
                                     </span>
                                 }
-                            </td>
-                            <td>
-                                <!-- บทบาทที่เกี่ยวข้องกับสินค้านี้ -->
-                                <div class="d-flex flex-column gap-1">
-                                    <span class="role-badge-pill role-sales" title="ฝ่ายดูแลสต็อกและส่งมอบสินค้า">
-                                        <i class="bi bi-box-seam me-1"></i>ฝ่ายซื้อ-เช่า (จัดการสต็อก/ส่งมอบ)
-                                    </span>
-                                    @if (!isSale)
-                                    {
-                                        <span class="role-badge-pill role-accounting" title="ฝ่ายดูแลเงินมัดจำและคิดค่าปรับ">
-                                            <i class="bi bi-calculator me-1"></i>ฝ่ายบัญชี (มัดจำ/ค่าปรับ)
-                                        </span>
-                                    }
-                                    <span class="role-badge-pill role-customer" title="ลูกค้าเป็นผู้เลือกซื้อ/เช่า">
-                                        <i class="bi bi-person me-1"></i>ลูกค้า (@(isSale ? "ซื้อ" : "เช่า"))
-                                    </span>
-                                </div>
                             </td>
                             <td class="text-end">
                                 <span class="fw-bold text-success fs-6">@prod.Price.ToString("N0") ฿</span>
@@ -488,7 +406,7 @@
                         <h5 class="modal-title fw-bold" id="addProductModalLabel">
                             <i class="bi bi-plus-circle-fill me-2"></i>เพิ่มสินค้าหรืออุปกรณ์ใหม่ลงฐานข้อมูล
                         </h5>
-                        <small class="text-white-50">เมื่อบันทึก สินค้าจะถูกบันทึกลงในระบบและแสดงในบทบาทที่เกี่ยวข้องทันที</small>
+                        <small class="text-white-50">ตรวจสอบข้อมูลให้ครบก่อนบันทึกสินค้าและอุปกรณ์ลงในระบบ</small>
                     </div>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
@@ -571,19 +489,6 @@
                             <input type="number" min="0" name="stockQty" id="addStockQty" class="form-control" value="20" required />
                         </div>
 
-                        <!-- Preview บทบาทที่เกี่ยวข้องแบบไดนามิก -->
-                        <div class="col-12">
-                            <div class="p-3 rounded-3 border" style="background:#f0fdf4; border-color:#bbf7d0 !important;">
-                                <div class="fw-bold text-success small mb-1">
-                                    <i class="bi bi-info-circle-fill me-1"></i> บทบาทในระบบที่จะเห็นและจัดการรายการนี้:
-                                </div>
-                                <div id="addRolePreviewBox" class="small text-dark">
-                                    <!-- Dynamic text from JS -->
-                                    • <strong>ฝ่ายซื้อ-เช่าอุปกรณ์ (SALES_STAFF):</strong> จัดการสต็อกหน้าร้าน และส่งมอบสินค้าให้ลูกค้า<br>
-                                    • <strong>ลูกค้า (CUSTOMER):</strong> สั่งซื้อสินค้าลงตะกร้าพร้อมจองสนาม (ระบบคำนวณโปรโมชั่นอัตโนมัติ)
-                                </div>
-                            </div>
-                        </div>
                     </div>
                 </div>
 
@@ -637,8 +542,8 @@
                         <div class="col-md-6">
                             <label class="form-label fw-semibold small">ประเภทรายการ <span class="text-danger">*</span></label>
                             <select name="productType" id="editProductType" class="form-select fw-bold" required onchange="onEditProductTypeChanged(this.value)">
-                                <option value="SALE">🛒 สินค้าสำหรับขาย (SALE)</option>
-                                <option value="RENT">🏸 อุปกรณ์สำหรับเช่า (RENT)</option>
+                                <option value="SALE"> สินค้าสำหรับขาย (SALE)</option>
+                                <option value="RENT"> อุปกรณ์สำหรับเช่า (RENT)</option>
                             </select>
                         </div>
 
@@ -751,25 +656,14 @@
             const grpDeposit = document.getElementById('grpAddDeposit');
             const lblPrice = document.getElementById('lblAddPrice');
             const unitInput = document.getElementById('addUnit');
-            const rolePreview = document.getElementById('addRolePreviewBox');
-
             if (type === 'RENT') {
                 grpDeposit.style.display = 'block';
                 lblPrice.innerText = 'ราคาค่าเช่า (บาท/ครั้ง) *';
                 if (!unitInput.value || unitInput.value === 'หลอด') unitInput.value = 'ไม้';
-                rolePreview.innerHTML = `
-                    • <strong class="text-primary">ฝ่ายซื้อ-เช่าอุปกรณ์ (SALES_STAFF):</strong> ตรวจสอบสภาพ ส่งมอบและตรวจรับคืนอุปกรณ์<br>
-                    • <strong class="text-purple" style="color:#7c3aed;">ฝ่ายบัญชีและการเงิน (ACCOUNTING):</strong> ดูแลค่ามัดจำ และคิดค่าปรับกรณีเสียหาย<br>
-                    • <strong class="text-success">ลูกค้า (CUSTOMER):</strong> เช่าอุปกรณ์ลงตะกร้าพร้อมสนาม (คิดโปรโมชั่นลด 20%)
-                `;
             } else {
                 grpDeposit.style.display = 'none';
                 lblPrice.innerText = 'ราคาขาย (บาท) *';
                 if (!unitInput.value || unitInput.value === 'ไม้') unitInput.value = 'หลอด';
-                rolePreview.innerHTML = `
-                    • <strong class="text-primary">ฝ่ายซื้อ-เช่าอุปกรณ์ (SALES_STAFF):</strong> อัปเดตสต็อกหน้าร้าน และส่งมอบสินค้าให้ลูกค้า<br>
-                    • <strong class="text-success">ลูกค้า (CUSTOMER):</strong> สั่งซื้อสินค้าลงตะกร้า (ระบบคำนวณโปรโมชั่นซื้อ 2 หลอดลด 50%)
-                `;
             }
         }
 

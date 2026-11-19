@@ -144,10 +144,10 @@
                     ทั้งหมด (@Model.Count)
                 </button>
                 <button type="button" class="cat-pill-btn @(activeCat == "SALE" ? "active" : "")" onclick="filterCardsByCategory('SALE', this)">
-                    🛒 สินค้าขาย (@Model.Count(p => p.ProductType == "SALE"))
+                     สินค้าขาย (@Model.Count(p => p.ProductType == "SALE"))
                 </button>
                 <button type="button" class="cat-pill-btn @(activeCat == "RENT" ? "active" : "")" onclick="filterCardsByCategory('RENT', this)">
-                    🏸 อุปกรณ์เช่า (@Model.Count(p => p.ProductType == "RENT"))
+                     อุปกรณ์เช่า (@Model.Count(p => p.ProductType == "RENT"))
                 </button>
                 @foreach (var cat in categories)
                 {

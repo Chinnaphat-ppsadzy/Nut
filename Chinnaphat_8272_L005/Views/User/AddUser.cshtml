@@ -155,14 +155,6 @@
     .bg-purple   { background-color: #eadeffff !important; }
 </style>
 
-@if (TempData["SuccessMessage"] != null)
-{
-    <div class="alert alert-success alert-dismissible fade show mb-4" style="border-radius:10px;">
-        <i class="bi bi-check-circle me-2"></i>@TempData["SuccessMessage"]
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    </div>
-}
-
 <form asp-action="AddUser" asp-controller="User" method="post" id="addUserForm">
     @Html.AntiForgeryToken()
 
@@ -290,7 +282,7 @@
                         <label asp-for="Role" class="form-label">บทบาท <span class="required-star">*</span></label>
                         <div class="input-wrapper">
                             <i class="bi bi-shield bi-icon"></i>
-                            <select asp-for="Role" class="form-select" id="addRole" onchange="updateRoleDesc(this.value)">
+                            <select asp-for="Role" class="form-select" id="addRole">
                                 <option value="">-- เลือกบทบาทผู้ใช้งาน --</option>
                                 @foreach (var r in systemRoles)
                                 {
@@ -299,10 +291,6 @@
                             </select>
                         </div>
                         <span asp-validation-for="Role" class="text-danger small"></span>
-                        <!-- คำอธิบายบทบาทที่เลือก -->
-                        <div id="roleDescBox" class="mt-2 p-2 rounded-3 d-none" style="background:#f0fdf4; border:1px solid #bbf7d0; font-size:0.82rem; color:#1a472a;">
-                            <i class="bi bi-info-circle me-1"></i><span id="roleDescText"></span>
-                        </div>
                     </div>
                 </div>
 
@@ -376,27 +364,4 @@
     document.getElementById('addFirstName').addEventListener('input', updateAvatar);
     document.getElementById('addLastName').addEventListener('input', updateAvatar);
 
-    // คำอธิบายบทบาทที่เลือก
-    const roleDescriptions = {
-        'CUSTOMER':    'จองคอร์ท ซื้อ/เช่าอุปกรณ์ ชำระเงิน ติดตามสถานะการจองของตนเอง',
-        'COURT_STAFF': 'ดูตารางการจองประจำวัน Check-in/Check-out จัดการคิว Walk-in ล็อกคอร์ทชั่วคราว แจ้งอุปกรณ์ชำรุด',
-        'SALES_STAFF': 'ดูรายการออเดอร์ ส่งมอบสินค้า ตรวจรับคืนอุปกรณ์เช่า บันทึกความเสียหาย อัปเดตสต็อกหน้าร้าน',
-        'ACCOUNTING':  'ตรวจสอบสลิปโอนเงิน อนุมัติคิว ออกใบเสร็จ/ใบกำกับภาษี คิดค่าปรับ จัดการคืนเงิน ดูรายงานการเงิน',
-        'ADMIN':       'จัดการโปรโมชั่น 5 แบบ เพิ่ม/ลบ/แก้ไขข้อมูลคอร์ทและสินค้า กำหนดสิทธิ์พนักงาน ดู Dashboard ภาพรวมธุรกิจ'
-    };
-
-    function updateRoleDesc(code) {
-        const box = document.getElementById('roleDescBox');
-        const txt = document.getElementById('roleDescText');
-        if (code && roleDescriptions[code]) {
-            box.classList.remove('d-none');
-            txt.textContent = roleDescriptions[code];
-        } else {
-            box.classList.add('d-none');
-        }
-    }
-
-    // กรณีมีค่า default ตอน load
-    const initRole = document.getElementById('addRole').value;
-    if (initRole) updateRoleDesc(initRole);
 </script>

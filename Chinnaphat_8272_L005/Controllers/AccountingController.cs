@@ -3,18 +3,23 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
 using Chinnaphat_8272_L005.Models;
+using Chinnaphat_8272_L005.Helpers;
 
 namespace Chinnaphat_8272_L005.Controllers
 {
+    [RequireRole("ACCOUNTING", "ADMIN")]
     public class AccountingController : Controller
     {
         private readonly Csi402dbContext _db;
+        private readonly IWebHostEnvironment _env;
 
-        public AccountingController(Csi402dbContext db)
+        public AccountingController(Csi402dbContext db, IWebHostEnvironment env)
         {
             _db = db;
+            _env = env;
         }
 
         // ============================================================
@@ -40,7 +45,7 @@ namespace Chinnaphat_8272_L005.Controllers
 
             if (currentFilter == "PENDING")
             {
-                query = query.Where(b => b.Status == "PENDING_VERIFICATION");
+                query = query.Where(b => b.Status == "PENDING_VERIFY");
             }
             else if (currentFilter == "CONFIRMED")
             {
@@ -48,7 +53,7 @@ namespace Chinnaphat_8272_L005.Controllers
             }
             else if (currentFilter == "REJECTED")
             {
-                query = query.Where(b => b.Status == "SLIP_REJECTED" || b.Status == "CANCELLED");
+                query = query.Where(b => b.Status == "REJECTED" || b.Status == "CANCELLED");
             }
 
             if (!string.IsNullOrWhiteSpace(search))
@@ -64,16 +69,88 @@ namespace Chinnaphat_8272_L005.Controllers
                 .OrderByDescending(b => b.CreatedAt)
                 .ToListAsync();
 
+            var walkInSlips = await _db.WalkInQueues
+                .Include(q => q.Court)
+                .Include(q => q.Slot)
+                .Where(q => q.PaymentStatus == "PENDING_VERIFY" && q.SlipImageUrl != null)
+                .OrderBy(q => q.PaidAt)
+                .ToListAsync();
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var term = search.Trim().ToLower();
+                walkInSlips = walkInSlips.Where(q => q.CustomerName.ToLower().Contains(term) ||
+                    (q.Phone != null && q.Phone.Contains(term)) || $"W-{q.QueueNo:D2}".ToLower().Contains(term)).ToList();
+            }
+            ViewBag.WalkInPendingPayments = walkInSlips;
+
             // สถิติด่วนสำหรับหัวข้อ
-            ViewBag.PendingCount = await _db.Bookings.CountAsync(b => b.Status == "PENDING_VERIFICATION");
+            ViewBag.PendingCount = await _db.Bookings.CountAsync(b => b.Status == "PENDING_VERIFY");
             ViewBag.ConfirmedCount = await _db.Bookings.CountAsync(b => b.Status == "CONFIRMED" || b.Status == "CHECKED_IN" || b.Status == "COMPLETED");
-            ViewBag.RejectedCount = await _db.Bookings.CountAsync(b => b.Status == "SLIP_REJECTED");
+            ViewBag.RejectedCount = await _db.Bookings.CountAsync(b => b.Status == "REJECTED");
             ViewBag.TotalCount = await _db.Bookings.CountAsync();
 
             return View(bookings);
         }
 
+        [HttpGet]
+        public async Task<IActionResult> WalkInSlip(uint queueId)
+        {
+            await EnsureAccountingRoleAndUserAsync();
+            var slipPath = await _db.WalkInQueues.Where(q => q.QueueId == queueId)
+                .Select(q => q.SlipImageUrl).FirstOrDefaultAsync();
+            if (string.IsNullOrWhiteSpace(slipPath)) return NotFound();
+            var fileName = Path.GetFileName(slipPath);
+            var extension = Path.GetExtension(fileName).ToLowerInvariant();
+            var contentType = extension switch
+            {
+                ".jpg" or ".jpeg" => "image/jpeg",
+                ".png" => "image/png",
+                ".webp" => "image/webp",
+                _ => null
+            };
+            if (contentType == null) return NotFound();
+            var fullPath = Path.Combine(_env.WebRootPath, "uploads", "slips", fileName);
+            if (!System.IO.File.Exists(fullPath)) return NotFound();
+            Response.Headers.CacheControl = "no-store, private";
+            return PhysicalFile(fullPath, contentType);
+        }
+
         [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ApproveWalkInSlip(uint queueId)
+        {
+            await EnsureAccountingRoleAndUserAsync();
+            var queue = await _db.WalkInQueues.FirstOrDefaultAsync(q => q.QueueId == queueId);
+            if (queue == null) return Json(new { success = false, message = "ไม่พบคิว Walk-in" });
+            if (queue.PaymentStatus != "PENDING_VERIFY" || string.IsNullOrWhiteSpace(queue.SlipImageUrl))
+                return Json(new { success = false, message = "คิวนี้ไม่มีสลิปรอตรวจสอบ" });
+
+            queue.PaymentStatus = "PAID";
+            queue.PaidAt = DateTime.Now;
+            queue.PaidBy = await GetCurrentAccountantIdAsync();
+            await _db.SaveChangesAsync();
+            return Json(new { success = true, message = $"อนุมัติสลิปคิว W-{queue.QueueNo:D2} และยืนยันการชำระแล้ว" });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> RejectWalkInSlip(uint queueId, string? reason)
+        {
+            await EnsureAccountingRoleAndUserAsync();
+            var queue = await _db.WalkInQueues.FirstOrDefaultAsync(q => q.QueueId == queueId);
+            if (queue == null) return Json(new { success = false, message = "ไม่พบคิว Walk-in" });
+            if (queue.PaymentStatus != "PENDING_VERIFY")
+                return Json(new { success = false, message = "คิวนี้ไม่ได้อยู่ในสถานะรอตรวจสลิป" });
+
+            queue.PaymentStatus = "REJECTED";
+            queue.PaidAt = null;
+            queue.PaidBy = null;
+            await _db.SaveChangesAsync();
+            return Json(new { success = true, message = $"ปฏิเสธสลิปคิว W-{queue.QueueNo:D2} ลูกค้าสามารถแนบสลิปใหม่ได้" });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> ApproveBooking(uint bookingId)
         {
             try
@@ -88,31 +165,35 @@ namespace Chinnaphat_8272_L005.Controllers
                     return Json(new { success = false, message = "ไม่พบข้อมูลการจองในระบบ" });
                 }
 
+                if (booking.Status != "PENDING_VERIFY")
+                {
+                    return Json(new { success = false, message = "รายการนี้ไม่ได้อยู่ในสถานะรอตรวจสอบสลิป หรือได้รับการดำเนินการแล้ว" });
+                }
+
                 uint accountantId = await GetCurrentAccountantIdAsync();
+                var now = DateTime.Now;
 
                 // 1. อัปเดตสถานะการจองเป็น CONFIRMED
                 booking.Status = "CONFIRMED";
-                booking.ConfirmedAt = DateTime.Now;
-                booking.UpdatedAt = DateTime.Now;
+                booking.ConfirmedAt = now;
+                booking.UpdatedAt = now;
 
-                // 2. อัปเดตสถานะ Payment เป็น PAID
+                // 2. อัปเดตสถานะ Payment ตาม enum ในฐานข้อมูล
                 var payment = booking.Payments.OrderByDescending(p => p.PaymentId).FirstOrDefault();
                 if (payment != null)
                 {
-                    payment.Status = "PAID";
+                    payment.Status = "APPROVED";
+                    payment.VerifiedBy = accountantId;
+                    payment.VerifiedAt = now;
+                    payment.RejectReason = null;
                 }
                 else
                 {
-                    payment = new Payment
-                    {
-                        BookingId = booking.BookingId,
-                        Amount = booking.NetAmount,
-                        TransferAt = DateTime.Now,
-                        Status = "PAID"
-                    };
-                    _db.Payments.Add(payment);
-                    await _db.SaveChangesAsync();
+                    return Json(new { success = false, message = "ไม่พบข้อมูลการชำระเงินของรายการนี้ กรุณาให้ลูกค้าแนบสลิปก่อนอนุมัติ" });
                 }
+
+                // Persist the approval first so the payment has a database ID for the receipt FK.
+                await _db.SaveChangesAsync();
 
                 // 3. ออกใบเสร็จรับเงินอัตโนมัติ (หากยังไม่มี)
                 var existingReceipt = await _db.Receipts.FirstOrDefaultAsync(r => r.BookingId == booking.BookingId);
@@ -124,7 +205,7 @@ namespace Chinnaphat_8272_L005.Controllers
 
                     var receipt = new Receipt
                     {
-                        ReceiptNo = $"RC-{DateTime.Now:yyyyMMdd}-{booking.BookingId:D4}",
+                        ReceiptNo = $"RC-{now:yyyyMMdd}-{booking.BookingId:D4}",
                         BookingId = booking.BookingId,
                         PaymentId = payment.PaymentId,
                         DocType = "RECEIPT",
@@ -132,7 +213,7 @@ namespace Chinnaphat_8272_L005.Controllers
                         Amount = amountBeforeVat,
                         VatAmount = vat,
                         IssuedBy = accountantId,
-                        IssuedAt = DateTime.Now
+                        IssuedAt = now
                     };
                     _db.Receipts.Add(receipt);
                 }
@@ -152,6 +233,7 @@ namespace Chinnaphat_8272_L005.Controllers
         }
 
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> RejectSlip(uint bookingId, string reason)
         {
             try
@@ -165,7 +247,7 @@ namespace Chinnaphat_8272_L005.Controllers
                     return Json(new { success = false, message = "ไม่พบข้อมูลการจองในระบบ" });
                 }
 
-                booking.Status = "SLIP_REJECTED";
+                booking.Status = "REJECTED";
                 booking.CancelReason = string.IsNullOrWhiteSpace(reason) ? "สลิปโอนเงินไม่ถูกต้อง หรือยอดเงินไม่ตรง" : reason.Trim();
                 booking.UpdatedAt = DateTime.Now;
 
@@ -319,7 +401,7 @@ namespace Chinnaphat_8272_L005.Controllers
                 .Include(b => b.User)
                 .Include(b => b.Payments)
                 .Include(b => b.Refunds)
-                .Where(b => (b.Status == "CANCELLED" || b.Status == "SLIP_REJECTED") && b.Payments.Any(p => p.Status == "PAID"))
+                .Where(b => (b.Status == "CANCELLED" || b.Status == "REJECTED") && b.Payments.Any(p => p.Status == "PAID"))
                 .OrderByDescending(b => b.UpdatedAt)
                 .ToListAsync();
 
@@ -452,18 +534,26 @@ namespace Chinnaphat_8272_L005.Controllers
                     .OrderBy(b => b.CreatedAt)
                     .ToListAsync();
 
-                decimal totalCourt = dailyBookings.Sum(b => b.CourtAmount);
+                var dailyWalkIns = await _db.WalkInQueues
+                    .Include(q => q.Court).Include(q => q.Slot)
+                    .Where(q => q.QueueDate == targetDate && q.PaymentStatus == "PAID")
+                    .OrderBy(q => q.PaidAt)
+                    .ToListAsync();
+
+                decimal totalCourt = dailyBookings.Sum(b => b.CourtAmount) + dailyWalkIns.Sum(q => q.CourtFee);
                 decimal totalSale = dailyBookings.Sum(b => b.SaleAmount);
                 decimal totalRent = dailyBookings.Sum(b => b.RentalAmount);
                 decimal totalDiscount = dailyBookings.Sum(b => b.DiscountAmount);
-                decimal netTotal = dailyBookings.Sum(b => b.NetAmount);
+                decimal netTotal = dailyBookings.Sum(b => b.NetAmount) + dailyWalkIns.Sum(q => q.CourtFee);
 
                 ViewBag.TotalCourt = totalCourt;
                 ViewBag.TotalSale = totalSale;
                 ViewBag.TotalRent = totalRent;
                 ViewBag.TotalDiscount = totalDiscount;
                 ViewBag.NetTotal = netTotal;
-                ViewBag.TransactionsCount = dailyBookings.Count;
+                ViewBag.TransactionsCount = dailyBookings.Count + dailyWalkIns.Count;
+                ViewBag.WalkInPayments = dailyWalkIns;
+                ViewBag.WalkInTotal = dailyWalkIns.Sum(q => q.CourtFee);
 
                 return View(dailyBookings);
             }
@@ -481,31 +571,33 @@ namespace Chinnaphat_8272_L005.Controllers
                     .OrderBy(b => b.PlayDate)
                     .ToListAsync();
 
-                decimal totalCourt = monthlyBookings.Sum(b => b.CourtAmount);
+                var monthlyWalkIns = await _db.WalkInQueues
+                    .Include(q => q.Court).Include(q => q.Slot)
+                    .Where(q => q.QueueDate >= startMonth && q.QueueDate <= endMonth && q.PaymentStatus == "PAID")
+                    .OrderBy(q => q.QueueDate).ThenBy(q => q.PaidAt)
+                    .ToListAsync();
+
+                decimal totalCourt = monthlyBookings.Sum(b => b.CourtAmount) + monthlyWalkIns.Sum(q => q.CourtFee);
                 decimal totalSale = monthlyBookings.Sum(b => b.SaleAmount);
                 decimal totalRent = monthlyBookings.Sum(b => b.RentalAmount);
                 decimal totalDiscount = monthlyBookings.Sum(b => b.DiscountAmount);
-                decimal netTotal = monthlyBookings.Sum(b => b.NetAmount);
+                decimal netTotal = monthlyBookings.Sum(b => b.NetAmount) + monthlyWalkIns.Sum(q => q.CourtFee);
 
                 ViewBag.TotalCourt = totalCourt;
                 ViewBag.TotalSale = totalSale;
                 ViewBag.TotalRent = totalRent;
                 ViewBag.TotalDiscount = totalDiscount;
                 ViewBag.NetTotal = netTotal;
-                ViewBag.TransactionsCount = monthlyBookings.Count;
+                ViewBag.TransactionsCount = monthlyBookings.Count + monthlyWalkIns.Count;
+                ViewBag.WalkInPayments = monthlyWalkIns;
+                ViewBag.WalkInTotal = monthlyWalkIns.Sum(q => q.CourtFee);
 
                 // Group by Day for chart/summary
                 var dailyGroups = monthlyBookings
-                    .GroupBy(b => b.PlayDate.Day)
-                    .Select(g => new
-                    {
-                        Day = g.Key,
-                        Court = g.Sum(x => x.CourtAmount),
-                        Sale = g.Sum(x => x.SaleAmount),
-                        Rent = g.Sum(x => x.RentalAmount),
-                        Net = g.Sum(x => x.NetAmount),
-                        Count = g.Count()
-                    })
+                    .Select(b => new { Day = b.PlayDate.Day, Court = b.CourtAmount, Sale = b.SaleAmount, Rent = b.RentalAmount, Net = b.NetAmount, Count = 1 })
+                    .Concat(monthlyWalkIns.Select(q => new { Day = q.QueueDate.Day, Court = q.CourtFee, Sale = 0m, Rent = 0m, Net = q.CourtFee, Count = 1 }))
+                    .GroupBy(x => x.Day)
+                    .Select(g => new { Day = g.Key, Court = g.Sum(x => x.Court), Sale = g.Sum(x => x.Sale), Rent = g.Sum(x => x.Rent), Net = g.Sum(x => x.Net), Count = g.Sum(x => x.Count) })
                     .OrderBy(g => g.Day)
                     .ToList();
 

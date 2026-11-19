@@ -4,6 +4,8 @@
     ViewData["Title"] = "ล็อกคอร์ทชั่วคราวกรณีซ่อมบำรุง";
 
     var courts = ViewBag.Courts as List<Chinnaphat_8272_L005.Models.Court> ?? new();
+    var defaultBlockStart = DateTime.Now.AddHours(1);
+    var defaultBlockEnd = DateTime.Now.AddHours(3);
 }
 
 <div class="row g-4">
@@ -35,14 +37,14 @@
                         <label class="form-label fw-bold small text-secondary">
                             เวลาเริ่มต้นล็อกคอร์ท <span class="text-danger">*</span>
                         </label>
-                        <input type="datetime-local" name="blockStart" class="form-control" value="@DateTime.Now.ToString("yyyy-MM-ddTHH:00")" required />
+                        <input type="datetime-local" name="blockStart" class="form-control" value="@defaultBlockStart.ToString("yyyy-MM-ddTHH:00")" required />
                     </div>
 
                     <div class="mb-3">
                         <label class="form-label fw-bold small text-secondary">
                             เวลาสิ้นสุดการล็อกคอร์ท <span class="text-danger">*</span>
                         </label>
-                        <input type="datetime-local" name="blockEnd" class="form-control" value="@DateTime.Now.AddHours(2).ToString("yyyy-MM-ddTHH:00")" required />
+                        <input type="datetime-local" name="blockEnd" class="form-control" value="@defaultBlockEnd.ToString("yyyy-MM-ddTHH:00")" required />
                     </div>
 
                     <div class="mb-3">
@@ -57,7 +59,7 @@
                             <option value="ทำความสะอาดใหญ่และฆ่าเชื้อประจำรอบ">ทำความสะอาดใหญ่และฆ่าเชื้อประจำรอบ</option>
                             <option value="ซ่อมบำรุงพัดลมและระบบหมุนเวียนอากาศ">ซ่อมบำรุงพัดลมและระบบหมุนเวียนอากาศ</option>
                         </select>
-                        <textarea name="reason" id="reasonInput" class="form-control" rows="3" placeholder="ระบุเหตุผล เช่น ซ่อมระบบไฟส่องสว่าง BWF ชั่วคราว" required></textarea>
+                        <textarea name="reason" id="reasonInput" class="form-control" rows="3" maxlength="255" placeholder="ระบุเหตุผล เช่น ซ่อมระบบไฟส่องสว่าง BWF ชั่วคราว" required></textarea>
                     </div>
 
                     <div class="form-check form-switch mb-4">
@@ -90,9 +92,13 @@
                                 {
                                     <span class="badge bg-danger">ซ่อมบำรุง</span>
                                 }
-                                else
+                                else if (c.Status == "AVAILABLE")
                                 {
                                     <span class="badge bg-success">เปิดบริการ</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-secondary">ปิดใช้งาน</span>
                                 }
                             </div>
                             <small class="text-muted d-block" style="font-size:0.75rem;">@c.Description</small>
@@ -133,7 +139,7 @@
                         <tbody>
                             @foreach (var b in Model)
                             {
-                                bool isCurrentlyActive = DateTime.Now >= b.BlockStart && DateTime.Now <= b.BlockEnd;
+                                bool isCurrentlyActive = DateTime.Now >= b.BlockStart && DateTime.Now < b.BlockEnd;
                                 bool isPast = DateTime.Now > b.BlockEnd;
 
                                 <tr>

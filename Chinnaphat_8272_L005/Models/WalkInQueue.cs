@@ -48,6 +48,18 @@ public partial class WalkInQueue
     /// </summary>
     public string Status { get; set; } = null!;
 
+    public decimal CourtFee { get; set; }
+
+    public string PaymentStatus { get; set; } = "UNPAID";
+
+    public string? PaymentMethod { get; set; }
+
+    public string? SlipImageUrl { get; set; }
+
+    public DateTime? PaidAt { get; set; }
+
+    public uint? PaidBy { get; set; }
+
     /// <summary>
     /// FK -&gt; users.user_id (เธเนเธฒเธขเธเธนเนเธฅเธเธญเธฃเนเธ)
     /// </summary>

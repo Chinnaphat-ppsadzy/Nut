@@ -128,24 +128,6 @@
     </div>
 </div>
 
-<!-- Alerts -->
-@if (TempData["SuccessMessage"] != null)
-{
-    <div class="alert alert-success alert-dismissible fade show mb-4 shadow-sm" style="border-radius:12px;" role="alert">
-        <i class="bi bi-check-circle-fill me-2 fs-5"></i>
-        <strong>สำเร็จ:</strong> @TempData["SuccessMessage"]
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    </div>
-}
-@if (TempData["ErrorMessage"] != null)
-{
-    <div class="alert alert-danger alert-dismissible fade show mb-4 shadow-sm" style="border-radius:12px;" role="alert">
-        <i class="bi bi-exclamation-triangle-fill me-2 fs-5"></i>
-        <strong>ข้อผิดพลาด:</strong> @TempData["ErrorMessage"]
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    </div>
-}
-
 <!-- Summary Stats -->
 <div class="row g-3 mb-4">
     <div class="col-md-4">

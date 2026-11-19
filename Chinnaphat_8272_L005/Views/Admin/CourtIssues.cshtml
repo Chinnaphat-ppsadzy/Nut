@@ -6,6 +6,7 @@
     int pendingCount = ViewBag.PendingCount ?? 0;
     int inProgressCount = ViewBag.InProgressCount ?? 0;
     int resolvedCount = ViewBag.ResolvedCount ?? 0;
+    var courts = ViewBag.Courts as List<Chinnaphat_8272_L005.Models.Court> ?? new();
 }
 
 <div class="card border-0 shadow-sm mb-4" style="border-radius:18px; background: linear-gradient(135deg, #1a472a 0%, #2d6a4f 60%, #52b788 100%); color:white;">
@@ -80,7 +81,7 @@
                 <tbody>
                     @foreach (var i in Model)
                     {
-                        <tr>
+                        <tr id="issue-@i.IssueId">
                             <td>
                                 <strong class="font-monospace text-primary">#ISSUE-@i.IssueId.ToString("D3")</strong>
                             </td>
@@ -126,14 +127,17 @@
                                 }
                             </td>
                             <td class="text-end">
-                                @if (i.Status == "PENDING")
+                                <button class="btn btn-sm btn-outline-success me-1" type="button" data-bs-toggle="collapse" data-bs-target="#edit-issue-@i.IssueId" aria-expanded="false">
+                                    <i class="bi bi-pencil-square me-1"></i>แก้ไข
+                                </button>
+                                @if (i.Status == "OPEN")
                                 {
                                     <form method="post" asp-action="UpdateIssueStatus" class="d-inline">
                                         @Html.AntiForgeryToken()
                                         <input type="hidden" name="issueId" value="@i.IssueId" />
                                         <input type="hidden" name="status" value="IN_PROGRESS" />
                                         <button type="submit" class="btn btn-sm btn-info text-dark fw-bold me-1">
-                                            <i class="bi bi-wrench me-1"></i> รับเรื่อง/จัดช่าง
+                                            <i class="bi bi-wrench me-1"></i> รับเรื่อง/ปิดคอร์ท
                                         </button>
                                     </form>
                                     <form method="post" asp-action="UpdateIssueStatus" class="d-inline">
@@ -162,6 +166,31 @@
                                         แก้ไขโดย @(i.ResolvedByNavigation?.FullName ?? "Admin")
                                     </span>
                                 }
+                            </td>
+                        </tr>
+                        <tr class="collapse bg-light" id="edit-issue-@i.IssueId">
+                            <td colspan="7" class="p-3">
+                                <form method="post" asp-action="UpdateCourtIssue" class="row g-2 align-items-end">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="issueId" value="@i.IssueId" />
+                                    <div class="col-md-3">
+                                        <label class="form-label small">สนาม / บริเวณ</label>
+                                        <select name="courtId" class="form-select form-select-sm">
+                                            <option value="">ส่วนกลาง / อุปกรณ์ทั่วไป</option>
+                                            @foreach (var court in courts)
+                                            {
+                                                <option value="@court.CourtId" selected="@(i.CourtId == court.CourtId)">@court.CourtName</option>
+                                            }
+                                        </select>
+                                    </div>
+                                    <div class="col-md-7">
+                                        <label class="form-label small">รายละเอียดปัญหา</label>
+                                        <textarea name="description" class="form-control form-control-sm" rows="2" required maxlength="500">@i.Description</textarea>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <button type="submit" class="btn btn-success btn-sm w-100"><i class="bi bi-save me-1"></i>บันทึกการแก้ไข</button>
+                                    </div>
+                                </form>
                             </td>
                         </tr>
                     }

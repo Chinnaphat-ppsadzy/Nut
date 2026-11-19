@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Chinnaphat_8272_L005.Models;
+using Chinnaphat_8272_L005.Database;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
@@ -21,6 +22,20 @@ builder.Services.AddDbContext<Csi402dbContext>(
 
 var app = builder.Build();
 
+if (app.Environment.IsDevelopment())
+{
+    using var schemaScope = app.Services.CreateScope();
+    var db = schemaScope.ServiceProvider.GetRequiredService<Csi402dbContext>();
+    try
+    {
+        await WalkInPaymentSchemaInitializer.EnsureColumnsAsync(db);
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "Could not prepare the Walk-in payment columns. Apply Database/WalkInPayments.sql to the configured database.");
+    }
+}
+
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
@@ -30,6 +45,16 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.Use(async (context, next) =>
+{
+    // Slip files must only be served through the owner/staff authorization action.
+    if (context.Request.Path.StartsWithSegments("/uploads/slips", StringComparison.OrdinalIgnoreCase))
+    {
+        context.Response.StatusCode = StatusCodes.Status404NotFound;
+        return;
+    }
+    await next();
+});
 app.UseRouting();
 app.UseSession();
 
@@ -39,7 +64,7 @@ app.MapStaticAssets();
 
 app.MapControllerRoute(
     name: "default",
-    pattern: "{controller=Home}/{action=Index}/{id?}")
+    pattern: "{controller=Home}/{action=Customer}/{id?}")
     .WithStaticAssets();
 
 

@@ -1,9 +1,11 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Chinnaphat_8272_L005.Models;
+using Chinnaphat_8272_L005.Helpers;
 
 namespace Chinnaphat_8272_L005.Controllers
 {
+    [RequireRole("SALES_STAFF", "ADMIN")]
     public class SalesStaffController : Controller
     {
         private readonly Csi402dbContext _db;
@@ -264,13 +266,14 @@ namespace Chinnaphat_8272_L005.Controllers
                 {
                     RoleId = salesRole.RoleId,
                     Email = "sales@courtbook.com",
-                    PasswordHash = "123456",
+                    PasswordHash = string.Empty,
                     FullName = "พนักงานฝ่ายซื้อ-เช่า",
                     Phone = "082-345-6789",
                     Status = "active",
                     CreatedAt = DateTime.Now,
                     UpdatedAt = DateTime.Now
                 };
+                salesUser.PasswordHash = PasswordSecurity.Hash(salesUser, "123456");
                 _db.Users.Add(salesUser);
                 await _db.SaveChangesAsync();
             }

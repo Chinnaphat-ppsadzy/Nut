@@ -35,15 +35,9 @@ namespace Chinnaphat_8272_L005.Controllers
         [HttpGet]
         public async Task<IActionResult> Notifications()
         {
+            Response.Headers.CacheControl = "no-store, no-cache, must-revalidate";
+            Response.Headers.Pragma = "no-cache";
             var notifications = new List<AdminNotificationItem>();
-
-            var pendingPayments = await _db.Bookings
-                .Where(b => b.Status == "PENDING_VERIFY")
-                .OrderByDescending(b => b.CreatedAt)
-                .Select(b => new { b.BookingCode, b.NetAmount, b.CreatedAt, CustomerName = b.User.FullName })
-                .ToListAsync();
-            foreach (var booking in pendingPayments)
-                notifications.Add(new AdminNotificationItem("payment", $"รอตรวจสลิป {booking.BookingCode}", $"{booking.CustomerName} · {booking.NetAmount:N0} บาท", booking.CreatedAt, Url.Action("Index", "Accounting", new { filter = "PENDING" })));
 
             var pendingIssues = await _db.CourtIssues
                 .Where(i => i.Status == "OPEN" || i.Status == "IN_PROGRESS")
@@ -52,23 +46,6 @@ namespace Chinnaphat_8272_L005.Controllers
                 .ToListAsync();
             foreach (var issue in pendingIssues)
                 notifications.Add(new AdminNotificationItem("issue", $"แจ้งซ่อม #{issue.IssueId:D3} · {issue.CourtName}", issue.Description, issue.CreatedAt, $"{Url.Action(nameof(CourtIssues))}#issue-{issue.IssueId}"));
-
-            var reportedDamages = await _db.EquipmentDamages
-                .Where(d => d.Status == "REPORTED")
-                .Include(d => d.BookingItem).ThenInclude(i => i.Product)
-                .OrderByDescending(d => d.CreatedAt)
-                .ToListAsync();
-            foreach (var damage in reportedDamages)
-                notifications.Add(new AdminNotificationItem("damage", $"แจ้งอุปกรณ์ชำรุด #{damage.DamageId}", $"{damage.BookingItem.Product.ProductName} · {damage.Description}", damage.CreatedAt, Url.Action("DamagesAndRefunds", "Accounting", new { tab = "damages" })));
-
-            var refundBookings = await _db.Bookings
-                .Where(b => (b.Status == "CANCELLED" || b.Status == "REJECTED") &&
-                    b.Payments.Any(p => p.Status == "PAID") && !b.Refunds.Any(r => r.Status == "COMPLETED"))
-                .OrderByDescending(b => b.UpdatedAt)
-                .Select(b => new { b.BookingCode, b.NetAmount, b.UpdatedAt })
-                .ToListAsync();
-            foreach (var booking in refundBookings)
-                notifications.Add(new AdminNotificationItem("refund", $"ตรวจสอบคืนเงิน {booking.BookingCode}", $"ยอดชำระ {booking.NetAmount:N0} บาท", booking.UpdatedAt, Url.Action("DamagesAndRefunds", "Accounting", new { tab = "refunds" })));
 
             var lowStockCount = await _db.Products.CountAsync(p => (p.IsActive == true || p.IsActive == null) && p.StockQty <= 5);
             var lowStock = await _db.Products
@@ -88,11 +65,8 @@ namespace Chinnaphat_8272_L005.Controllers
             if (maintenanceCourts.Count > 0)
                 notifications.Add(new AdminNotificationItem("court", $"คอร์ทปิดปรับปรุง {maintenanceCourts.Count} สนาม", string.Join(", ", maintenanceCourts), DateTime.Now, Url.Action(nameof(Court))));
 
-            var totalCount = await _db.Bookings.CountAsync(b => b.Status == "PENDING_VERIFY")
-                + await _db.CourtIssues.CountAsync(i => i.Status == "OPEN" || i.Status == "IN_PROGRESS")
-                + await _db.EquipmentDamages.CountAsync(d => d.Status == "REPORTED")
-                + await _db.Bookings.CountAsync(b => (b.Status == "CANCELLED" || b.Status == "REJECTED") && b.Payments.Any(p => p.Status == "PAID") && !b.Refunds.Any(r => r.Status == "COMPLETED"))
-                + await _db.Products.CountAsync(p => (p.IsActive == true || p.IsActive == null) && p.StockQty <= 5)
+            var totalCount = await _db.CourtIssues.CountAsync(i => i.Status == "OPEN" || i.Status == "IN_PROGRESS")
+                + lowStockCount
                 + maintenanceCourts.Count;
 
             var items = notifications.OrderByDescending(n => n.CreatedAt)
@@ -126,21 +100,6 @@ namespace Chinnaphat_8272_L005.Controllers
             }
 
             return View(courts);
-        }
-
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> ToggleCourtStatus(ushort courtId)
-        {
-            var court = await _db.Courts.FindAsync(courtId);
-            if (court != null)
-            {
-                court.Status = court.Status == "AVAILABLE" ? "MAINTENANCE" : "AVAILABLE";
-                court.UpdatedAt = DateTime.Now;
-                await _db.SaveChangesAsync();
-                TempData["SuccessMessage"] = $"เปลี่ยนสถานะ {court.CourtName} เป็น {(court.Status == "AVAILABLE" ? "เปิดให้บริการ" : "ปิดปรับปรุง")} สำเร็จ";
-            }
-            return RedirectToAction(nameof(Court));
         }
 
         [HttpPost]
@@ -200,11 +159,17 @@ namespace Chinnaphat_8272_L005.Controllers
             string unit,
             int stockQty,
             string? sku,
-            string? imageUrl)
+            IFormFile? imageFile)
         {
             if (string.IsNullOrWhiteSpace(productName))
             {
                 TempData["ErrorMessage"] = "กรุณาระบุชื่อสินค้าหรืออุปกรณ์";
+                return RedirectToAction(nameof(Product));
+            }
+
+            if (price < 0 || price > 99_999_999.99m || deposit < 0 || deposit > 99_999_999.99m)
+            {
+                TempData["ErrorMessage"] = "ราคาหรือค่ามัดจำต้องอยู่ระหว่าง 0 ถึง 99,999,999.99 บาท";
                 return RedirectToAction(nameof(Product));
             }
 
@@ -228,6 +193,13 @@ namespace Chinnaphat_8272_L005.Controllers
                 finalSku = $"{finalSku}-{new Random().Next(10, 99)}";
             }
 
+            var imageUrl = await SaveProductImageAsync(imageFile);
+            if (imageFile != null && imageUrl == null)
+            {
+                TempData["ErrorMessage"] = "รูปสินค้าไม่ถูกต้อง (รองรับ JPG, PNG, WEBP ขนาดไม่เกิน 5 MB)";
+                return RedirectToAction(nameof(Product));
+            }
+
             var newProduct = new Product
             {
                 ProductName = productName.Trim(),
@@ -238,14 +210,24 @@ namespace Chinnaphat_8272_L005.Controllers
                 Unit = string.IsNullOrWhiteSpace(unit) ? (productType == "RENT" ? "ชิ้น" : "ชิ้น") : unit.Trim(),
                 StockQty = stockQty < 0 ? 0 : stockQty,
                 Sku = finalSku,
-                ImageUrl = imageUrl?.Trim(),
+                ImageUrl = imageUrl,
                 IsActive = true,
                 CreatedAt = DateTime.Now,
                 UpdatedAt = DateTime.Now
             };
 
             _db.Products.Add(newProduct);
-            await _db.SaveChangesAsync();
+            try
+            {
+                await _db.SaveChangesAsync();
+            }
+            catch (DbUpdateException)
+            {
+                DeleteProductImage(imageUrl);
+                _db.Entry(newProduct).State = EntityState.Detached;
+                TempData["ErrorMessage"] = "บันทึกสินค้าไม่สำเร็จ กรุณาตรวจสอบราคาและข้อมูลสินค้า แล้วลองเลือกไฟล์รูปส่งใหม่อีกครั้ง";
+                return RedirectToAction(nameof(Product));
+            }
             TempData["SuccessMessage"] = $"เพิ่มสินค้า/อุปกรณ์ \"{newProduct.ProductName}\" ลงในระบบสำเร็จ";
 
             return RedirectToAction(nameof(Product));
@@ -263,13 +245,32 @@ namespace Chinnaphat_8272_L005.Controllers
             decimal deposit,
             string unit,
             int stockQty,
-            bool isActive)
+            bool isActive,
+            IFormFile? imageFile)
         {
             var product = await _db.Products.FindAsync(productId);
             if (product == null)
             {
                 TempData["ErrorMessage"] = "ไม่พบสินค้าหรืออุปกรณ์ที่ต้องการแก้ไข";
                 return RedirectToAction(nameof(Product));
+            }
+
+            if (price < 0 || price > 99_999_999.99m || deposit < 0 || deposit > 99_999_999.99m)
+            {
+                TempData["ErrorMessage"] = "ราคาหรือค่ามัดจำต้องอยู่ระหว่าง 0 ถึง 99,999,999.99 บาท";
+                return RedirectToAction(nameof(Product));
+            }
+
+            string? newImageUrl = null;
+            if (imageFile != null && imageFile.Length > 0)
+            {
+                newImageUrl = await SaveProductImageAsync(imageFile);
+                if (newImageUrl == null)
+                {
+                    TempData["ErrorMessage"] = "รูปสินค้าไม่ถูกต้อง (รองรับ JPG, PNG, WEBP ขนาดไม่เกิน 5 MB)";
+                    return RedirectToAction(nameof(Product));
+                }
+                product.ImageUrl = newImageUrl;
             }
 
             product.ProductName = productName.Trim();
@@ -282,10 +283,69 @@ namespace Chinnaphat_8272_L005.Controllers
             product.IsActive = isActive;
             product.UpdatedAt = DateTime.Now;
 
-            await _db.SaveChangesAsync();
+            try
+            {
+                await _db.SaveChangesAsync();
+            }
+            catch (DbUpdateException)
+            {
+                DeleteProductImage(newImageUrl);
+                _db.Entry(product).State = EntityState.Detached;
+                TempData["ErrorMessage"] = "บันทึกการแก้ไขไม่สำเร็จ กรุณาตรวจสอบราคาและข้อมูลสินค้า แล้วลองใหม่อีกครั้ง";
+                return RedirectToAction(nameof(Product));
+            }
             TempData["SuccessMessage"] = $"บันทึกการแก้ไข \"{product.ProductName}\" สำเร็จ";
 
             return RedirectToAction(nameof(Product));
+        }
+
+        private async Task<string?> SaveProductImageAsync(IFormFile? imageFile)
+        {
+            if (imageFile == null || imageFile.Length == 0) return null;
+            if (imageFile.Length > 5 * 1024 * 1024) return null;
+
+            var extension = Path.GetExtension(imageFile.FileName).ToLowerInvariant();
+            if (extension is not (".jpg" or ".jpeg" or ".png" or ".webp")) return null;
+
+            // Check file signature as well as its extension before storing it.
+            byte[] header = new byte[12];
+            await using (var input = imageFile.OpenReadStream())
+            {
+                int read = await input.ReadAsync(header.AsMemory(0, header.Length));
+                bool valid = extension switch
+                {
+                    ".jpg" or ".jpeg" => read >= 3 && header[0] == 0xFF && header[1] == 0xD8 && header[2] == 0xFF,
+                    ".png" => read >= 8 && header.AsSpan(0, 8).SequenceEqual(new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 }),
+                    ".webp" => read >= 12 && header.AsSpan(0, 4).SequenceEqual("RIFF"u8) && header.AsSpan(8, 4).SequenceEqual("WEBP"u8),
+                    _ => false
+                };
+                if (!valid) return null;
+            }
+
+            // Runtime uploads stay outside wwwroot so dotnet watch does not treat
+            // a newly uploaded product image as a source/content change and restart the app.
+            var folder = Path.Combine(Directory.GetCurrentDirectory(), "App_Data", "uploads", "products");
+            Directory.CreateDirectory(folder);
+            var fileName = $"{Guid.NewGuid():N}{extension}";
+            var path = Path.Combine(folder, fileName);
+            await using (var output = System.IO.File.Create(path))
+            await using (var input = imageFile.OpenReadStream())
+                await input.CopyToAsync(output);
+
+            return $"/uploads/products/{fileName}";
+        }
+
+        private static void DeleteProductImage(string? imageUrl)
+        {
+            if (string.IsNullOrWhiteSpace(imageUrl) || !imageUrl.StartsWith("/uploads/products/", StringComparison.Ordinal))
+                return;
+
+            var fileName = Path.GetFileName(imageUrl);
+            if (string.IsNullOrWhiteSpace(fileName)) return;
+
+            var path = Path.Combine(Directory.GetCurrentDirectory(), "App_Data", "uploads", "products", fileName);
+            if (System.IO.File.Exists(path))
+                System.IO.File.Delete(path);
         }
 
         // POST: ลบสินค้าออกจากฐานข้อมูล (หรือเปลี่ยนเป็นปิดใช้งานหากมีประวัติใช้งาน)
@@ -563,7 +623,7 @@ namespace Chinnaphat_8272_L005.Controllers
                 (discountType == "PERCENT" && discountValue > 100) ||
                 (discountType == "FREE_ITEM" && discountValue != decimal.Truncate(discountValue)) ||
                 (discountType != "PERCENT" && discountType != "FIXED_AMOUNT" && discountType != "FREE_ITEM") ||
-                minBillAmount < 0)
+                minBillAmount < 0 || requiredQty == 0 || nthItem == 0)
             {
                 TempData["ErrorMessage"] = "ข้อมูลโปรโมชั่นไม่ถูกต้อง กรุณาตรวจชื่อ รหัส และค่าส่วนลด";
                 return RedirectToAction(nameof(Promotion));
@@ -584,6 +644,19 @@ namespace Chinnaphat_8272_L005.Controllers
             if (promo == null)
             {
                 TempData["ErrorMessage"] = "ไม่พบโปรโมชั่นที่ต้องการแก้ไข";
+                return RedirectToAction(nameof(Promotion));
+            }
+
+            var requiredDiscountType = promo.PromoType switch
+            {
+                "TIME_BASED" or "VOLUME_SALE" or "BUNDLE_RENTAL" => "PERCENT",
+                "CROSS_SELL" => "FREE_ITEM",
+                "TOTAL_BILL" => "FIXED_AMOUNT",
+                _ => promo.DiscountType
+            };
+            if (!string.Equals(discountType, requiredDiscountType, StringComparison.Ordinal))
+            {
+                TempData["ErrorMessage"] = "ชนิดส่วนลดไม่ตรงกับรูปแบบโปรโมชั่น";
                 return RedirectToAction(nameof(Promotion));
             }
 
@@ -608,19 +681,18 @@ namespace Chinnaphat_8272_L005.Controllers
             }
 
             // อัปเดตกฎเงื่อนไข (PromotionRules)
-            if (requiredQty.HasValue || nthItem.HasValue)
+            if (requiredQty.HasValue && (promo.PromoType is "VOLUME_SALE" or "BUNDLE_RENTAL"))
             {
-                foreach (var rule in promo.PromotionRules)
+                foreach (var rule in promo.PromotionRules.Where(r => r.RuleKind == "CONDITION"))
                 {
-                    if (requiredQty.HasValue && rule.RequiredQty != requiredQty.Value)
-                    {
-                        rule.RequiredQty = requiredQty.Value;
-                    }
-                    if (nthItem.HasValue)
-                    {
-                        rule.NthItem = nthItem.Value;
-                    }
+                    rule.RequiredQty = requiredQty.Value;
                 }
+            }
+
+            if (nthItem.HasValue && promo.PromoType == "VOLUME_SALE")
+            {
+                var rewardRule = promo.PromotionRules.FirstOrDefault(r => r.RuleKind == "REWARD");
+                if (rewardRule != null) rewardRule.NthItem = nthItem.Value;
             }
 
             await _db.SaveChangesAsync();
@@ -890,10 +962,32 @@ namespace Chinnaphat_8272_L005.Controllers
             var issue = await _db.CourtIssues.FindAsync(issueId);
             if (issue != null)
             {
-                issue.Status = status;
                 Court? affectedCourt = issue.CourtId.HasValue
                     ? await _db.Courts.FindAsync(issue.CourtId.Value)
                     : null;
+
+                // A report stays informational until Admin accepts it. Only the
+                // OPEN -> IN_PROGRESS transition closes the court for maintenance.
+                if ((issue.Status == "OPEN" && status == "RESOLVED") ||
+                    (issue.Status == "IN_PROGRESS" && status == "OPEN"))
+                {
+                    TempData["ErrorMessage"] = issue.Status == "OPEN"
+                        ? "กรุณารับเรื่องก่อน จึงจะปิดงานซ่อมได้"
+                        : "รายการที่รับเรื่องแล้วไม่สามารถย้อนกลับเป็นรอตรวจสอบได้";
+                    return RedirectToAction(nameof(CourtIssues));
+                }
+                if (issue.Status == "RESOLVED" && status != "RESOLVED")
+                {
+                    TempData["ErrorMessage"] = "รายการที่ปิดงานแล้วไม่สามารถเปิดกลับได้ กรุณาสร้างรายการแจ้งใหม่";
+                    return RedirectToAction(nameof(CourtIssues));
+                }
+
+                issue.Status = status;
+                if (status == "IN_PROGRESS" && affectedCourt != null)
+                {
+                    affectedCourt.Status = "MAINTENANCE";
+                    affectedCourt.UpdatedAt = DateTime.Now;
+                }
 
                 if (issue.Status == "RESOLVED")
                 {
@@ -904,22 +998,23 @@ namespace Chinnaphat_8272_L005.Controllers
                         issue.ResolvedBy = uid;
                     }
 
-                    // Reopen the court only after every active report for it is resolved.
+                    // OPEN reports await review and must not keep a court closed.
                     if (affectedCourt != null && affectedCourt.Status == "MAINTENANCE")
                     {
-                        bool hasOtherActiveIssues = await _db.CourtIssues.AnyAsync(i =>
+                        bool hasOtherAcceptedIssues = await _db.CourtIssues.AnyAsync(i =>
                             i.IssueId != issue.IssueId && i.CourtId == issue.CourtId &&
-                            (i.Status == "OPEN" || i.Status == "IN_PROGRESS"));
-                        if (!hasOtherActiveIssues)
+                            i.Status == "IN_PROGRESS");
+                        if (!hasOtherAcceptedIssues)
+                        {
                             affectedCourt.Status = "AVAILABLE";
+                            affectedCourt.UpdatedAt = DateTime.Now;
+                        }
                     }
                 }
                 else
                 {
                     issue.ResolvedAt = null;
                     issue.ResolvedBy = null;
-                    if (affectedCourt != null)
-                        affectedCourt.Status = "MAINTENANCE";
                 }
                 await _db.SaveChangesAsync();
                 var courtMessage = affectedCourt == null
@@ -958,6 +1053,12 @@ namespace Chinnaphat_8272_L005.Controllers
             if (courtId.HasValue && !await _db.Courts.AnyAsync(c => c.CourtId == courtId.Value))
             {
                 TempData["ErrorMessage"] = "ไม่พบสนามที่เลือก";
+                return Redirect($"/Admin/CourtIssues#issue-{issueId}");
+            }
+
+            if (issue.Status == "IN_PROGRESS" && issue.CourtId != courtId)
+            {
+                TempData["ErrorMessage"] = "รายการที่กำลังซ่อมไม่สามารถเปลี่ยนสนามได้ เพื่อให้สถานะปิดปรับปรุงตรงกับรายการแจ้ง";
                 return Redirect($"/Admin/CourtIssues#issue-{issueId}");
             }
 

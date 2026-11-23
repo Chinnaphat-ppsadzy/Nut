@@ -24,8 +24,8 @@
 <style>
     .timeline-slot {
         height: 76px;
-        min-width: 112px;
-        width: 112px;
+        min-width: 118px;
+        width: 118px;
         font-size: 0.78rem;
         padding: 7px 8px;
         border: 1px solid #e2e8f0;
@@ -44,47 +44,67 @@
         z-index: 2;
     }
     .slot-available {
-        background-color: #ecfdf5;
-        color: #065f46;
-        border-color: #a7f3d0;
+        background-color: #e7f4eb !important;
+        color: #17633f;
+        border-color: #b9ddc5;
     }
     .slot-confirmed {
-        background-color: #fef3c7;
+        background-color: #fef3c7 !important;
         color: #92400e;
         border-color: #fde68a;
     }
     .slot-checkedin {
-        background-color: #dbeafe;
+        background-color: #dbeafe !important;
         color: #1e40af;
         border-color: #bfdbfe;
         font-weight: 600;
     }
     .slot-completed {
-        background-color: #f1f5f9;
+        background-color: #f1f5f9 !important;
         color: #64748b;
         border-color: #cbd5e1;
     }
     .slot-walkin {
-        background-color: #cffafe;
+        background-color: #cffafe !important;
         color: #155e75;
         border-color: #67e8f9;
     }
     .slot-blocked {
-        background-color: #fee2e2;
+        background-color: #fee2e2 !important;
         color: #991b1b;
         border-color: #fecaca;
     }
-    .timeline-matrix { min-width: max-content; }
-    .timeline-matrix thead th { position: sticky; top: 0; z-index: 3; white-space: nowrap; }
-    .timeline-matrix .timeline-court-cell { position: sticky; left: 0; z-index: 2; min-width: 130px; background: #fff; }
+    .slot-past {
+        background-color: #f1f5f9 !important;
+        color: #64748b;
+        border-color: #dbe3ea;
+        cursor: default;
+    }
+    .timeline-header { display: grid; grid-template-columns: minmax(280px, .8fr) minmax(0, 2fr); align-items: center; gap: 1rem; padding: 1rem 1.25rem; }
+    .timeline-legend { display: flex; justify-content: flex-end; align-items: center; flex-wrap: wrap; gap: .5rem; }
+    .timeline-legend .badge { display: inline-flex; align-items: center; padding: .42rem .68rem !important; border-radius: 999px; white-space: nowrap; line-height: 1.15; font-size: .72rem; font-weight: 600; }
+    .timeline-table-wrap { overflow-x: auto; overscroll-behavior-x: contain; }
+    .timeline-matrix { min-width: max-content; margin-bottom: 0; }
+    .timeline-matrix thead th { position: sticky; top: 0; z-index: 3; white-space: nowrap; padding: .72rem .55rem; vertical-align: middle; background: #245b42; border-color: rgba(255,255,255,.16); }
+    .timeline-matrix .timeline-court-cell { position: sticky; left: 0; z-index: 2; min-width: 135px; background: #fff; padding: .65rem; }
     .timeline-matrix thead th:first-child { left: 0; z-index: 4; }
+    .court-name-badge { display: block; padding: .4rem .55rem; border-radius: .6rem; background: #e8f3ec; color: #205c40; font-weight: 700; }
     .timeline-slot .slot-main { display: block; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .timeline-slot .slot-meta { display: block; margin-top: 4px; font-size: .67rem; color: inherit; opacity: .82; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .timeline-slot.slot-available { cursor: pointer; }
-    .timeline-slot.slot-available .walkin-action { display: inline-flex; align-items: center; gap: 4px; margin-top: 5px; padding: 3px 8px; border: 1px solid #a7f3d0; border-radius: 999px; background: #fff; color: #087443; font-size: .68rem; font-weight: 600; }
-    .timeline-slot.slot-available:hover .walkin-action { background: #087443; color: #fff; }
+    .timeline-slot.slot-available .walkin-action { display: inline-flex; width: 27px; height: 27px; align-items: center; justify-content: center; margin-top: 5px; padding: 0; border: 1px solid #bfdac9; border-radius: 50%; background: #fff; color: #087443; font-size: .8rem; font-weight: 600; }
+    .timeline-slot.slot-available:hover { background-color: #d5ebdc !important; }
+    .timeline-slot.slot-available:hover .walkin-action { background: #087443; border-color: #087443; color: #fff; }
+    .timeline-matrix tbody tr:hover .timeline-court-cell { background: #f7fbf8; }
+    .timeline-matrix td, .timeline-matrix th { border-color: #e5ece8; }
+    @@media (max-width: 1100px) {
+        .timeline-header { grid-template-columns: 1fr; }
+        .timeline-legend { justify-content: flex-start; }
+    }
     @@media (max-width: 768px) {
-        .timeline-slot { min-width: 104px; width: 104px; height: 70px; padding: 5px; }
+        .timeline-slot { min-width: 112px; width: 112px; height: 72px; padding: 5px; }
+        .timeline-header { padding: .9rem; }
+        .timeline-legend .badge { font-size: .68rem; }
     }
 </style>
 
@@ -118,13 +138,7 @@
                     <button type="button" class="btn btn-outline-light btn-sm fw-semibold" onclick="setScheduleDate('@DateTime.Today.AddDays(1).ToString("yyyy-MM-dd")')">
                         พรุ่งนี้
                     </button>
-                    <div class="input-group" style="max-width: 200px;">
-                        <span class="input-group-text bg-white border-0"><i class="bi bi-calendar3 text-success"></i></span>
-                        <input type="date" id="scheduleDateInput" name="date" class="form-control border-0" value="@selectedDateStr" onchange="this.form.submit()" />
-                    </div>
-                    <button type="submit" class="btn btn-dark fw-bold px-3" style="border-radius:8px;">
-                        <i class="bi bi-search me-1"></i> ค้นหา
-                    </button>
+                    <input type="hidden" id="scheduleDateInput" name="date" value="@selectedDateStr" />
                 </form>
             </div>
         </div>
@@ -210,28 +224,28 @@
      DAILY TIMETABLE GRID (ตารางช่วงเวลาคอร์ทแบบ Matrix)
      ============================================================ -->
 <div class="card border-0 shadow-sm mb-4" style="border-radius:18px; overflow:hidden;">
-    <div class="p-3 bg-white border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div class="timeline-header bg-white border-bottom">
         <h5 class="fw-bold mb-0 text-dark">
             <i class="bi bi-grid-3x3-gap-fill text-success me-2"></i>ผังตารางเวลาสนามประจำวัน (Timeline Matrix)
         </h5>
-        <div class="d-flex align-items-center gap-2 small flex-wrap">
-            <span class="badge slot-available px-2 py-1"><i class="bi bi-circle-fill me-1 text-success"></i> ว่าง</span>
-            <span class="badge slot-confirmed px-2 py-1"><i class="bi bi-circle-fill me-1 text-warning"></i> ยืนยันแล้ว (รอเช็คอิน)</span>
-            <span class="badge slot-checkedin px-2 py-1"><i class="bi bi-circle-fill me-1 text-primary"></i> เช็คอินแล้ว (กำลังเล่น)</span>
-            <span class="badge slot-completed px-2 py-1"><i class="bi bi-circle-fill me-1 text-secondary"></i> เล่นเสร็จสิ้น</span>
-            <span class="badge slot-walkin px-2 py-1"><i class="bi bi-circle-fill me-1 text-info"></i> Walk-in ระบุคอร์ท/เวลาแล้ว</span>
-            <span class="badge slot-blocked px-2 py-1"><i class="bi bi-circle-fill me-1 text-danger"></i> ปิดซ่อมบำรุง</span>
+        <div class="timeline-legend small">
+            <span class="badge slot-available" title="คอร์ทและช่วงเวลาว่าง"><i class="bi bi-circle-fill me-1 text-success"></i> ว่าง</span>
+            <span class="badge slot-confirmed" title="ยืนยันแล้วและรอเช็คอิน"><i class="bi bi-circle-fill me-1 text-warning"></i> รอเช็คอิน</span>
+            <span class="badge slot-checkedin" title="ลูกค้าเช็คอินและกำลังใช้สนาม"><i class="bi bi-circle-fill me-1 text-primary"></i> กำลังเล่น</span>
+            <span class="badge slot-completed" title="ใช้สนามเสร็จสิ้น"><i class="bi bi-circle-fill me-1 text-secondary"></i> เสร็จแล้ว</span>
+            <span class="badge slot-walkin" title="Walk-in ระบุคอร์ทและเวลาแล้ว"><i class="bi bi-circle-fill me-1 text-info"></i> Walk-in</span>
+            <span class="badge slot-blocked" title="ปิดคอร์ทเพื่อซ่อมบำรุง"><i class="bi bi-circle-fill me-1 text-danger"></i> ปิดซ่อม</span>
         </div>
     </div>
 
-    <div class="table-responsive">
+    <div class="table-responsive timeline-table-wrap">
         <table class="table table-bordered mb-0 align-middle timeline-matrix">
             <thead class="table-dark" style="background: linear-gradient(135deg, #1a472a 0%, #2d6a4f 100%);">
                 <tr class="small text-center">
                     <th style="min-width:130px; width:130px;">สนาม / ช่วงเวลา</th>
                     @foreach (var slot in timeSlots)
                     {
-                        <th style="min-width:105px;">
+                        <th style="min-width:112px;">
                             <div>@slot.StartTime.ToString("HH:mm") - @slot.EndTime.ToString("HH:mm")</div>
                         </th>
                     }
@@ -242,7 +256,7 @@
                 {
                     <tr>
                         <td class="fw-bold text-center align-middle border-end timeline-court-cell">
-                            <span class="badge bg-dark fs-6 d-block mb-1">@court.CourtName</span>
+                            <span class="court-name-badge mb-1">@court.CourtName</span>
                             <small class="text-muted d-block" style="font-size:0.75rem;">@court.PricePerHour.ToString("N0") ฿/ชม.</small>
                         </td>
 
@@ -260,6 +274,8 @@
                                 .SelectMany(b => b.BookingSlots, (b, bs) => new { Booking = b, Slot = bs })
                                 .FirstOrDefault(x => x.Slot.CourtId == court.CourtId && x.Slot.SlotId == slot.SlotId);
                             var walkInSlot = scheduledWalkIns.FirstOrDefault(q => q.CourtId == court.CourtId && q.SlotId == slot.SlotId);
+                            bool slotHasPassed = selectedDate.Date < DateTime.Today ||
+                                (selectedDate.Date == DateTime.Today && slot.EndTime <= TimeOnly.FromDateTime(DateTime.Now));
 
                             if (block != null)
                             {
@@ -332,11 +348,20 @@
                                     <small class="text-truncate w-100">@court.Status</small>
                                 </td>
                             }
+                            else if (slotHasPassed)
+                            {
+                                <td class="timeline-slot slot-past" title="ช่วงเวลานี้ผ่านไปแล้ว ไม่สามารถเปิดคิว Walk-in ได้">
+                                    <span class="slot-main"><i class="bi bi-clock-history me-1"></i>@(selectedDate.Date < DateTime.Today ? "วันที่ผ่านมาแล้ว" : "หมดเวลาแล้ว")</span>
+                                    <span class="slot-meta">ดูย้อนหลังได้ · จองไม่ได้</span>
+                                </td>
+                            }
                             else
                             {
-                                <td class="timeline-slot slot-available" onclick="promptWalkInForSlot('@court.CourtId', '@court.CourtName', '@slot.SlotId', '@slot.StartTime.ToString("HH:mm") - @slot.EndTime.ToString("HH:mm")')">
+                                <td class="timeline-slot slot-available" title="ว่าง · คลิกเพื่อออกคิว Walk-in" onclick="promptWalkInForSlot('@court.CourtId', '@court.CourtName', '@slot.SlotId', '@slot.StartTime.ToString("HH:mm") - @slot.EndTime.ToString("HH:mm")')">
                                     <span class="slot-main"><i class="bi bi-check-circle-fill me-1"></i>ว่าง</span>
-                                    <span class="walkin-action"><i class="bi bi-plus-circle"></i>เพิ่ม Walk-in</span>
+                                    <button type="button" class="walkin-action" aria-label="เพิ่มคิว Walk-in @court.CourtName เวลา @slot.StartTime.ToString("HH:mm")" title="เพิ่มคิว Walk-in" onclick="event.stopPropagation(); promptWalkInForSlot('@court.CourtId', '@court.CourtName', '@slot.SlotId', '@slot.StartTime.ToString("HH:mm") - @slot.EndTime.ToString("HH:mm")')">
+                                        <i class="bi bi-plus-lg"></i>
+                                    </button>
                                 </td>
                             }
                         }
@@ -621,6 +646,13 @@
 
         // Direct prompt Walk-in for available slot
         function promptWalkInForSlot(courtId, courtName, slotId, timeText) {
+            const scheduleDate = document.getElementById('scheduleDateInput')?.value;
+            const today = new Date();
+            const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+            if (scheduleDate && scheduleDate < todayIso) {
+                alert('วันที่ผ่านไปแล้ว ไม่สามารถเปิดคิวหรือจองย้อนหลังได้');
+                return;
+            }
             if (confirm(`คอร์ท ${courtName} ช่วงเวลา ${timeText} ยังว่าง\nต้องการเปิดหน้าลงทะเบียนคิว Walk-in หรือไม่?`)) {
                 window.location.href = `/CourtStaff/WalkIn?courtId=${courtId}&slotId=${slotId}`;
             }

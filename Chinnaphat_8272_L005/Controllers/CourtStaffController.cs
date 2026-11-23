@@ -19,7 +19,7 @@ namespace Chinnaphat_8272_L005.Controllers
         public DateTime? FansTurnedOnAt { get; set; }
     }
 
-    [RequireRole("COURT_STAFF", "ADMIN")]
+    [RequireRole("COURT_STAFF")]
     public class CourtStaffController : Controller
     {
         private readonly Csi402dbContext _db;
@@ -549,7 +549,7 @@ namespace Chinnaphat_8272_L005.Controllers
             if (extension == null)
                 return Json(new { success = false, message = "กรุณาแนบสลิป JPG, PNG หรือ WEBP ขนาดไม่เกิน 5 MB" });
 
-            var uploadsFolder = Path.Combine(_env.WebRootPath, "uploads", "slips");
+            var uploadsFolder = UploadStorage.GetSlipDirectory(_env);
             Directory.CreateDirectory(uploadsFolder);
             var safeName = $"walkin_W{queue.QueueNo:D2}_{queue.QueueDate:yyyyMMdd}_{Guid.NewGuid():N}{extension}";
             var fullPath = Path.Combine(uploadsFolder, safeName);

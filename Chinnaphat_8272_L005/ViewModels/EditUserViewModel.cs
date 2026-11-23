@@ -25,6 +25,7 @@ namespace Chinnaphat_8272_L005.ViewModels
         public string Email { get; set; } = string.Empty;
 
         [Display(Name = "เบอร์โทรศัพท์")]
+        [RegularExpression(@"^$|^[0-9]{10}$", ErrorMessage = "กรุณากรอกเบอร์โทรศัพท์ 10 หลัก โดยไม่ใส่ขีด")]
         public string? Phone { get; set; }
 
         // Password เป็น optional — ถ้าเว้นว่างไว้จะไม่เปลี่ยน

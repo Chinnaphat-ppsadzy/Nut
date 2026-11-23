@@ -12,6 +12,7 @@
     int rejectedCount = ViewBag.RejectedCount ?? 0;
     int totalCount = ViewBag.TotalCount ?? 0;
     var walkInSlips = ViewBag.WalkInPendingPayments as List<WalkInQueue> ?? new();
+    var posPayments = ViewBag.PosPendingPayments as List<PosSaleTransaction> ?? new();
 }
 
 <style>
@@ -48,13 +49,41 @@
                     ตรวจสอบสลิปโอนเงินจากลูกค้า ตรวจสอบยอดสุทธิ และกด "อนุมัติ" เพื่อยืนยันคิวจองสนามและปล่อยคอร์ทให้พร้อมใช้งาน
                 </p>
             </div>
-            <div class="d-flex gap-2">
-                <a asp-action="Reports" class="btn btn-light fw-bold text-success px-4 py-2 shadow-sm" style="border-radius:10px;">
-                    <i class="bi bi-graph-up-arrow me-1"></i> ดูรายงานยอดขาย
-                </a>
-            </div>
         </div>
     </div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4 rounded-4 overflow-hidden">
+    <div class="p-3 bg-white border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <h5 class="fw-bold mb-0"><i class="bi bi-shop-window text-success me-2"></i>สลิปขายสินค้า / เช่าอุปกรณ์ (POS)</h5>
+        <span class="badge bg-warning-subtle text-dark">@posPayments.Count รายการรอตรวจ</span>
+    </div>
+    @if (posPayments.Any())
+    {
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light"><tr><th>สลิป</th><th>เลขที่บิล / ลูกค้า</th><th>รายการ</th><th>เวลาส่ง</th><th>ยอดโอน</th><th class="text-end">ตรวจสอบ</th></tr></thead>
+                <tbody>
+                @foreach (var sale in posPayments)
+                {
+                    var slipUrl = Url.Action("PosSaleSlip", "Accounting", new { saleId = sale.SaleId });
+                    <tr>
+                        <td><img src="@slipUrl" alt="สลิป POS" class="slip-thumbnail" onclick="viewFullSlipModal('@slipUrl', '@sale.ReceiptCode', '@sale.NetTotal.ToString("N2")', '@sale.CustomerName')" /></td>
+                        <td><strong class="font-monospace text-primary">@sale.ReceiptCode</strong><span class="d-block fw-semibold">@sale.CustomerName</span><small class="text-muted">@(sale.CustomerPhone ?? "-")</small></td>
+                        <td style="max-width:360px;white-space:normal">@sale.ItemsSummary</td>
+                        <td>@sale.CreatedAt.ToString("dd/MM/yyyy HH:mm")</td>
+                        <td class="fw-bold text-success">@sale.NetTotal.ToString("N2") ฿</td>
+                        <td class="text-end text-nowrap"><button type="button" class="btn btn-sm btn-success" onclick="reviewPosSale(@sale.SaleId, true)"><i class="bi bi-check-circle me-1"></i>อนุมัติ</button> <button type="button" class="btn btn-sm btn-outline-danger" onclick="reviewPosSale(@sale.SaleId, false)"><i class="bi bi-x-circle me-1"></i>ปฏิเสธ</button></td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+    else
+    {
+        <div class="p-4 text-center text-muted"><i class="bi bi-check-circle text-success me-1"></i>ไม่มีสลิป POS รอตรวจสอบ</div>
+    }
 </div>
 
 <!-- ============================================================
@@ -417,6 +446,21 @@
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'RequestVerificationToken': antiforgeryToken() },
                 body: `queueId=${queueId}&reason=${encodeURIComponent(reason)}&__RequestVerificationToken=${encodeURIComponent(antiforgeryToken())}`
+            }).then(res => res.json()).then(data => {
+                alert(data.message || (data.success ? 'บันทึกสำเร็จ' : 'ทำรายการไม่สำเร็จ'));
+                if (data.success) window.location.reload();
+            }).catch(() => alert('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ กรุณาลองใหม่'));
+        }
+
+        function reviewPosSale(saleId, approve) {
+            const reason = approve ? '' : (prompt('ระบุเหตุผลที่ปฏิเสธสลิป:', 'ยอดเงินหรือข้อมูลสลิปไม่ถูกต้อง') || '');
+            if (!approve && !reason.trim()) return;
+            const action = approve ? 'ApprovePosSale' : 'RejectPosSale';
+            if (!confirm(approve ? 'ยืนยันยอดเงินและอนุมัติรายการขายนี้หรือไม่?' : 'ยืนยันปฏิเสธสลิปและคืนสินค้าเข้าสต็อกหรือไม่?')) return;
+            fetch(`/Accounting/${action}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'RequestVerificationToken': antiforgeryToken() },
+                body: `saleId=${saleId}&reason=${encodeURIComponent(reason)}&__RequestVerificationToken=${encodeURIComponent(antiforgeryToken())}`
             }).then(res => res.json()).then(data => {
                 alert(data.message || (data.success ? 'บันทึกสำเร็จ' : 'ทำรายการไม่สำเร็จ'));
                 if (data.success) window.location.reload();

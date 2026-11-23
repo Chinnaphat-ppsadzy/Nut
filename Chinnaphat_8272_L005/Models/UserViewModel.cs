@@ -25,7 +25,7 @@ namespace Chinnaphat_8272_L005.Models
 
         [Required(ErrorMessage = "กรุณากรอกรหัสผ่าน")]
         [DataType(DataType.Password)]
-        [StringLength(100, MinimumLength = 4, ErrorMessage = "รหัสผ่านต้องมีอย่างน้อย 4 ตัวอักษร")]
+        [StringLength(100, MinimumLength = 6, ErrorMessage = "รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร")]
         [Display(Name = "รหัสผ่าน")]
         public string Password { get; set; } = string.Empty;
 
@@ -37,6 +37,7 @@ namespace Chinnaphat_8272_L005.Models
         public string? Gender { get; set; }
 
         [Required(ErrorMessage = "กรุณากรอกเบอร์โทรศัพท์")]
+        [RegularExpression(@"^[0-9]{10}$", ErrorMessage = "กรุณากรอกเบอร์โทรศัพท์ 10 หลัก โดยไม่ใส่ขีด")]
         [Display(Name = "เบอร์โทรศัพท์")]
         public string Phone { get; set; } = string.Empty;
 

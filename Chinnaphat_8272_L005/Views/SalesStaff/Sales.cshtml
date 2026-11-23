@@ -79,6 +79,21 @@
         justify-content: center;
         border-radius: 6px;
     }
+    .pos-pagination { display:flex; justify-content:space-between; align-items:center; gap:1rem; padding:.8rem 1rem; margin-top:1rem; background:#fff; border:1px solid #e2e8f0; border-radius:12px; }
+    #posPaymentModal .pos-payment-dialog { width:calc(100% - 2rem); max-width:580px; }
+    #posPaymentModal .modal-content { max-height:calc(100vh - 2rem); }
+    #posPaymentModal .pos-payment-qr { width:235px; height:319px; max-width:100%; object-fit:contain; }
+    #posPaymentModal .pos-payment-card { background:linear-gradient(160deg,#f2fbf6,#fff 58%); border:1px solid #b7e4ca; }
+    #posPaymentModal .pos-payment-amount { display:inline-flex; align-items:center; gap:.4rem; padding:.35rem .9rem; border-radius:999px; background:#e8f5e9; color:#1a472a; }
+    #posPaymentModal .pos-slip-upload { padding:1rem; background:#f8fafc; border:1px solid #e2e8f0; border-radius:14px; }
+    #posPaymentModal .pos-payment-footer { display:flex; justify-content:flex-end; gap:.65rem; }
+    #posPaymentModal .pos-payment-header { position:relative; justify-content:center; text-align:center; padding:1.1rem 3.5rem; }
+    #posPaymentModal .pos-payment-header .btn-close { position:absolute; right:1.15rem; top:50%; transform:translateY(-50%); margin:0; }
+    @@media (max-width:575.98px) {
+        #posPaymentModal .pos-payment-qr { width:min(58vw, 210px); height:min(79vw, 285px); }
+        #posPaymentModal .pos-payment-footer { flex-direction:column-reverse; }
+        #posPaymentModal .pos-payment-footer .btn { width:100%; }
+    }
 </style>
 
 <!-- Alert messages -->
@@ -94,7 +109,7 @@
                 {
                     <div class="mt-2">
                         <button type="button" class="btn btn-sm btn-outline-success" onclick="openReceiptModal()">
-                            <i class="bi bi-receipt me-1"></i> ดูใบเสร็จรับเงิน (@TempData["LastReceiptCode"])
+                            <i class="bi bi-receipt me-1"></i> ดูใบรับรายการ (@TempData["LastReceiptCode"])
                         </button>
                     </div>
                 }
@@ -200,6 +215,17 @@
                                     }
                                 </div>
 
+                                <div class="text-center rounded-3 mb-2 d-flex align-items-center justify-content-center" style="height:110px;background:@(isSale ? "#f0fdf4" : "#eff6ff");">
+                                    @if (!string.IsNullOrWhiteSpace(prod.ImageUrl))
+                                    {
+                                        <img src="@prod.ImageUrl" alt="@prod.ProductName" loading="lazy" style="max-width:100%;max-height:100px;object-fit:contain;" />
+                                    }
+                                    else
+                                    {
+                                        <i class="bi bi-box-seam text-secondary" style="font-size:3rem;"></i>
+                                    }
+                                </div>
+
                                 <!-- Title & Category -->
                                 <h6 class="fw-bold text-dark mb-1" style="font-size:0.95rem; line-height:1.3;">
                                     @prod.ProductName
@@ -259,6 +285,13 @@
                 }
             }
         </div>
+        <div class="pos-pagination" id="productPagination" style="display:none">
+            <small class="text-muted" id="productPageInfo"></small>
+            <div class="btn-group btn-group-sm" role="group" aria-label="เปลี่ยนหน้าสินค้า">
+                <button type="button" class="btn btn-outline-success" id="productPrev" onclick="changeProductPage(-1)">ก่อนหน้า</button>
+                <button type="button" class="btn btn-outline-success" id="productNext" onclick="changeProductPage(1)">ถัดไป</button>
+            </div>
+        </div>
     </div>
 
     <!-- ================= RIGHT AREA: POS BILL / CART ================= -->
@@ -278,7 +311,7 @@
             </div>
 
             <!-- Form for Checkout -->
-            <form asp-action="Checkout" asp-controller="SalesStaff" method="post" id="posCheckoutForm">
+            <form asp-action="Checkout" asp-controller="SalesStaff" method="post" enctype="multipart/form-data" id="posCheckoutForm">
                 @Html.AntiForgeryToken()
                 <input type="hidden" name="itemsJson" id="hiddenItemsJson" value="[]" />
                 <input type="hidden" name="subtotal" id="hiddenSubtotal" value="0" />
@@ -342,31 +375,46 @@
                     </div>
                 </div>
 
-                <!-- Payment Method -->
-                <div class="mb-3">
-                    <label class="form-label fw-semibold small mb-1">ช่องทางชำระเงิน:</label>
-                    <div class="row g-2">
-                        <div class="col-6">
-                            <input type="radio" class="btn-check" name="paymentMethod" id="payCash" value="CASH" checked>
-                            <label class="btn btn-outline-success w-100 btn-sm py-2" for="payCash">
-                                <i class="bi bi-cash-coin me-1"></i> เงินสด (Cash)
-                            </label>
-                        </div>
-                        <div class="col-6">
-                            <input type="radio" class="btn-check" name="paymentMethod" id="payQr" value="QR">
-                            <label class="btn btn-outline-primary w-100 btn-sm py-2" for="payQr">
-                                <i class="bi bi-qr-code-scan me-1"></i> โอนเงิน QR
-                            </label>
-                        </div>
-                    </div>
-                </div>
+                <input type="hidden" name="paymentMethod" value="QR" />
 
                 <!-- Submit Button -->
-                <button type="submit" class="btn btn-success w-100 py-3 fw-bold shadow-sm" id="btnCheckout"
+                <button type="button" class="btn btn-success w-100 py-3 fw-bold shadow-sm" id="btnCheckout" onclick="openPaymentModal()"
                         style="border-radius:12px; background:linear-gradient(135deg, #1a472a, #2d6a4f); border:none;" disabled>
-                    <i class="bi bi-check2-circle me-1"></i> ยืนยันการขาย & ตัดสต็อก
+                    <i class="bi bi-qr-code-scan me-1"></i> ชำระเงินด้วย QR
                 </button>
+
             </form>
+        </div>
+    </div>
+</div>
+
+<!-- Keep modal outside the sticky cart panel so its backdrop stays behind the dialog. -->
+<div class="modal fade" id="posPaymentModal" tabindex="-1" aria-labelledby="posPaymentModalTitle" aria-hidden="true" data-bs-backdrop="true" data-bs-keyboard="true">
+    <div class="modal-dialog modal-dialog-centered pos-payment-dialog">
+        <div class="modal-content border-0 shadow" style="border-radius:16px;">
+            <div class="modal-header pos-payment-header border-0 text-white" style="background:linear-gradient(135deg,#1a472a,#52b788);border-radius:16px 16px 0 0;">
+                <div class="w-100">
+                    <h5 class="modal-title fw-bold mb-1" id="posPaymentModalTitle"><i class="bi bi-qr-code-scan me-1"></i>ชำระเงินด้วย PromptPay</h5>
+                    <small class="text-white opacity-75">สแกน QR แล้วแนบสลิปเพื่อส่งให้ฝ่ายบัญชี</small>
+                </div>
+                <button type="button" class="btn-close btn-close-white ms-3" onclick="closePaymentModal()" aria-label="ปิดหน้าต่างชำระเงิน" title="ปิด"></button>
+            </div>
+            <div class="modal-body p-4 overflow-auto">
+                <div class="text-center rounded-4 p-3 p-sm-4 pos-payment-card">
+                    <img src="/images/promptpay-payment.png" alt="PromptPay QR" class="pos-payment-qr" />
+                    <div class="mt-2"><span class="pos-payment-amount fw-semibold"><i class="bi bi-cash-coin"></i>ยอดที่ต้องชำระ <strong id="posQrAmount">0 ฿</strong></span></div>
+                    <small class="text-muted d-block mt-1">สแกน QR แล้วกรอกยอดตามที่แสดง</small>
+                </div>
+                <div class="mt-4 pos-slip-upload">
+                    <label for="posSlipFile" class="form-label fw-semibold mb-2"><i class="bi bi-cloud-arrow-up text-success me-1"></i>แนบสลิปส่งฝ่ายบัญชี <span class="text-danger">*</span></label>
+                    <input type="file" class="form-control" id="posSlipFile" name="slipFile" form="posCheckoutForm" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" required />
+                    <small class="text-muted d-block mt-2">รองรับ JPG, PNG หรือ WEBP ขนาดไม่เกิน 5 MB เพื่อให้ฝ่ายบัญชีตรวจสอบ</small>
+                </div>
+            </div>
+            <div class="modal-footer pos-payment-footer border-top bg-light px-4 py-3" style="border-radius:0 0 16px 16px;">
+                <button type="button" class="btn btn-outline-secondary px-4" onclick="closePaymentModal()"><i class="bi bi-arrow-left me-1"></i>กลับไปแก้รายการ</button>
+                <button type="submit" class="btn btn-success fw-semibold px-4" form="posCheckoutForm"><i class="bi bi-send-check me-1"></i>ส่งสลิปให้บัญชี</button>
+            </div>
         </div>
     </div>
 </div>
@@ -379,13 +427,13 @@
         <div class="modal-content" style="border-radius:18px; border:none; box-shadow:0 20px 60px rgba(0,0,0,0.2);">
             <div class="modal-header bg-success text-white" style="border-top-left-radius:18px; border-top-right-radius:18px;">
                 <h6 class="modal-title fw-bold">
-                    <i class="bi bi-receipt me-1"></i> ใบเสร็จรับเงินหน้าร้าน
+                    <i class="bi bi-receipt me-1"></i> ใบรับรายการชำระเงิน
                 </h6>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-4 text-center">
                 <div class="mb-2">
-                    <i class="bi bi-check-circle-fill text-success" style="font-size:3rem;"></i>
+                    <i class="bi bi-hourglass-split text-warning" style="font-size:3rem;"></i>
                 </div>
                 <h5 class="fw-bold mb-1">CourtBook Arena</h5>
                 <small class="text-muted d-block mb-3">สาขาพญาไท &bull; ฝ่ายซื้อ-เช่าอุปกรณ์</small>
@@ -409,16 +457,14 @@
                     </div>
                     <hr class="my-2">
                     <div class="d-flex justify-content-between fw-bold fs-6 text-dark">
-                        <span>ยอดชำระ:</span>
+                    <span>ยอดรอตรวจสอบ:</span>
                         <span class="text-success">@TempData["LastNetTotal"] ฿</span>
                     </div>
                 </div>
 
                 <div class="d-flex gap-2 justify-content-center">
                     <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">ปิด</button>
-                    <button type="button" class="btn btn-outline-success btn-sm px-3" onclick="window.print()">
-                        <i class="bi bi-printer me-1"></i> พิมพ์
-                    </button>
+                    <span class="small text-warning fw-semibold">รอฝ่ายบัญชีตรวจสอบสลิป</span>
                 </div>
             </div>
         </div>
@@ -429,6 +475,10 @@
     <script>
         // In-memory POS Cart
         let posCart = [];
+        let productPage = 1;
+        const productPageSize = 9;
+        let productCategory = '@Html.Raw(activeCat)';
+        let productSearch = '';
 
         // Active Promotions from DB
         const systemPromotions = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
@@ -542,7 +592,10 @@
                             </button>
                         </div>
                         <div class="d-flex justify-content-between align-items-center">
-                            <span class="text-muted" style="font-size:0.8rem;">${item.price.toLocaleString()} ฿ x ${item.qty} ${item.unit}</span>
+                            <div>
+                                <span class="text-muted d-block" style="font-size:0.8rem;">${item.price.toLocaleString()} ฿ x ${item.qty} ${item.unit}</span>
+                                ${item.type === 'RENT' && item.deposit > 0 ? `<small class="text-warning-emphasis">มัดจำ ${item.deposit.toLocaleString()} ฿ x ${item.qty} = ${(item.deposit * item.qty).toLocaleString()} ฿</small>` : ''}
+                            </div>
                             <div class="d-flex align-items-center gap-1">
                                 <button type="button" class="btn btn-sm btn-outline-secondary qty-btn" onclick="changeQty(${item.id}, -1)">-</button>
                                 <span class="fw-bold px-2 small">${item.qty}</span>
@@ -590,6 +643,7 @@
 
             document.getElementById('posSubtotalText').innerText = `${subtotal.toLocaleString()} ฿`;
             document.getElementById('posNetTotalText').innerText = `${netTotal.toLocaleString()} ฿`;
+            document.getElementById('posQrAmount').innerText = `${netTotal.toLocaleString()} ฿`;
 
             // Hidden form fields
             document.getElementById('hiddenSubtotal').value = subtotal;
@@ -642,30 +696,54 @@
             document.querySelectorAll('.cat-pill-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
 
-            const cards = document.querySelectorAll('.product-card-wrapper');
-            cards.forEach(card => {
-                const type = card.getAttribute('data-type');
-                const cId = card.getAttribute('data-cat');
-                if (cat === 'ALL' || type === cat || cId === cat) {
-                    card.style.display = '';
-                } else {
-                    card.style.display = 'none';
-                }
-            });
+            productCategory = cat;
+            productPage = 1;
+            renderProductPage();
         }
 
         // Filter cards by search keyword
         function filterCardsBySearch(query) {
-            const q = query.trim().toLowerCase();
-            const cards = document.querySelectorAll('.product-card-wrapper');
-            cards.forEach(card => {
-                const title = card.getAttribute('data-title');
-                if (!q || title.includes(q)) {
-                    card.style.display = '';
-                } else {
-                    card.style.display = 'none';
-                }
+            productSearch = query.trim().toLowerCase();
+            productPage = 1;
+            renderProductPage();
+        }
+
+        function renderProductPage() {
+            const cards = [...document.querySelectorAll('.product-card-wrapper')];
+            const filtered = cards.filter(card => {
+                const type = card.dataset.type;
+                const matchesCategory = productCategory === 'ALL' || type === productCategory || card.dataset.cat === productCategory;
+                return matchesCategory && (!productSearch || (card.dataset.title || '').includes(productSearch));
             });
+            const pageCount = Math.max(1, Math.ceil(filtered.length / productPageSize));
+            productPage = Math.min(productPage, pageCount);
+            const start = (productPage - 1) * productPageSize;
+            cards.forEach(card => card.style.display = 'none');
+            filtered.slice(start, start + productPageSize).forEach(card => card.style.display = '');
+            const pager = document.getElementById('productPagination');
+            pager.style.display = filtered.length > productPageSize ? 'flex' : 'none';
+            document.getElementById('productPageInfo').textContent = filtered.length
+                ? `แสดง ${start + 1}–${Math.min(start + productPageSize, filtered.length)} จาก ${filtered.length} รายการ · หน้า ${productPage}/${pageCount}`
+                : 'ไม่พบสินค้าที่ค้นหา';
+            document.getElementById('productPrev').disabled = productPage <= 1;
+            document.getElementById('productNext').disabled = productPage >= pageCount;
+        }
+
+        function changeProductPage(delta) {
+            productPage += delta;
+            renderProductPage();
+            document.getElementById('productCardsContainer').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function openPaymentModal() {
+            if (posCart.length === 0) return;
+            const modalElement = document.getElementById('posPaymentModal');
+            bootstrap.Modal.getOrCreateInstance(modalElement).show();
+        }
+
+        function closePaymentModal() {
+            const modalElement = document.getElementById('posPaymentModal');
+            bootstrap.Modal.getOrCreateInstance(modalElement).hide();
         }
 
         function openReceiptModal() {
@@ -674,6 +752,7 @@
 
         // Auto open receipt if just checked out
         window.addEventListener('DOMContentLoaded', () => {
+            renderProductPage();
             @if (TempData["LastReceiptCode"] != null)
             {
                 <text>openReceiptModal();</text>

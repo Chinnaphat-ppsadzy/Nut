@@ -170,6 +170,22 @@
     @foreach (var promo in Model)
     {
         bool isActive = promo.IsActive == true;
+        var conditionRules = promo.PromotionRules.Where(r => r.RuleKind == "CONDITION").ToList();
+        string RuleDescription(Chinnaphat_8272_L005.Models.PromotionRule rule)
+        {
+            var categoryCode = rule.Category?.CategoryCode ?? string.Empty;
+            var categoryName = rule.Category?.CategoryName ?? "สินค้า";
+            var unit = categoryCode switch
+            {
+                "SHUTTLECOCK" => "หลอด",
+                "RACKET" => "ไม้",
+                "SHOES" => "คู่",
+                "BEVERAGE" => "ขวด",
+                _ => "ชิ้น"
+            };
+            var verb = rule.TargetType == "SALE_ITEM" ? "ซื้อ" : "เช่า";
+            return $"{verb}{categoryName} {rule.RequiredQty} {unit}";
+        }
 
         string iconClass = "bi-tag-fill";
         string iconBg    = "#e8f5e9";
@@ -200,8 +216,10 @@
                 iconBg = "#fef9c3"; iconColor = "#b45309";
                 typeBadgeBg = "#fef9c3"; typeBadgeColor = "#92400e";
                 typeLabel = "โปรฯ ที่ 2 — ส่งเสริมการขาย (Volume Sale)";
-                conditionSummary = "ซื้อลูกแบดมินตัน 2 หลอดขึ้นไปในบิลเดียวกัน";
-                rewardText = $"ลูกแบดหลอดที่ 2 ลด {promo.DiscountValue.ToString("N0")}%";
+                var volumeRule = conditionRules.FirstOrDefault();
+                var volumeReward = promo.PromotionRules.FirstOrDefault(r => r.RuleKind == "REWARD");
+                conditionSummary = volumeRule == null ? "ซื้อสินค้าตามหมวดที่กำหนดในบิลเดียวกัน" : $"{RuleDescription(volumeRule)} ขึ้นไปในบิลเดียวกัน";
+                rewardText = $"ชิ้นที่ {volumeReward?.NthItem ?? 2} ลด {promo.DiscountValue.ToString("N0")}%";
                 rewardBg = "#fef9c3"; rewardColor = "#92400e";
                 break;
             case "BUNDLE_RENTAL":
@@ -209,7 +227,7 @@
                 iconBg = "#ede9fe"; iconColor = "#5b21b6";
                 typeBadgeBg = "#ede9fe"; typeBadgeColor = "#5b21b6";
                 typeLabel = "โปรฯ ที่ 3 — ส่งเสริมการเช่า (Bundle Rental)";
-                conditionSummary = "เช่าไม้แบด 2 ไม้ + รองเท้า 2 คู่ ในบิลเดียวกัน";
+                conditionSummary = conditionRules.Count == 0 ? "เช่าอุปกรณ์ตามหมวดที่กำหนดในบิลเดียวกัน" : string.Join(" + ", conditionRules.Select(RuleDescription)) + " ในบิลเดียวกัน";
                 rewardText = $"ลดค่าเช่าอุปกรณ์เซ็ตนี้ {promo.DiscountValue.ToString("N0")}%";
                 rewardBg = "#ede9fe"; rewardColor = "#5b21b6";
                 break;
@@ -218,7 +236,7 @@
                 iconBg = "#ffe4e6"; iconColor = "#e11d48";
                 typeBadgeBg = "#ffe4e6"; typeBadgeColor = "#be123c";
                 typeLabel = "โปรฯ ที่ 4 — ซื้อคู่เช่า (Cross-selling)";
-                conditionSummary = "ซื้อลูกแบด 1 หลอด + เช่าไม้แบด 2 ไม้ ในบิลเดียวกัน";
+                conditionSummary = conditionRules.Count == 0 ? "ซื้อและเช่าสินค้าตามหมวดที่กำหนดในบิลเดียวกัน" : string.Join(" + ", conditionRules.Select(RuleDescription)) + " ในบิลเดียวกัน";
                 rewardText = $"เช่ารองเท้าฟรี {promo.DiscountValue.ToString("N0")} คู่";
                 rewardBg = "#ffe4e6"; rewardColor = "#be123c";
                 break;
@@ -312,6 +330,8 @@
                                 desc: '@Html.Raw(promo.Description?.Replace("'", "\\'"))',
                                 discount: @promo.DiscountValue,
                                 discountType: '@promo.DiscountType',
+                                requiredQty: @(conditionRules.FirstOrDefault()?.RequiredQty ?? 2),
+                                nthItem: @(promo.PromotionRules.FirstOrDefault(r => r.RuleKind == "REWARD")?.NthItem ?? 2),
                                 minBill: @(promo.MinBillAmount ?? 0),
                                 timeStart: '@(promo.TimeStart?.ToString("HH:mm") ?? "09:00")',
                                 timeEnd: '@(promo.TimeEnd?.ToString("HH:mm") ?? "15:00")',
@@ -479,6 +499,12 @@
             document.getElementById('modalDiscountValue').value = data.discount;
             document.getElementById('modalDiscountType').value  = data.discountType;
             document.getElementById('modalIsActive').checked    = data.isActive;
+            document.getElementById('modalRequiredQty').value   = data.requiredQty || 2;
+            document.getElementById('modalNthItem').value       = data.nthItem || 2;
+
+            const discountInput = document.getElementById('modalDiscountValue');
+            discountInput.step = data.discountType === 'FREE_ITEM' ? '1' : '0.5';
+            discountInput.max = data.discountType === 'PERCENT' ? '100' : '10000';
 
             // Label & hint ตาม discount type
             const unitEl = document.getElementById('discountUnitText');
@@ -507,7 +533,7 @@
 
             grpTime.style.display  = data.type === 'TIME_BASED' ? 'block' : 'none';
             grpTotal.style.display = data.type === 'TOTAL_BILL' ? 'block' : 'none';
-            grpRules.style.display = ['VOLUME_SALE','BUNDLE_RENTAL','CROSS_SELL'].includes(data.type) ? 'block' : 'none';
+            grpRules.style.display = ['VOLUME_SALE','BUNDLE_RENTAL'].includes(data.type) ? 'block' : 'none';
             nthItem.style.display  = data.type === 'VOLUME_SALE' ? 'block' : 'none';
 
             if (data.type === 'TIME_BASED') {

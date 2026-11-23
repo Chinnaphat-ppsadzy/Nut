@@ -138,6 +138,39 @@ namespace Chinnaphat_8272_L005.Controllers
             return View(model);
         }
 
+        [HttpGet]
+        public IActionResult ForgotPassword()
+        {
+            ViewData["Title"] = "ลืมรหัสผ่าน";
+            return View(new ForgotPasswordViewModel());
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public IActionResult ForgotPassword(ForgotPasswordViewModel model)
+        {
+            ViewData["Title"] = "ลืมรหัสผ่าน";
+            if (!ModelState.IsValid) return View(model);
+
+            string submittedPhone = new string(model.Phone.Where(char.IsAsciiDigit).ToArray());
+            var user = _db.Users.FirstOrDefault(u => u.Email == model.Email.Trim());
+            string savedPhone = user?.Phone == null
+                ? string.Empty
+                : new string(user.Phone.Where(char.IsAsciiDigit).ToArray());
+
+            if (user != null && savedPhone == submittedPhone)
+            {
+                user.PasswordHash = PasswordSecurity.Hash(user, model.NewPassword);
+                user.UpdatedAt = DateTime.Now;
+                _db.SaveChanges();
+            }
+
+            // Keep the same response whether the account matched or not.
+            ViewBag.ResultMessage = "หากอีเมลและเบอร์โทรตรงกับบัญชี ระบบจะเปลี่ยนรหัสผ่านให้แล้ว สามารถกลับไปเข้าสู่ระบบด้วยรหัสใหม่ได้";
+            ModelState.Clear();
+            return View(new ForgotPasswordViewModel());
+        }
+
 
         // ============================================================
         // REGISTER — CREATE: บันทึกผู้ใช้ใหม่ลงฐานข้อมูล
@@ -283,15 +316,21 @@ namespace Chinnaphat_8272_L005.Controllers
                 // READ — ค้นหา RoleId จาก RoleCode
                 string roleCode = string.IsNullOrWhiteSpace(model.Role) ? "CUSTOMER" : model.Role.Trim().ToUpper();
                 var role = _db.Roles.FirstOrDefault(r => r.RoleCode == roleCode);
-                byte roleId = role != null ? role.RoleId : (byte)1;
+                if (role == null)
+                {
+                    ModelState.AddModelError("Role", "กรุณาเลือกบทบาทที่มีอยู่ในระบบ");
+                    ViewBag.Roles = _db.Roles.OrderBy(r => r.RoleId).ToList();
+                    ViewData["Title"] = "เพิ่มผู้ใช้งาน";
+                    return View(model);
+                }
 
                 try
                 {
                     // CREATE — บันทึกผู้ใช้ใหม่ลงฐานข้อมูล
                     var newUser = new User
                     {
-                        RoleId       = roleId,
-                        Email        = model.Email.Trim(),
+                        RoleId       = role.RoleId,
+                        Email        = model.Email?.Trim() ?? string.Empty,
                         PasswordHash = string.Empty,
                         FullName     = $"{model.FirstName?.Trim()} {model.LastName?.Trim()}".Trim(),
                         Phone        = model.Phone?.Trim(),
@@ -308,9 +347,10 @@ namespace Chinnaphat_8272_L005.Controllers
                     TempData["SuccessMessage"] = $"เพิ่มผู้ใช้ {newUser.FullName} ({newUser.Email}) สำเร็จ!";
                     return RedirectToAction("UserList");
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
-                    ModelState.AddModelError("", "เกิดข้อผิดพลาดในการบันทึก: " + ex.Message);
+                    ModelState.AddModelError(string.Empty, "เพิ่มผู้ใช้ไม่สำเร็จ กรุณาตรวจสอบอีเมลและข้อมูลที่กรอก แล้วลองใหม่อีกครั้ง");
+                    _db.ChangeTracker.Clear();
                 }
             }
 
@@ -391,6 +431,17 @@ namespace Chinnaphat_8272_L005.Controllers
                 string userEmail = user.Email;
                 string userName = user.FullName;
 
+                // Keep financial and booking history. Accounts with bookings are
+                // deactivated instead of deleting their related records.
+                if (await _db.Bookings.AnyAsync(b => b.UserId == user.UserId))
+                {
+                    user.Status = "INACTIVE";
+                    user.UpdatedAt = DateTime.Now;
+                    await _db.SaveChangesAsync();
+                    TempData["SuccessMessage"] = $"ปิดใช้งานบัญชี {userName} แล้ว และเก็บประวัติการจอง/การชำระเงินไว้ครบถ้วน";
+                    return RedirectToAction("UserList");
+                }
+
                 // 1. ลบ Carts และ CartItems ของผู้ใช้ (ถ้ามี)
                 var userCarts = await _db.Carts.Include(c => c.CartItems).Where(c => c.UserId == user.UserId).ToListAsync();
                 if (userCarts.Any())
@@ -469,6 +520,7 @@ namespace Chinnaphat_8272_L005.Controllers
                 // หากติด Foreign key ที่ลบไม่ได้ ให้ Soft delete แทน เพื่อไม่ให้เกิดข้อผิดพลาด 500
                 try
                 {
+                    _db.ChangeTracker.Clear();
                     var fallbackUser = await _db.Users.FindAsync((uint)id);
                     if (fallbackUser != null)
                     {
@@ -550,6 +602,19 @@ namespace Chinnaphat_8272_L005.Controllers
 
                 if (user != null)
                 {
+                    string? currentUserId = HttpContext.Session.GetString("UserId");
+                    bool isEditingSelf = uint.TryParse(currentUserId, out var currentUid) && currentUid == user.UserId;
+                    bool isChangingSelfRole = !string.IsNullOrWhiteSpace(model.Role) &&
+                        !string.Equals(model.Role.Trim(), "ADMIN", StringComparison.OrdinalIgnoreCase);
+                    if (isEditingSelf && (!model.IsActive || isChangingSelfRole))
+                    {
+                        ModelState.AddModelError(string.Empty, "ไม่สามารถปิดใช้งานหรือเปลี่ยนบทบาทบัญชีแอดมินที่กำลังใช้งานอยู่ได้");
+                        ViewBag.Roles = _db.Roles.OrderBy(r => r.RoleId).ToList();
+                        model.UserId = id;
+                        ViewData["Title"] = "แก้ไขผู้ใช้งาน";
+                        return View("EditUser", model);
+                    }
+
                     // READ — ค้นหา Role จาก RoleCode (ถ้ามีการเลือกมา)
                     if (!string.IsNullOrEmpty(model.Role))
                     {

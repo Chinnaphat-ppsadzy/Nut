@@ -110,8 +110,9 @@ public class HomeController : Controller
         return View();
     }
 
-    public async Task<IActionResult> Customer(string? date, string? section)
+    public async Task<IActionResult> Customer(string? date, string? section, string? showpromo)
     {
+        ViewBag.ShowPromoPopup = showpromo == "1";
         // Set section-specific title
         string sectionLower = section?.ToLower()?.Trim() ?? "";
         ViewBag.Section = sectionLower;
@@ -123,9 +124,12 @@ public class HomeController : Controller
             "mybookings" => "การจองของฉัน",
             _            => "หน้าหลัก - ระบบจองและซื้ออุปกรณ์"
         };
-        string selectedDate = string.IsNullOrWhiteSpace(date)
-            ? DateTime.Today.ToString("yyyy-MM-dd")
-            : date.Trim();
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        var selectedDate = DateOnly.TryParseExact(date?.Trim(), "yyyy-MM-dd",
+                System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None, out var requestedDate) && requestedDate >= today
+            ? requestedDate.ToString("yyyy-MM-dd")
+            : today.ToString("yyyy-MM-dd");
         ViewBag.SelectedDate = selectedDate;
 
         try
@@ -315,12 +319,14 @@ public class HomeController : Controller
                 return Json(new { success = false, message = "กรุณาระบุชื่อ-นามสกุล และเบอร์โทรศัพท์" });
             }
 
-            if (!DateOnly.TryParse(playDate, out DateOnly targetPlayDate))
+            if (!DateOnly.TryParseExact(playDate?.Trim(), "yyyy-MM-dd",
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None, out DateOnly targetPlayDate))
             {
                 return Json(new { success = false, message = "วันที่เล่นไม่ถูกต้อง กรุณาเลือกวันที่ใหม่" });
             }
             if (targetPlayDate < DateOnly.FromDateTime(DateTime.Today))
-                return Json(new { success = false, message = "ไม่สามารถจองย้อนหลังได้" });
+                return Json(new { success = false, message = "วันที่เลือกผ่านไปแล้ว ไม่สามารถจองย้อนหลังได้ กรุณาเลือกวันนี้หรือวันถัดไป" });
 
             // 1. ตรวจสอบสิทธิ์ผู้ใช้งาน (Guest ไม่สามารถจองหรือชำระเงินได้ ต้องเข้าสู่ระบบด้วยบัญชี Customer ก่อน)
             string? loggedInUidStr = HttpContext.Session.GetString("UserId");
@@ -582,7 +588,7 @@ public class HomeController : Controller
                 if (extension == null)
                     return Json(new { success = false, message = "ไฟล์สลิปต้องเป็นภาพ JPG, PNG หรือ WEBP ขนาดไม่เกิน 5 MB" });
 
-                var uploadsFolder = Path.Combine(_env.WebRootPath, "uploads", "slips");
+                var uploadsFolder = UploadStorage.GetSlipDirectory(_env);
                 if (!Directory.Exists(uploadsFolder))
                 {
                     Directory.CreateDirectory(uploadsFolder);
@@ -838,7 +844,7 @@ public class HomeController : Controller
 
         var user = await _db.Users.Include(u => u.Role).FirstOrDefaultAsync(u => u.UserId == currentUserId);
         bool isOwner = booking.UserId == currentUserId;
-        bool isAuthorizedStaff = user?.Role?.RoleCode is "ACCOUNTING" or "ADMIN";
+        bool isAuthorizedStaff = user?.Role?.RoleCode == "ACCOUNTING";
         if (!isOwner && !isAuthorizedStaff) return Forbid();
 
         var slipPath = booking.Payments.OrderByDescending(p => p.PaymentId)
@@ -856,7 +862,7 @@ public class HomeController : Controller
         if (contentType == null) return NotFound();
 
         var fileName = Path.GetFileName(slipPath);
-        var fullPath = Path.Combine(_env.WebRootPath, "uploads", "slips", fileName);
+        var fullPath = UploadStorage.GetSlipPath(_env, slipPath);
         if (!System.IO.File.Exists(fullPath)) return NotFound();
 
         Response.Headers.CacheControl = "no-store, private";
@@ -900,7 +906,7 @@ public class HomeController : Controller
             return StatusCode(StatusCodes.Status403Forbidden);
         }
 
-        var uploadsFolder = Path.Combine(_env.WebRootPath, "uploads", "slips");
+        var uploadsFolder = UploadStorage.GetSlipDirectory(_env);
         if (!Directory.Exists(uploadsFolder)) Directory.CreateDirectory(uploadsFolder);
         var safeName = $"slip_{b.BookingCode}_{DateTime.Now:yyyyMMdd_HHmmss}_{Guid.NewGuid().ToString("N")[..12]}{extension}";
         var path = Path.Combine(uploadsFolder, safeName);
@@ -959,7 +965,10 @@ public class HomeController : Controller
     [HttpGet]
     public async Task<IActionResult> GetBookedSlots(string date)
     {
-        if (!DateOnly.TryParse(date, out DateOnly targetDate))
+        if (!DateOnly.TryParseExact(date?.Trim(), "yyyy-MM-dd",
+                System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None, out DateOnly targetDate) ||
+            targetDate < DateOnly.FromDateTime(DateTime.Today))
         {
             return Json(new { success = false, bookedSlots = new List<string>() });
         }

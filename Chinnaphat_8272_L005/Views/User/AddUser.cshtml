@@ -204,12 +204,7 @@
         <div class="col-lg-8">
             <div class="form-card">
 
-                @if (!ViewData.ModelState.IsValid && ViewData.ModelState.ErrorCount > 0)
-                {
-                    <div class="alert alert-danger py-2 mb-3" style="border-radius:10px;">
-                        <i class="bi bi-exclamation-triangle me-2"></i>กรุณาตรวจสอบข้อมูลให้ครบถ้วน
-                    </div>
-                }
+                <div asp-validation-summary="ModelOnly" class="alert alert-danger py-2 mb-3" style="border-radius:10px;"></div>
 
                 <!-- ส่วน: ข้อมูลส่วนตัว -->
                 <p class="section-title"><i class="bi bi-person me-1"></i>ข้อมูลส่วนตัว</p>
@@ -251,7 +246,7 @@
                         <label asp-for="Phone" class="form-label">เบอร์โทรศัพท์ <span class="required-star">*</span></label>
                         <div class="input-wrapper">
                             <i class="bi bi-telephone bi-icon"></i>
-                            <input asp-for="Phone" class="form-control" id="addPhone" placeholder="0XX-XXX-XXXX" />
+                            <input asp-for="Phone" class="form-control" id="addPhone" type="text" inputmode="numeric" autocomplete="tel-national" maxlength="10" pattern="[0-9]{10}" placeholder="กรอกตัวเลข 10 หลัก" />
                         </div>
                         <span asp-validation-for="Phone" class="text-danger small"></span>
                     </div>
@@ -325,6 +320,10 @@
 <script src="https://cdn.jsdelivr.net/npm/jquery-validation-unobtrusive@4.0.0/dist/jquery.validate.unobtrusive.min.js"></script>
 
 <script>
+    const addPhone = document.getElementById('addPhone');
+    addPhone.value = addPhone.value.replace(/\D/g, '').slice(0, 10);
+    addPhone.addEventListener('input', () => addPhone.value = addPhone.value.replace(/\D/g, '').slice(0, 10));
+
     function togglePwd(inputId, iconId) {
         const input = document.getElementById(inputId);
         const icon  = document.getElementById(iconId);

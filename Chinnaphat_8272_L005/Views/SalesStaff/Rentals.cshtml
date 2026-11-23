@@ -4,6 +4,8 @@
     ViewData["Title"] = "ตรวจรับคืนและจัดการอุปกรณ์เช่า";
     Layout = "_SalesStaffLayout";
     var damages = ViewBag.Damages as List<Chinnaphat_8272_L005.Models.EquipmentDamage> ?? new();
+    var rentalItems = ViewBag.ActiveRentalItems as List<Chinnaphat_8272_L005.Models.BookingItem> ?? new();
+    var posRentalItems = ViewBag.PosRentalItems as List<Chinnaphat_8272_L005.Controllers.PosRentalLineViewModel> ?? new();
 }
 
 <style>
@@ -39,10 +41,10 @@
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
         <div>
             <h3 class="fw-bold mb-1">
-                <i class="bi bi-arrow-repeat me-2"></i>ตรวจรับคืนอุปกรณ์เช่า และบันทึกความเสียหาย
+                <i class="bi bi-arrow-repeat me-2"></i>ส่งมอบและตรวจรับคืนอุปกรณ์เช่า
             </h3>
             <p class="mb-0 opacity-75 small">
-                ฝ่ายซื้อ-เช่าอุปกรณ์มีหน้าที่ตรวจสอบสภาพอุปกรณ์เช่า (ไม้แบด, รองเท้า) เมื่อลูกค้าส่งคืน หากชำรุดสามารถกดบันทึกเพื่อส่งให้ฝ่ายบัญชีคิดค่าปรับ
+                ฝ่ายขาย/เช่ารับอุปกรณ์และตรวจสภาพ จากนั้นส่งคำขอคืนมัดจำให้ฝ่ายบัญชีตรวจยอดและบันทึกการโอนคืน
             </p>
         </div>
     </div>
@@ -53,43 +55,98 @@
     <div class="col-lg-7">
         <div class="card border-0 shadow-sm rounded-4 p-3 bg-white">
             <h5 class="fw-bold text-dark mb-3">
-                <i class="bi bi-collection text-primary me-2"></i>รายการอุปกรณ์เช่าในระบบ (@Model.Count รายการ)
+                <i class="bi bi-collection text-primary me-2"></i>รายการเช่าที่ต้องส่งมอบ / ตรวจคืน (@(rentalItems.Count + posRentalItems.Count) รายการ)
             </h5>
+            @if (rentalItems.Any() || posRentalItems.Any())
+            {
             <div class="table-responsive">
                 <table class="table align-middle">
                     <thead class="table-light">
                         <tr>
-                            <th>SKU</th>
-                            <th>อุปกรณ์เช่า</th>
-                            <th>ค่าเช่า</th>
-                            <th>มัดจำ</th>
-                            <th>คงเหลือ</th>
-                            <th class="text-center">แจ้งชำรุด</th>
+                            <th>รายการจอง / ลูกค้า</th>
+                            <th>อุปกรณ์</th>
+                            <th>จำนวน</th>
+                            <th>สถานะ</th>
+                            <th class="text-end">ดำเนินการ</th>
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach (var prod in Model)
+                        @if (rentalItems.Any())
+                        {
+                            <tr class="table-success"><td colspan="5" class="small fw-bold">รายการจองออนไลน์</td></tr>
+                        }
+                        @foreach (var rental in rentalItems)
                         {
                             <tr>
-                                <td><span class="badge bg-light text-dark border font-monospace">@prod.Sku</span></td>
                                 <td>
-                                    <div class="fw-bold">@prod.ProductName</div>
-                                    <small class="text-muted">@(prod.Category?.CategoryName ?? "-")</small>
+                                    <div class="fw-bold text-primary">@(rental.Booking?.BookingCode ?? "-")</div>
+                                    <small class="text-muted">@(rental.Booking?.User?.FullName ?? "ลูกค้า") · @(rental.Booking?.User?.Phone ?? "ไม่มีเบอร์")</small>
                                 </td>
-                                <td><span class="fw-bold text-success">@prod.Price.ToString("N0") ฿</span></td>
-                                <td><span class="fw-semibold text-warning">@prod.Deposit.ToString("N0") ฿</span></td>
-                                <td><span class="badge bg-light text-dark border">@prod.StockQty @prod.Unit</span></td>
-                                <td class="text-center">
-                                    <button type="button" class="btn btn-outline-danger btn-sm px-2 py-1" style="border-radius:8px;"
-                                            onclick="openDamageModal(@prod.ProductId, '@Html.Raw(prod.ProductName.Replace("'", "\\'"))')">
-                                        <i class="bi bi-exclamation-triangle me-1"></i>แจ้งชำรุด
-                                    </button>
+                                <td><div class="fw-semibold">@(rental.Product?.ProductName ?? "อุปกรณ์เช่า")</div><small class="text-muted">SKU: @(rental.Product?.Sku ?? "-")</small></td>
+                                <td>@rental.Quantity @(rental.Product?.Unit ?? "ชิ้น")</td>
+                                <td>
+                                    @if (rental.ItemStatus == "RESERVED") { <span class="badge bg-warning text-dark">รอส่งมอบ</span> }
+                                    else { <span class="badge bg-primary">ลูกค้ารับอุปกรณ์แล้ว</span> }
+                                </td>
+                                <td class="text-end text-nowrap">
+                                    @if (rental.ItemStatus == "RESERVED")
+                                    {
+                                        <form asp-action="MarkRentalHandedOver" method="post" class="d-inline" onsubmit="return confirm('ยืนยันส่งมอบอุปกรณ์รายการนี้ให้ลูกค้า?')">
+                                            @Html.AntiForgeryToken()<input type="hidden" name="bookingItemId" value="@rental.BookingItemId" />
+                                            <button class="btn btn-sm btn-success"><i class="bi bi-box-arrow-up-right me-1"></i>ส่งมอบ</button>
+                                        </form>
+                                    }
+                                    else
+                                    {
+                                        <form asp-action="MarkRentalReturned" method="post" class="d-inline" onsubmit="return confirm('ยืนยันว่าอุปกรณ์สภาพปกติและรับคืนแล้ว?')">
+                                            @Html.AntiForgeryToken()<input type="hidden" name="bookingItemId" value="@rental.BookingItemId" />
+                                            <button class="btn btn-sm btn-outline-success"><i class="bi bi-check2-circle me-1"></i>คืนปกติ</button>
+                                        </form>
+                                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="openDamageModal(@rental.BookingItemId, '@(rental.Product?.ProductName ?? "อุปกรณ์")', '@(rental.Booking?.BookingCode ?? "-")')"><i class="bi bi-exclamation-triangle me-1"></i>แจ้งชำรุด</button>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                        @if (posRentalItems.Any())
+                        {
+                            <tr class="table-success"><td colspan="5" class="small fw-bold">รายการเช่าหน้าร้าน (POS) · มัดจำจะส่งให้ฝ่ายบัญชีตรวจและคืน</td></tr>
+                        }
+                        @foreach (var row in posRentalItems)
+                        {
+                            var pendingRefund = row.Item.DepositRefunds.Where(r => r.Status == "PENDING").Sum(r => r.Amount);
+                            <tr>
+                                <td>
+                                    <div class="fw-bold text-primary">@row.Sale.ReceiptCode <span class="badge bg-secondary">POS</span></div>
+                                    <small class="text-muted">@row.Sale.CustomerName · @(row.Sale.CustomerPhone ?? "ไม่มีเบอร์")</small>
+                                </td>
+                                <td><div class="fw-semibold">@row.Item.ProductName</div><small class="text-muted">มัดจำ @row.Item.Deposit.ToString("N2") ฿ / @row.Item.Unit</small></td>
+                                <td>@row.RemainingQty / @row.Item.Qty @row.Item.Unit</td>
+                                <td>
+                                    @if (pendingRefund > 0) { <span class="badge bg-warning text-dark">รอบัญชีคืน @pendingRefund.ToString("N2") ฿</span> }
+                                    else if (row.RemainingQty > 0) { <span class="badge bg-info text-dark">รอรับคืน · มัดจำ @((row.RemainingQty * row.Item.Deposit).ToString("N2")) ฿</span> }
+                                </td>
+                                <td class="text-end">
+                                    @if (row.RemainingQty > 0)
+                                    {
+                                        <form asp-action="ReturnPosRental" method="post" class="d-flex gap-2 align-items-center justify-content-end" onsubmit="return confirm('ยืนยันรับอุปกรณ์คืนสภาพปกติ และส่งยอดมัดจำให้ฝ่ายบัญชีตรวจสอบ?')">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="saleId" value="@row.Sale.SaleId" />
+                                            <input type="hidden" name="productId" value="@row.Item.ProductId" />
+                                            <input type="number" name="quantity" min="1" max="@row.RemainingQty" value="1" class="form-control form-control-sm" style="width:72px" aria-label="จำนวนที่รับคืน" />
+                                            <button class="btn btn-sm btn-outline-success text-nowrap"><i class="bi bi-box-arrow-in-down me-1"></i>รับคืน / ส่งบัญชี</button>
+                                        </form>
+                                    }
                                 </td>
                             </tr>
                         }
                     </tbody>
                 </table>
             </div>
+            }
+            else
+            {
+                <div class="text-center py-5 text-muted"><i class="bi bi-check2-circle fs-2 text-success d-block mb-2"></i>ไม่มีรายการเช่าที่รอส่งมอบหรือตรวจคืน</div>
+            }
         </div>
     </div>
 
@@ -115,14 +172,15 @@
                     {
                         <div class="p-3 bg-light rounded-3 border">
                             <div class="d-flex justify-content-between align-items-start mb-1">
-                                <span class="badge bg-danger bg-opacity-10 text-danger border border-danger small">
-                                    <i class="bi bi-exclamation-circle me-1"></i>แจ้งความเสียหาย
+                                <span class="badge @(dmg.Status == "REPORTED" ? "bg-warning text-dark" : dmg.Status == "PAID" ? "bg-success" : dmg.Status == "WAIVED" ? "bg-secondary" : "bg-danger") small">
+                                    <i class="bi bi-exclamation-circle me-1"></i>@dmg.Status
                                 </span>
                                 <small class="text-muted">@dmg.CreatedAt.ToString("dd/MM/yyyy HH:mm")</small>
                             </div>
-                            <div class="fw-bold text-dark small mb-1">@dmg.Description</div>
+                            <div class="fw-bold text-dark small mb-1">@(dmg.BookingItem?.Product?.ProductName ?? "อุปกรณ์") · @(dmg.BookingItem?.Booking?.User?.FullName ?? "ลูกค้า")</div>
+                            <div class="text-muted small">@dmg.Description</div>
                             <div class="d-flex justify-content-between align-items-center mt-2 pt-1 border-top">
-                                <small class="text-muted">ส่งเรื่องให้ฝ่ายบัญชีคิดค่าปรับ</small>
+                                <small class="text-muted">@(dmg.ProcessedAt.HasValue ? "ฝ่ายบัญชีตรวจแล้ว" : "ส่งฝ่ายบัญชีประเมิน")</small>
                                 <strong class="text-danger">ค่าปรับ: @dmg.FineAmount.ToString("N0") ฿</strong>
                             </div>
                         </div>
@@ -139,25 +197,20 @@
         <div class="modal-content" style="border-radius:18px; border:none; box-shadow:0 20px 50px rgba(0,0,0,0.2);">
             <form asp-action="ReportDamage" asp-controller="SalesStaff" method="post">
                 @Html.AntiForgeryToken()
-                <input type="hidden" name="productId" id="dmgProductId" />
-                <input type="hidden" name="equipmentName" id="dmgEquipmentName" />
+                <input type="hidden" name="bookingItemId" id="dmgBookingItemId" />
 
                 <div class="modal-header bg-danger text-white" style="border-top-left-radius:18px; border-top-right-radius:18px;">
                     <h5 class="modal-title fw-bold">
-                        <i class="bi bi-exclamation-triangle-fill me-2"></i>บันทึกความเสียหายอุปกรณ์เช่า
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>แจ้งความเสียหายเพื่อให้บัญชีประเมิน
                     </h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
 
                 <div class="modal-body p-4">
                     <div class="mb-3">
-                        <label class="form-label text-muted small mb-1">อุปกรณ์ที่ชำรุด:</label>
-                        <h6 class="fw-bold text-dark" id="displayDmgName">-</h6>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold small">ชื่อลูกค้าผู้เช่า: <span class="text-danger">*</span></label>
-                        <input type="text" name="customerName" class="form-control" placeholder="เช่น คุณสมศักดิ์ (คอร์ท 2)" required />
+                        <label class="form-label text-muted small mb-1">อุปกรณ์ / รหัสจอง:</label>
+                        <h6 class="fw-bold text-dark mb-0" id="displayDmgName">-</h6>
+                        <small class="text-muted" id="displayDmgBooking"></small>
                     </div>
 
                     <div class="mb-3">
@@ -165,20 +218,13 @@
                         <textarea name="description" class="form-control" rows="3" placeholder="เช่น ก้านไม้แบดหัก, เอ็นขาด, พื้นรองเท้าฉีกขาด..." required></textarea>
                     </div>
 
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold small">ประมาณการค่าปรับ (บาท):</label>
-                        <div class="input-group">
-                            <span class="input-group-text">฿</span>
-                            <input type="number" step="50" min="0" name="estimatedFine" class="form-control fw-bold text-danger" placeholder="200" value="200" />
-                        </div>
-                        <small class="text-muted">ฝ่ายบัญชีจะนำยอดนี้ไปเรียกเก็บหรือหักจากเงินมัดจำของลูกค้า</small>
-                    </div>
+                    <div class="alert alert-info small mb-0">ฝ่ายบัญชีจะเป็นผู้ตรวจสอบและกำหนดค่าปรับ รายการนี้จะยังไม่คืนเข้าสต็อก</div>
                 </div>
 
                 <div class="modal-footer bg-light" style="border-bottom-left-radius:18px; border-bottom-right-radius:18px;">
                     <button type="button" class="btn btn-secondary px-3" data-bs-dismiss="modal">ยกเลิก</button>
                     <button type="submit" class="btn btn-danger fw-bold px-4">
-                        <i class="bi bi-check-circle me-1"></i> ยืนยันแจ้งชำรุด
+                        <i class="bi bi-send me-1"></i> ส่งเรื่องให้บัญชี
                     </button>
                 </div>
             </form>
@@ -188,10 +234,10 @@
 
 @section Scripts {
     <script>
-        function openDamageModal(id, name) {
-            document.getElementById('dmgProductId').value = id;
-            document.getElementById('dmgEquipmentName').value = name;
+        function openDamageModal(id, name, bookingCode) {
+            document.getElementById('dmgBookingItemId').value = id;
             document.getElementById('displayDmgName').innerText = name;
+            document.getElementById('displayDmgBooking').innerText = 'รหัสจอง ' + bookingCode;
             new bootstrap.Modal(document.getElementById('damageModal')).show();
         }
     </script>

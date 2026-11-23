@@ -58,7 +58,7 @@
                 <i class="bi bi-building me-2"></i>จัดการสนามแบดมินตัน
             </h3>
             <p class="mb-0 opacity-75">
-                ตรวจสอบคอร์ททั้งหมด ปรับเปลี่ยนราคาค่าเช่าต่อชั่วโมง หรือเปิด-ปิดสถานะปรับปรุงสนาม
+                ตรวจสอบสนามและปรับราคา การปิดปรับปรุงทำผ่านรายการแจ้งซ่อมที่ Admin ตรวจสอบเหตุผลแล้วเท่านั้น
             </p>
         </div>
     </div>
@@ -148,23 +148,9 @@
                 </div>
 
                 <div class="p-3 bg-light border-top d-flex gap-2">
-                    <!-- Toggle Status -->
-                    <form asp-action="ToggleCourtStatus" asp-controller="Admin" method="post" class="flex-grow-1">
-                        @Html.AntiForgeryToken()
-                        <input type="hidden" name="courtId" value="@court.CourtId" />
-                        @if (isAvail)
-                        {
-                            <button type="submit" class="btn btn-outline-warning w-100 btn-sm fw-semibold" style="border-radius:8px;">
-                                <i class="bi bi-pause-circle me-1"></i>ปิดปรับปรุง
-                            </button>
-                        }
-                        else
-                        {
-                            <button type="submit" class="btn btn-success w-100 btn-sm fw-semibold" style="border-radius:8px;">
-                                <i class="bi bi-play-circle me-1"></i>เปิดใช้งาน
-                            </button>
-                        }
-                    </form>
+                    <a asp-action="CourtIssues" asp-controller="Admin" class="btn btn-outline-success btn-sm fw-semibold flex-grow-1" style="border-radius:8px;">
+                        <i class="bi bi-clipboard-check me-1"></i>ตรวจรายการแจ้งซ่อม
+                    </a>
 
                     <!-- Edit Price Button -->
                     <button type="button" class="btn btn-outline-secondary btn-sm px-3" style="border-radius:8px;"

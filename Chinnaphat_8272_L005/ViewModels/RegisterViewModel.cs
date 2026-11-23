@@ -38,7 +38,7 @@ namespace Chinnaphat_8272_L005.ViewModels
         public string Gender { get; set; } = string.Empty;
 
         [Required(ErrorMessage = "กรุณากรอกเบอร์โทรศัพท์")]
-        [Phone(ErrorMessage = "รูปแบบเบอร์โทรไม่ถูกต้อง")]
+        [RegularExpression(@"^[0-9]{10}$", ErrorMessage = "กรุณากรอกเบอร์โทรศัพท์ 10 หลัก โดยไม่ใส่ขีด")]
         [Display(Name = "เบอร์โทรศัพท์")]
         public string Phone { get; set; } = string.Empty;
     }

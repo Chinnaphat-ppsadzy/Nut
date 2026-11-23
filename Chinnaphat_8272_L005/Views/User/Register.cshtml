@@ -202,7 +202,7 @@
                 <label asp-for="Phone" class="form-label">เบอร์โทรศัพท์ <span class="required-star">*</span></label>
                 <div class="input-wrapper">
                     <i class="bi bi-telephone bi-icon"></i>
-                    <input asp-for="Phone" class="form-control" id="phone" placeholder="0XX-XXX-XXXX" />
+                    <input asp-for="Phone" class="form-control" id="phone" type="text" inputmode="numeric" autocomplete="tel-national" maxlength="10" pattern="[0-9]{10}" placeholder="กรอกตัวเลข 10 หลัก" />
                 </div>
                 <span asp-validation-for="Phone" class="text-danger small"></span>
             </div>
@@ -263,6 +263,12 @@
 <script src="https://cdn.jsdelivr.net/npm/jquery-validation-unobtrusive@4.0.0/dist/jquery.validate.unobtrusive.min.js"></script>
 
 <script>
+    const registerPhone = document.getElementById('phone');
+    registerPhone.value = registerPhone.value.replace(/\D/g, '').slice(0, 10);
+    registerPhone.addEventListener('input', () => {
+        registerPhone.value = registerPhone.value.replace(/\D/g, '').slice(0, 10);
+    });
+
     function togglePwd(inputId, iconId) {
         const input = document.getElementById(inputId);
         const icon  = document.getElementById(iconId);

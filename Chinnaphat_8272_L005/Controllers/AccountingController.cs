@@ -10,7 +10,7 @@ using Chinnaphat_8272_L005.Helpers;
 
 namespace Chinnaphat_8272_L005.Controllers
 {
-    [RequireRole("ACCOUNTING", "ADMIN")]
+    [RequireRole("ACCOUNTING")]
     public class AccountingController : Controller
     {
         private readonly Csi402dbContext _db;
@@ -83,6 +83,17 @@ namespace Chinnaphat_8272_L005.Controllers
             }
             ViewBag.WalkInPendingPayments = walkInSlips;
 
+            var posPayments = await _db.PosSaleTransactions
+                .Where(s => s.PaymentStatus == "PENDING_VERIFY" && s.SlipImageUrl != null)
+                .OrderBy(s => s.CreatedAt)
+                .ToListAsync();
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var term = search.Trim().ToLower();
+                posPayments = posPayments.Where(s => s.ReceiptCode.ToLower().Contains(term) || s.CustomerName.ToLower().Contains(term) || (s.CustomerPhone != null && s.CustomerPhone.Contains(term))).ToList();
+            }
+            ViewBag.PosPendingPayments = posPayments;
+
             // สถิติด่วนสำหรับหัวข้อ
             ViewBag.PendingCount = await _db.Bookings.CountAsync(b => b.Status == "PENDING_VERIFY");
             ViewBag.ConfirmedCount = await _db.Bookings.CountAsync(b => b.Status == "CONFIRMED" || b.Status == "CHECKED_IN" || b.Status == "COMPLETED");
@@ -109,7 +120,7 @@ namespace Chinnaphat_8272_L005.Controllers
                 _ => null
             };
             if (contentType == null) return NotFound();
-            var fullPath = Path.Combine(_env.WebRootPath, "uploads", "slips", fileName);
+            var fullPath = UploadStorage.GetSlipPath(_env, slipPath);
             if (!System.IO.File.Exists(fullPath)) return NotFound();
             Response.Headers.CacheControl = "no-store, private";
             return PhysicalFile(fullPath, contentType);
@@ -147,6 +158,64 @@ namespace Chinnaphat_8272_L005.Controllers
             queue.PaidBy = null;
             await _db.SaveChangesAsync();
             return Json(new { success = true, message = $"ปฏิเสธสลิปคิว W-{queue.QueueNo:D2} ลูกค้าสามารถแนบสลิปใหม่ได้" });
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> PosSaleSlip(uint saleId)
+        {
+            await EnsureAccountingRoleAndUserAsync();
+            var slipUrl = await _db.PosSaleTransactions.Where(s => s.SaleId == saleId).Select(s => s.SlipImageUrl).FirstOrDefaultAsync();
+            if (string.IsNullOrWhiteSpace(slipUrl)) return NotFound();
+            var extension = Path.GetExtension(slipUrl).ToLowerInvariant();
+            var contentType = extension switch { ".jpg" or ".jpeg" => "image/jpeg", ".png" => "image/png", ".webp" => "image/webp", _ => null };
+            if (contentType == null) return NotFound();
+            var fullPath = UploadStorage.GetSlipPath(_env, slipUrl);
+            if (!System.IO.File.Exists(fullPath)) return NotFound();
+            Response.Headers.CacheControl = "no-store, private";
+            return PhysicalFile(fullPath, contentType);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ApprovePosSale(uint saleId)
+        {
+            await EnsureAccountingRoleAndUserAsync();
+            var sale = await _db.PosSaleTransactions.FirstOrDefaultAsync(s => s.SaleId == saleId);
+            if (sale == null) return Json(new { success = false, message = "ไม่พบรายการขาย" });
+            if (sale.PaymentStatus != "PENDING_VERIFY" || string.IsNullOrWhiteSpace(sale.SlipImageUrl))
+                return Json(new { success = false, message = "รายการนี้ไม่มีสลิปรอตรวจสอบ" });
+            sale.PaymentStatus = "PAID";
+            sale.PaidAt = DateTime.Now;
+            sale.VerifiedAt = DateTime.Now;
+            sale.VerifiedBy = await GetCurrentAccountantIdAsync();
+            sale.RejectReason = null;
+            await _db.SaveChangesAsync();
+            return Json(new { success = true, message = $"อนุมัติสลิป {sale.ReceiptCode} ยอด {sale.NetTotal:N2} บาทแล้ว และบันทึกรายรับเรียบร้อย" });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> RejectPosSale(uint saleId, string? reason)
+        {
+            await EnsureAccountingRoleAndUserAsync();
+            await using var transaction = await _db.Database.BeginTransactionAsync();
+            var sale = await _db.PosSaleTransactions.FirstOrDefaultAsync(s => s.SaleId == saleId);
+            if (sale == null) return Json(new { success = false, message = "ไม่พบรายการขาย" });
+            if (sale.PaymentStatus != "PENDING_VERIFY") return Json(new { success = false, message = "รายการนี้ผ่านการตรวจหรือถูกปฏิเสธไปแล้ว" });
+            if (!string.IsNullOrWhiteSpace(sale.ItemsJson))
+            {
+                var items = System.Text.Json.JsonSerializer.Deserialize<List<PosCartItemDto>>(sale.ItemsJson) ?? new();
+                foreach (var item in items)
+                {
+                    var product = await _db.Products.FirstOrDefaultAsync(p => p.ProductId == (uint)item.ProductId);
+                    if (product != null) { product.StockQty += item.Qty; product.UpdatedAt = DateTime.Now; }
+                }
+            }
+            sale.PaymentStatus = "REJECTED";
+            sale.RejectReason = string.IsNullOrWhiteSpace(reason) ? "สลิปไม่ผ่านการตรวจสอบ" : reason.Trim()[..Math.Min(reason.Trim().Length, 500)];
+            await _db.SaveChangesAsync();
+            await transaction.CommitAsync();
+            return Json(new { success = true, message = $"ปฏิเสธรายการ {sale.ReceiptCode} และคืนสต็อกแล้ว" });
         }
 
         [HttpPost]
@@ -386,6 +455,32 @@ namespace Chinnaphat_8272_L005.Controllers
 
             ViewBag.Damages = damages;
 
+            // POS rental deposit refunds are stored with each sale line in the existing items_json column.
+            var posDepositRefunds = new List<PosDepositRefundViewModel>();
+            var paidPosSales = await _db.PosSaleTransactions
+                .Where(s => s.PaymentStatus == "PAID")
+                .OrderByDescending(s => s.CreatedAt)
+                .Take(250)
+                .ToListAsync();
+            foreach (var sale in paidPosSales)
+            {
+                if (string.IsNullOrWhiteSpace(sale.ItemsJson)) continue;
+                var items = System.Text.Json.JsonSerializer.Deserialize<List<PosCartItemDto>>(sale.ItemsJson) ?? new();
+                foreach (var item in items.Where(i => i.ProductType == "RENT"))
+                {
+                    foreach (var request in item.DepositRefunds)
+                    {
+                        posDepositRefunds.Add(new PosDepositRefundViewModel
+                        {
+                            Sale = sale,
+                            Item = item,
+                            Request = request
+                        });
+                    }
+                }
+            }
+            ViewBag.PosDepositRefunds = posDepositRefunds.OrderByDescending(r => r.Request.CreatedAt).ToList();
+
             // 2. ข้อมูลรายการคืนเงิน (Refunds)
             var refunds = await _db.Refunds
                 .Include(r => r.Booking).ThenInclude(b => b.User)
@@ -411,6 +506,7 @@ namespace Chinnaphat_8272_L005.Controllers
         }
 
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> UpdateDamageFine(uint damageId, decimal fineAmount, string status)
         {
             try
@@ -421,6 +517,29 @@ namespace Chinnaphat_8272_L005.Controllers
                     TempData["ErrorMessage"] = "ไม่พบรายการอุปกรณ์เสียหาย";
                     return RedirectToAction(nameof(DamagesAndRefunds), new { tab = "damages" });
                 }
+
+                status = (status ?? string.Empty).Trim().ToUpperInvariant();
+                if (fineAmount < 0 || status is not ("CHARGED" or "PAID" or "WAIVED"))
+                {
+                    TempData["ErrorMessage"] = "กรุณาระบุยอดค่าปรับและสถานะให้ถูกต้อง";
+                    return RedirectToAction(nameof(DamagesAndRefunds), new { tab = "damages" });
+                }
+                if (damage.Status is "PAID" or "WAIVED")
+                {
+                    TempData["ErrorMessage"] = "รายการที่ชำระหรือยกเว้นแล้วไม่สามารถแก้ไขซ้ำได้";
+                    return RedirectToAction(nameof(DamagesAndRefunds), new { tab = "damages" });
+                }
+                if (damage.Status == "REPORTED" && status == "PAID")
+                {
+                    TempData["ErrorMessage"] = "กรุณากำหนดค่าปรับก่อน แล้วจึงบันทึกการชำระเงิน";
+                    return RedirectToAction(nameof(DamagesAndRefunds), new { tab = "damages" });
+                }
+                if (status == "CHARGED" && fineAmount <= 0)
+                {
+                    TempData["ErrorMessage"] = "กรุณากำหนดค่าปรับมากกว่า 0 บาท หรือเลือกยกเว้นค่าปรับ";
+                    return RedirectToAction(nameof(DamagesAndRefunds), new { tab = "damages" });
+                }
+                if (status == "WAIVED") fineAmount = 0;
 
                 uint accountantId = await GetCurrentAccountantIdAsync();
 
@@ -447,6 +566,45 @@ namespace Chinnaphat_8272_L005.Controllers
                 TempData["ErrorMessage"] = "เกิดข้อผิดพลาดในการบันทึกค่าปรับ: " + ex.Message;
                 return RedirectToAction(nameof(DamagesAndRefunds), new { tab = "damages" });
             }
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ProcessPosRentalDepositRefund(uint saleId, int productId, string requestId, decimal refundedAmount, bool approve)
+        {
+            await EnsureAccountingRoleAndUserAsync();
+            var sale = await _db.PosSaleTransactions.FirstOrDefaultAsync(s => s.SaleId == saleId);
+            if (sale == null || sale.PaymentStatus != "PAID" || string.IsNullOrWhiteSpace(sale.ItemsJson))
+            {
+                TempData["ErrorMessage"] = "ไม่พบรายการ POS ที่ชำระเงินแล้ว";
+                return RedirectToAction(nameof(DamagesAndRefunds), new { tab = "depositRefunds" });
+            }
+
+            var items = System.Text.Json.JsonSerializer.Deserialize<List<PosCartItemDto>>(sale.ItemsJson) ?? new();
+            var item = items.FirstOrDefault(i => i.ProductId == productId && i.ProductType == "RENT");
+            var request = item?.DepositRefunds.FirstOrDefault(r => r.RequestId == requestId);
+            if (item == null || request == null || request.Status != "PENDING")
+            {
+                TempData["ErrorMessage"] = "รายการคืนมัดจำนี้ถูกดำเนินการแล้วหรือไม่ถูกต้อง";
+                return RedirectToAction(nameof(DamagesAndRefunds), new { tab = "depositRefunds" });
+            }
+            if (approve && (refundedAmount <= 0 || refundedAmount > request.Amount))
+            {
+                TempData["ErrorMessage"] = "ยอดคืนต้องมากกว่า 0 และไม่เกินยอดมัดจำที่ฝ่ายขายแจ้ง";
+                return RedirectToAction(nameof(DamagesAndRefunds), new { tab = "depositRefunds" });
+            }
+
+            request.Status = approve ? "COMPLETED" : "REJECTED";
+            request.RefundedAmount = approve ? refundedAmount : 0m;
+            request.ProcessedBy = await GetCurrentAccountantIdAsync();
+            request.ProcessedAt = DateTime.Now;
+            sale.ItemsJson = System.Text.Json.JsonSerializer.Serialize(items);
+            await _db.SaveChangesAsync();
+
+            TempData["SuccessMessage"] = approve
+                ? $"บันทึกคืนมัดจำ {sale.ReceiptCode} จำนวน {refundedAmount:N2} ฿ แล้ว (โปรดโอนเงินจริงให้ลูกค้าตามช่องทางที่ตกลง)"
+                : $"ปฏิเสธคำขอคืนมัดจำ {sale.ReceiptCode} แล้ว";
+            return RedirectToAction(nameof(DamagesAndRefunds), new { tab = "depositRefunds" });
         }
 
         [HttpPost]
@@ -612,7 +770,7 @@ namespace Chinnaphat_8272_L005.Controllers
                 var dailyGroups = monthlyBookings
                     .Select(b => new { Day = b.PlayDate.Day, Court = b.CourtAmount, Sale = b.SaleAmount, Rent = b.RentalAmount, Net = b.NetAmount, Count = 1 })
                     .Concat(monthlyWalkIns.Select(q => new { Day = q.QueueDate.Day, Court = q.CourtFee, Sale = 0m, Rent = 0m, Net = q.CourtFee, Count = 1 }))
-                    .Concat(monthlyPosSales.Select(s => new { Day = s.PaidAt.Day, Court = 0m, Sale = s.SaleAmount, Rent = s.RentalAmount, Net = s.NetTotal, Count = 1 }))
+                    .Concat(monthlyPosSales.Where(s => s.PaidAt.HasValue).Select(s => new { Day = s.PaidAt!.Value.Day, Court = 0m, Sale = s.SaleAmount, Rent = s.RentalAmount, Net = s.NetTotal, Count = 1 }))
                     .GroupBy(x => x.Day)
                     .Select(g => new { Day = g.Key, Court = g.Sum(x => x.Court), Sale = g.Sum(x => x.Sale), Rent = g.Sum(x => x.Rent), Net = g.Sum(x => x.Net), Count = g.Sum(x => x.Count) })
                     .OrderBy(g => g.Day)

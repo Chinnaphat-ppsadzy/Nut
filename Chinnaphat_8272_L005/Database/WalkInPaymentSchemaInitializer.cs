@@ -58,15 +58,39 @@ public static class WalkInPaymentSchemaInitializer
                 discount_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00,
                 net_total DECIMAL(10,2) NOT NULL DEFAULT 0.00,
                 payment_method ENUM('CASH','QR') NOT NULL,
-                payment_status ENUM('PAID','VOID') NOT NULL DEFAULT 'PAID',
-                paid_at DATETIME NOT NULL,
+                payment_status ENUM('PENDING_VERIFY','PAID','REJECTED','VOID') NOT NULL DEFAULT 'PENDING_VERIFY',
+                paid_at DATETIME NULL,
                 created_by INT UNSIGNED NOT NULL,
                 created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                items_json LONGTEXT NULL,
+                slip_image_url VARCHAR(255) NULL,
+                verified_by INT UNSIGNED NULL,
+                verified_at DATETIME NULL,
+                reject_reason VARCHAR(500) NULL,
                 PRIMARY KEY (sale_id),
                 UNIQUE KEY uq_pos_sale_receipt (receipt_code),
                 KEY ix_pos_sale_paid_at (paid_at)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
             await createPosSales.ExecuteNonQueryAsync();
+
+            var posColumns = new (string Name, string Definition)[]
+            {
+                ("items_json", "LONGTEXT NULL"), ("slip_image_url", "VARCHAR(255) NULL"),
+                ("verified_by", "INT UNSIGNED NULL"), ("verified_at", "DATETIME NULL"), ("reject_reason", "VARCHAR(500) NULL")
+            };
+            foreach (var column in posColumns)
+            {
+                await using var check = connection.CreateCommand();
+                check.CommandText = "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'pos_sale_transactions' AND COLUMN_NAME = @columnName";
+                var parameter = check.CreateParameter(); parameter.ParameterName = "@columnName"; parameter.Value = column.Name; check.Parameters.Add(parameter);
+                if (Convert.ToInt32(await check.ExecuteScalarAsync()) > 0) continue;
+                await using var alter = connection.CreateCommand();
+                alter.CommandText = $"ALTER TABLE pos_sale_transactions ADD COLUMN {column.Name} {column.Definition}";
+                await alter.ExecuteNonQueryAsync();
+            }
+            await using var updatePosSchema = connection.CreateCommand();
+            updatePosSchema.CommandText = "ALTER TABLE pos_sale_transactions MODIFY COLUMN payment_status ENUM('PENDING_VERIFY','PAID','REJECTED','VOID') NOT NULL DEFAULT 'PENDING_VERIFY', MODIFY COLUMN paid_at DATETIME NULL";
+            await updatePosSchema.ExecuteNonQueryAsync();
         }
         finally
         {

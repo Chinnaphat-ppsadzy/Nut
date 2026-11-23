@@ -46,8 +46,10 @@ public sealed class RequireRoleFilter : IAsyncAuthorizationFilter
             .Select(user => new { RoleCode = user.Role.RoleCode, user.Status })
             .FirstOrDefaultAsync();
 
+        var status = currentUser?.Status?.Trim();
+        var blockedStatuses = new[] { "inactive", "banned", "disabled", "suspended" };
         if (currentUser == null ||
-            string.Equals(currentUser.Status, "inactive", StringComparison.OrdinalIgnoreCase) ||
+            blockedStatuses.Contains(status, StringComparer.OrdinalIgnoreCase) ||
             !_roleCodes.Contains(currentUser.RoleCode, StringComparer.OrdinalIgnoreCase))
         {
             context.Result = new StatusCodeResult(StatusCodes.Status403Forbidden);

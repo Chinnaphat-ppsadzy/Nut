@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.FileProviders;
 using Chinnaphat_8272_L005.Models;
 using Chinnaphat_8272_L005.Database;
 var builder = WebApplication.CreateBuilder(args);
@@ -54,6 +55,18 @@ app.Use(async (context, next) =>
         return;
     }
     await next();
+});
+// Uploaded product images are created at runtime, so serve them from wwwroot
+// in addition to the build-time static asset manifest below.
+app.UseStaticFiles();
+// Serve product images from App_Data so runtime uploads are not watched as wwwroot
+// content files by dotnet watch, which would restart the app after each upload.
+var productImageDirectory = Path.Combine(app.Environment.ContentRootPath, "App_Data", "uploads", "products");
+Directory.CreateDirectory(productImageDirectory);
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(productImageDirectory),
+    RequestPath = "/uploads/products"
 });
 app.UseRouting();
 app.UseSession();

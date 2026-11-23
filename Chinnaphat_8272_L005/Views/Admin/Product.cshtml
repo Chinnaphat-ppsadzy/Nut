@@ -276,8 +276,16 @@
                                 </span>
                             </td>
                             <td>
-                                <div class="fw-bold text-dark product-name-cell">@prod.ProductName</div>
-                                <small class="text-muted">หน่วย: @prod.Unit</small>
+                                <div class="d-flex align-items-center gap-2">
+                                    @if (!string.IsNullOrWhiteSpace(prod.ImageUrl))
+                                    {
+                                        <img src="@prod.ImageUrl" alt="@prod.ProductName" loading="lazy" style="width:48px;height:48px;object-fit:cover;border-radius:8px;border:1px solid #e2e8f0;" />
+                                    }
+                                    <div>
+                                        <div class="fw-bold text-dark product-name-cell">@prod.ProductName</div>
+                                        <small class="text-muted">หน่วย: @prod.Unit</small>
+                                    </div>
+                                </div>
                             </td>
                             <td>
                                 <span class="badge bg-white text-secondary border">
@@ -342,18 +350,18 @@
                             <td class="text-center">
                                 <div class="d-flex justify-content-center gap-1">
                                     <!-- ปุ่มแก้ไข -->
-                                    <button type="button" class="btn btn-outline-primary btn-sm px-2 py-1" style="border-radius:8px;"
-                                            onclick="openEditProductModal({
-                                                id: @prod.ProductId,
-                                                name: '@Html.Raw(prod.ProductName.Replace("'", "\\'"))',
-                                                catId: @prod.CategoryId,
-                                                type: '@prod.ProductType',
-                                                price: @prod.Price,
-                                                deposit: @prod.Deposit,
-                                                unit: '@Html.Raw(prod.Unit)',
-                                                stock: @prod.StockQty,
-                                                isActive: @(isActive ? "true" : "false")
-                                            })" title="แก้ไขข้อมูล">
+                                    <button type="button" class="btn btn-outline-primary btn-sm px-2 py-1 js-edit-product" style="border-radius:8px;"
+                                            data-product-id="@prod.ProductId"
+                                            data-product-name="@prod.ProductName"
+                                            data-category-id="@prod.CategoryId"
+                                            data-product-type="@prod.ProductType"
+                                            data-price="@prod.Price.ToString(System.Globalization.CultureInfo.InvariantCulture)"
+                                            data-deposit="@prod.Deposit.ToString(System.Globalization.CultureInfo.InvariantCulture)"
+                                            data-unit="@prod.Unit"
+                                            data-stock="@prod.StockQty"
+                                            data-image-url="@prod.ImageUrl"
+                                            data-is-active="@(isActive ? "true" : "false")"
+                                            title="แก้ไขข้อมูล" aria-label="แก้ไขสินค้า @prod.ProductName">
                                         <i class="bi bi-pencil-square"></i>
                                     </button>
 
@@ -398,7 +406,7 @@
 <div class="modal fade" id="addProductModal" tabindex="-1" aria-labelledby="addProductModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content" style="border-radius:18px; border:none; box-shadow:0 20px 60px rgba(0,0,0,0.2);">
-            <form asp-action="AddProduct" asp-controller="Admin" method="post" id="addProductForm">
+            <form asp-action="AddProduct" asp-controller="Admin" method="post" enctype="multipart/form-data" id="addProductForm">
                 @Html.AntiForgeryToken()
 
                 <div class="modal-header text-white" style="background:linear-gradient(135deg, #1a472a 0%, #2d6a4f 60%, #52b788 100%); border-top-left-radius:18px; border-top-right-radius:18px; padding:1.25rem 1.75rem;">
@@ -414,18 +422,10 @@
                 <div class="modal-body p-4">
                     <div class="row g-3">
                         <!-- ชื่อสินค้า/อุปกรณ์ -->
-                        <div class="col-md-8">
+                        <div class="col-md-6">
                             <label class="form-label fw-semibold small">ชื่อสินค้า / อุปกรณ์ <span class="text-danger">*</span></label>
                             <input type="text" name="productName" id="addProductName" class="form-control"
                                    placeholder="เช่น ลูกแบดมินตัน Yonex Aerosensa 30 หรือ ไม้แบด Yonex Astrox" required />
-                        </div>
-
-                        <!-- รหัส SKU -->
-                        <div class="col-md-4">
-                            <label class="form-label fw-semibold small">รหัสสินค้า (SKU)</label>
-                            <input type="text" name="sku" id="addSku" class="form-control text-uppercase font-monospace"
-                                   placeholder="เช่น SHT-01 (เว้นว่างเพื่อ auto)" />
-                            <small class="text-muted" style="font-size:0.75rem;">เว้นว่างไว้หากต้องการให้ระบบสร้างให้อัตโนมัติ</small>
                         </div>
 
                         <!-- หมวดหมู่ -->
@@ -441,13 +441,34 @@
                             </select>
                         </div>
 
+                        <div class="col-12">
+                            <div class="border rounded-3 p-3 bg-light">
+                                <label class="form-label fw-semibold small mb-2" for="addProductImage"><i class="bi bi-image me-1 text-success"></i>รูปสินค้า / อุปกรณ์</label>
+                                <div class="d-flex flex-column flex-sm-row align-items-sm-center gap-3">
+                                    <img id="addProductImagePreview" class="rounded-3 border bg-white d-none" alt="ตัวอย่างรูปสินค้า" style="width:112px;height:112px;object-fit:cover;" />
+                                    <div class="flex-grow-1">
+                                        <input type="file" name="imageFile" id="addProductImage" class="form-control" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" onchange="previewProductImage(this, 'addProductImagePreview')" />
+                                        <small class="text-muted d-block mt-2">แนบรูปสินค้าเพื่อแสดงในหน้าร้าน (JPG, PNG หรือ WEBP ขนาดไม่เกิน 5 MB)</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- ประเภท: ขาย หรือ เช่า -->
                         <div class="col-md-6">
                             <label class="form-label fw-semibold small">ประเภทรายการ <span class="text-danger">*</span></label>
                             <select name="productType" id="addProductType" class="form-select fw-bold text-dark" required onchange="onProductTypeChanged(this.value)">
-                                <option value="SALE">🛒 สินค้าสำหรับขาย (SALE)</option>
-                                <option value="RENT">🏸 อุปกรณ์สำหรับเช่า (RENT)</option>
+                                <option value="SALE"> สินค้าสำหรับขาย (SALE)</option>
+                                <option value="RENT"> อุปกรณ์สำหรับเช่า (RENT)</option>
                             </select>
+                        </div>
+
+                        <!-- รหัส SKU -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold small">รหัสสินค้า (SKU)</label>
+                            <input type="text" name="sku" id="addSku" class="form-control text-uppercase font-monospace"
+                                   placeholder="เช่น SHT-01 (เว้นว่างเพื่อ auto)" />
+                            <small class="text-muted" style="font-size:0.75rem;">เว้นว่างไว้หากต้องการให้ระบบสร้างให้อัตโนมัติ</small>
                         </div>
 
                         <!-- ราคา -->
@@ -455,7 +476,7 @@
                             <label class="form-label fw-semibold small" id="lblAddPrice">ราคาขาย (บาท) <span class="text-danger">*</span></label>
                             <div class="input-group">
                                 <span class="input-group-text">฿</span>
-                                <input type="number" step="1" min="0" name="price" id="addPrice" class="form-control fw-bold fs-5 text-success" placeholder="0" required />
+                                <input type="number" step="1" min="0" max="99999999.99" name="price" id="addPrice" class="form-control fw-bold fs-5 text-success" placeholder="0" required />
                             </div>
                         </div>
 
@@ -464,7 +485,7 @@
                             <label class="form-label fw-semibold small">ค่ามัดจำอุปกรณ์ (บาท)</label>
                             <div class="input-group">
                                 <span class="input-group-text">฿</span>
-                                <input type="number" step="1" min="0" name="deposit" id="addDeposit" class="form-control fw-bold fs-5 text-warning" value="0" />
+                                <input type="number" step="1" min="0" max="99999999.99" name="deposit" id="addDeposit" class="form-control fw-bold fs-5 text-warning" value="0" />
                             </div>
                             <small class="text-muted" style="font-size:0.72rem;">คืนให้ลูกค้าเมื่อตรวจรับคืนอุปกรณ์</small>
                         </div>
@@ -509,11 +530,11 @@
 <div class="modal fade" id="editProductModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content" style="border-radius:18px; border:none; box-shadow:0 20px 60px rgba(0,0,0,0.2);">
-            <form asp-action="UpdateProduct" asp-controller="Admin" method="post" id="editProductForm">
+            <form asp-action="UpdateProduct" asp-controller="Admin" method="post" enctype="multipart/form-data" id="editProductForm">
                 @Html.AntiForgeryToken()
                 <input type="hidden" id="editProductId" name="productId" />
 
-                <div class="modal-header bg-primary text-white" style="border-top-left-radius:18px; border-top-right-radius:18px; padding:1.25rem 1.75rem;">
+                <div class="modal-header text-white" style="background:linear-gradient(135deg,#1a472a 0%,#2d6a4f 60%,#52b788 100%); border-top-left-radius:18px; border-top-right-radius:18px; padding:1.25rem 1.75rem;">
                     <div>
                         <h5 class="modal-title fw-bold">
                             <i class="bi bi-pencil-square me-2"></i>แก้ไขข้อมูลสินค้า / อุปกรณ์
@@ -525,11 +546,11 @@
 
                 <div class="modal-body p-4">
                     <div class="row g-3">
-                        <div class="col-md-8">
+                        <div class="col-md-6">
                             <label class="form-label fw-semibold small">ชื่อสินค้า / อุปกรณ์ <span class="text-danger">*</span></label>
                             <input type="text" name="productName" id="editProductName" class="form-control" required />
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-6">
                             <label class="form-label fw-semibold small">หมวดหมู่ <span class="text-danger">*</span></label>
                             <select name="categoryId" id="editCategoryId" class="form-select" required>
                                 @foreach (var cat in categories)
@@ -537,6 +558,19 @@
                                     <option value="@cat.CategoryId">@cat.CategoryName</option>
                                 }
                             </select>
+                        </div>
+
+                        <div class="col-12">
+                            <div class="border rounded-3 p-3 bg-light">
+                                <label class="form-label fw-semibold small mb-2" for="editProductImage"><i class="bi bi-image me-1 text-success"></i>รูปสินค้า / อุปกรณ์</label>
+                                <div class="d-flex flex-column flex-sm-row align-items-sm-center gap-3">
+                                    <img id="editProductImagePreview" class="rounded-3 border bg-white d-none" alt="ตัวอย่างรูปสินค้า" style="width:112px;height:112px;object-fit:cover;" />
+                                    <div class="flex-grow-1">
+                                        <input type="file" name="imageFile" id="editProductImage" class="form-control" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" onchange="previewProductImage(this, 'editProductImagePreview')" />
+                                        <small class="text-muted d-block mt-2">เลือกรูปใหม่เพื่อเพิ่มหรือเปลี่ยนรูป หากไม่เลือก ระบบจะเก็บรูปเดิมไว้ (JPG, PNG, WEBP ไม่เกิน 5 MB)</small>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <div class="col-md-6">
@@ -562,7 +596,7 @@
                             <label class="form-label fw-semibold small" id="lblEditPrice">ราคา (บาท) <span class="text-danger">*</span></label>
                             <div class="input-group">
                                 <span class="input-group-text">฿</span>
-                                <input type="number" step="1" min="0" name="price" id="editPrice" class="form-control fw-bold text-success fs-5" required />
+                                <input type="number" step="1" min="0" max="99999999.99" name="price" id="editPrice" class="form-control fw-bold text-success fs-5" required />
                             </div>
                         </div>
 
@@ -570,7 +604,7 @@
                             <label class="form-label fw-semibold small">ค่ามัดจำ (สำหรับเช่า)</label>
                             <div class="input-group">
                                 <span class="input-group-text">฿</span>
-                                <input type="number" step="1" min="0" name="deposit" id="editDeposit" class="form-control fw-bold text-warning" />
+                                <input type="number" step="1" min="0" max="99999999.99" name="deposit" id="editDeposit" class="form-control fw-bold text-warning" />
                             </div>
                         </div>
 
@@ -588,7 +622,7 @@
 
                 <div class="modal-footer bg-light px-4 py-3" style="border-bottom-left-radius:18px; border-bottom-right-radius:18px;">
                     <button type="button" class="btn btn-outline-secondary px-3" data-bs-dismiss="modal">ยกเลิก</button>
-                    <button type="submit" class="btn btn-primary fw-bold px-4">
+                    <button type="submit" class="btn btn-success fw-bold px-4" style="background:linear-gradient(135deg,#1a472a,#2d6a4f); border:none;">
                         <i class="bi bi-save me-1"></i> บันทึกการเปลี่ยนแปลง
                     </button>
                 </div>
@@ -637,6 +671,7 @@
         // Open Add Modal
         function openAddProductModal() {
             document.getElementById('addProductForm').reset();
+            document.getElementById('addProductImagePreview').classList.add('d-none');
             onProductTypeChanged('SALE');
             new bootstrap.Modal(document.getElementById('addProductModal')).show();
         }
@@ -680,8 +715,41 @@
             document.getElementById('editStockQty').value = data.stock;
             document.getElementById('editIsActive').checked = data.isActive;
 
+            const editPreview = document.getElementById('editProductImagePreview');
+            document.getElementById('editProductImage').value = '';
+            editPreview.src = data.imageUrl || '';
+            editPreview.classList.toggle('d-none', !data.imageUrl);
+
             onEditProductTypeChanged(data.type);
-            new bootstrap.Modal(document.getElementById('editProductModal')).show();
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('editProductModal')).show();
+        }
+
+        // Read product values from encoded HTML data attributes instead of inline JS,
+        // so punctuation or Thai names cannot break the edit button's click handler.
+        document.querySelectorAll('.js-edit-product').forEach(button => {
+            button.addEventListener('click', () => openEditProductModal({
+                id: button.dataset.productId,
+                name: button.dataset.productName,
+                catId: button.dataset.categoryId,
+                type: button.dataset.productType,
+                price: button.dataset.price,
+                deposit: button.dataset.deposit,
+                unit: button.dataset.unit,
+                stock: button.dataset.stock,
+                imageUrl: button.dataset.imageUrl,
+                isActive: button.dataset.isActive === 'true'
+            }));
+        });
+
+        function previewProductImage(input, previewId) {
+            const preview = document.getElementById(previewId);
+            const file = input.files && input.files[0];
+            if (!file) {
+                preview.classList.add('d-none');
+                return;
+            }
+            preview.src = URL.createObjectURL(file);
+            preview.classList.remove('d-none');
         }
 
         function onEditProductTypeChanged(type) {

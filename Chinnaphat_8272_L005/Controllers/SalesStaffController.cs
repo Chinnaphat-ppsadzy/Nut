@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Chinnaphat_8272_L005.Models;
 using Chinnaphat_8272_L005.Helpers;
+using Chinnaphat_8272_L005.Database;
 using Microsoft.AspNetCore.Hosting;
 
 namespace Chinnaphat_8272_L005.Controllers
@@ -97,6 +98,14 @@ namespace Chinnaphat_8272_L005.Controllers
 
             try
             {
+                customerPhone = (customerPhone ?? string.Empty).Trim();
+                if (customerPhone.Length > 0 &&
+                    (customerPhone.Length != 10 || customerPhone.Any(ch => ch < '0' || ch > '9')))
+                {
+                    TempData["ErrorMessage"] = "เบอร์โทรศัพท์ต้องเป็นตัวเลขให้ครบ 10 หลัก หรือเว้นว่างไว้";
+                    return RedirectToAction(nameof(Sales));
+                }
+
                 paymentMethod = (paymentMethod ?? string.Empty).Trim().ToUpperInvariant();
                 if (paymentMethod != "QR" || subtotal < 0 || discount < 0 || netTotal < 0)
                 {
@@ -159,7 +168,7 @@ namespace Chinnaphat_8272_L005.Controllers
                 var now = DateTime.Now;
                 string receiptSuffix = Guid.NewGuid().ToString("N")[..8];
                 string receiptCode = $"POS-{now:yyyyMMddHHmmss}-{receiptSuffix}";
-                uint.TryParse(HttpContext.Session.GetString("UserId") ?? Request.Cookies["cb_user_id"], out var salesStaffId);
+                uint.TryParse(HttpContext.Session.GetString("UserId"), out var salesStaffId);
                 decimal paidTotal = authoritativeSubtotal - discount + authoritativeDeposit;
                 var slipDirectory = UploadStorage.GetSlipDirectory(_env);
                 Directory.CreateDirectory(slipDirectory);
@@ -170,7 +179,7 @@ namespace Chinnaphat_8272_L005.Controllers
                 {
                     ReceiptCode = receiptCode,
                     CustomerName = string.IsNullOrWhiteSpace(customerName) ? "ลูกค้าทั่วไป (Walk-in)" : customerName.Trim()[..Math.Min(customerName.Trim().Length, 150)],
-                    CustomerPhone = string.IsNullOrWhiteSpace(customerPhone) ? null : customerPhone.Trim()[..Math.Min(customerPhone.Trim().Length, 20)],
+                    CustomerPhone = string.IsNullOrWhiteSpace(customerPhone) ? null : customerPhone,
                     ItemsSummary = string.Join(" · ", updatedItemsSummary),
                     ItemsJson = System.Text.Json.JsonSerializer.Serialize(normalizedItems),
                     SaleAmount = posSaleAmount,
@@ -265,6 +274,7 @@ namespace Chinnaphat_8272_L005.Controllers
         {
             ViewData["Title"] = "ตรวจรับคืนและจัดการอุปกรณ์เช่า";
             await EnsureSalesStaffRoleAndProductsAsync();
+            await WalkInPaymentSchemaInitializer.EnsureRentalDepositRefundTableAsync(_db);
 
             var rentalProducts = await _db.Products
                 .Include(p => p.Category)
@@ -295,6 +305,10 @@ namespace Chinnaphat_8272_L005.Controllers
                 .OrderByDescending(s => s.PaidAt)
                 .Take(100)
                 .ToListAsync();
+            var posSaleIds = paidPosSales.Select(s => s.SaleId).ToList();
+            var registeredPosReturns = await _db.RentalDepositRefundRequests
+                .Where(r => r.SaleId.HasValue && posSaleIds.Contains(r.SaleId.Value) && r.Status != "REJECTED")
+                .ToListAsync();
             foreach (var sale in paidPosSales)
             {
                 if (string.IsNullOrWhiteSpace(sale.ItemsJson)) continue;
@@ -302,10 +316,15 @@ namespace Chinnaphat_8272_L005.Controllers
                 foreach (var item in items.Where(i => i.ProductType == "RENT"))
                 {
                     var pendingQty = item.DepositRefunds.Where(r => r.Status == "PENDING").Sum(r => r.Quantity);
-                    var returnedQty = item.DepositRefunds.Sum(r => r.Quantity);
+                    var pendingAmount = item.DepositRefunds.Where(r => r.Status == "PENDING").Sum(r => r.Amount) + registeredPosReturns
+                        .Where(r => r.SaleId == sale.SaleId && r.ProductId == (uint)item.ProductId && r.Status == "PENDING")
+                        .Sum(r => r.DepositAmount);
+                    var returnedQty = item.DepositRefunds.Sum(r => r.Quantity) + registeredPosReturns
+                        .Where(r => r.SaleId == sale.SaleId && r.ProductId == (uint)item.ProductId)
+                        .Sum(r => r.Quantity);
                     var remainingQty = Math.Max(0, item.Qty - returnedQty);
                     if (remainingQty > 0 || pendingQty > 0)
-                        posRentals.Add(new PosRentalLineViewModel { Sale = sale, Item = item, RemainingQty = remainingQty });
+                        posRentals.Add(new PosRentalLineViewModel { Sale = sale, Item = item, RemainingQty = remainingQty, PendingRefundAmount = pendingAmount });
                 }
             }
             ViewBag.PosRentalItems = posRentals;
@@ -313,9 +332,113 @@ namespace Chinnaphat_8272_L005.Controllers
             return View(rentalProducts);
         }
 
+        [HttpGet]
+        public async Task<IActionResult> BookingRefunds()
+        {
+            await EnsureSalesStaffRoleAndProductsAsync();
+            await BookingRefundSchemaInitializer.EnsureAsync(_db);
+            ViewBag.RefundRequests = await _db.BookingRefundRequests
+                .Where(r => r.BookingItemId.HasValue && r.Status == "PENDING_SALES")
+                .OrderBy(r => r.CreatedAt).ToListAsync();
+            ViewBag.AllBookingRefundRequests = await _db.BookingRefundRequests.Where(r => r.BookingItemId.HasValue || r.SaleId.HasValue).OrderByDescending(r => r.CreatedAt).Take(100).ToListAsync();
+            var posReturnOptions = new List<PosSaleProductRefundOption>();
+            var paidPosSales = await _db.PosSaleTransactions.Where(s => s.PaymentStatus == "PAID").OrderByDescending(s => s.PaidAt).Take(100).ToListAsync();
+            foreach (var sale in paidPosSales)
+            {
+                var lines = string.IsNullOrWhiteSpace(sale.ItemsJson) ? new List<PosCartItemDto>() : System.Text.Json.JsonSerializer.Deserialize<List<PosCartItemDto>>(sale.ItemsJson) ?? new();
+                foreach (var line in lines.Where(i => i.ProductType == "SALE" && i.Qty > 0))
+                    posReturnOptions.Add(new PosSaleProductRefundOption { SaleId = sale.SaleId, ProductId = (uint)line.ProductId, ReceiptCode = sale.ReceiptCode, CustomerName = sale.CustomerName, ProductName = line.ProductName, Quantity = (uint)line.Qty, Amount = CalculatePosSaleItemRefund(sale, line) });
+            }
+            ViewBag.PosReturnOptions = posReturnOptions;
+            return View();
+        }
+
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> ReturnPosRental(uint saleId, int productId, int quantity)
+        public async Task<IActionResult> ReceivePosProductRefund(string saleProductKey, string reason, bool itemReturned)
+        {
+            await BookingRefundSchemaInitializer.EnsureAsync(_db);
+            if (!itemReturned || string.IsNullOrWhiteSpace(reason) || reason.Trim().Length > 500)
+            {
+                TempData["ErrorMessage"] = "ต้องรับสินค้าและตรวจสภาพคืน พร้อมระบุเหตุผลก่อนส่งบัญชี";
+                return RedirectToAction(nameof(BookingRefunds));
+            }
+            var parts = (saleProductKey ?? string.Empty).Split('|');
+            if (parts.Length != 2 || !uint.TryParse(parts[0], out var saleId) || !uint.TryParse(parts[1], out var productId))
+            { TempData["ErrorMessage"] = "กรุณาเลือกรายการสินค้า Walk-in ที่ถูกต้อง"; return RedirectToAction(nameof(BookingRefunds)); }
+            var sale = await _db.PosSaleTransactions.FirstOrDefaultAsync(s => s.SaleId == saleId && s.PaymentStatus == "PAID");
+            if (sale == null || string.IsNullOrWhiteSpace(sale.ItemsJson))
+            { TempData["ErrorMessage"] = "ไม่พบใบเสร็จ POS ที่ชำระเงินแล้ว"; return RedirectToAction(nameof(BookingRefunds)); }
+            var lines = System.Text.Json.JsonSerializer.Deserialize<List<PosCartItemDto>>(sale.ItemsJson) ?? new();
+            var line = lines.FirstOrDefault(i => i.ProductId == (int)productId && i.ProductType == "SALE" && i.Qty > 0);
+            if (line == null) { TempData["ErrorMessage"] = "เลือกรายการได้เฉพาะสินค้าที่ซื้อ ไม่รวมอุปกรณ์เช่า"; return RedirectToAction(nameof(BookingRefunds)); }
+            var duplicate = await _db.BookingRefundRequests.AnyAsync(r => r.SaleId == saleId && r.ProductId == productId && r.Status != "REJECTED");
+            if (duplicate) { TempData["ErrorMessage"] = "สินค้านี้มีคำขอคืนเงินอยู่แล้ว"; return RedirectToAction(nameof(BookingRefunds)); }
+            var previouslyRefunded = await _db.BookingRefundRequests.Where(r => r.SaleId == saleId && r.Status == "COMPLETED").SumAsync(r => (decimal?)r.Amount) ?? 0m;
+            var refundAmount = CalculatePosSaleItemRefund(sale, line);
+            var grossAll = sale.SaleAmount + sale.RentalAmount;
+            var saleGoodsNet = Math.Max(0m, decimal.Round(sale.SaleAmount - (grossAll > 0 ? sale.DiscountAmount * sale.SaleAmount / grossAll : 0m), 2, MidpointRounding.AwayFromZero));
+            if (previouslyRefunded + refundAmount > saleGoodsNet)
+            { TempData["ErrorMessage"] = "ยอดขอคืนเกินยอดสินค้าสุทธิในใบเสร็จ"; return RedirectToAction(nameof(BookingRefunds)); }
+            var staffId = await GetCurrentSalesStaffIdAsync();
+            _db.BookingRefundRequests.Add(new BookingRefundRequest
+            {
+                SaleId = saleId, ProductId = productId, ReferenceCode = sale.ReceiptCode, CustomerName = sale.CustomerName,
+                CustomerPhone = sale.CustomerPhone, ServiceDate = DateOnly.FromDateTime(sale.PaidAt ?? sale.CreatedAt),
+                ProductName = line.ProductName, ProductQuantity = (uint)line.Qty, Amount = refundAmount,
+                Reason = reason.Trim(), Status = "PENDING_ACCOUNTING", SalesNote = "ฝ่ายขายรับสินค้า Walk-in คืนและตรวจสภาพแล้ว",
+                SalesReviewedBy = staffId, SalesReviewedAt = DateTime.Now, CreatedAt = DateTime.Now
+            });
+            await _db.SaveChangesAsync();
+            TempData["SuccessMessage"] = "ส่งคำขอคืนเงินค่าสินค้า Walk-in ให้ฝ่ายบัญชีแล้ว";
+            return RedirectToAction(nameof(BookingRefunds));
+        }
+
+        private static decimal CalculatePosSaleItemRefund(PosSaleTransaction sale, PosCartItemDto line)
+        {
+            var gross = line.Price * line.Qty;
+            var grossAll = sale.SaleAmount + sale.RentalAmount;
+            var allocatedDiscount = grossAll > 0 ? sale.DiscountAmount * gross / grossAll : 0m;
+            return Math.Max(0m, decimal.Round(gross - allocatedDiscount, 2, MidpointRounding.AwayFromZero));
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ReviewBookingRefund(uint requestId, bool itemReturned, string? salesNote)
+        {
+            await BookingRefundSchemaInitializer.EnsureAsync(_db);
+            var request = await _db.BookingRefundRequests.FirstOrDefaultAsync(r => r.RequestId == requestId && r.Status == "PENDING_SALES");
+            if (request == null) return RedirectToAction(nameof(BookingRefunds));
+            var note = (salesNote ?? string.Empty).Trim();
+            if (note.Length > 500) { TempData["ErrorMessage"] = "บันทึกผลตรวจได้ไม่เกิน 500 ตัวอักษร"; return RedirectToAction(nameof(BookingRefunds)); }
+            if (!itemReturned)
+            {
+                if (note.Length < 3) { TempData["ErrorMessage"] = "ระบุเหตุผลเมื่อยังไม่ได้รับสินค้าคืน"; return RedirectToAction(nameof(BookingRefunds)); }
+                request.Status = "REJECTED";
+            }
+            else
+            {
+                var item = request.BookingItemId.HasValue
+                    ? await _db.BookingItems.FirstOrDefaultAsync(i => i.BookingItemId == request.BookingItemId.Value && i.ItemType == "SALE")
+                    : null;
+                if (item == null || item.LineTotal != request.Amount)
+                {
+                    TempData["ErrorMessage"] = "รายการนี้ไม่ใช่สินค้า หรือยอดสินค้าเปลี่ยนแปลง จึงส่งต่อบัญชีไม่ได้";
+                    return RedirectToAction(nameof(BookingRefunds));
+                }
+                request.Status = "PENDING_ACCOUNTING";
+            }
+            request.SalesNote = note.Length > 0 ? note : "ฝ่ายขายตรวจรับสินค้าคืนแล้ว";
+            request.SalesReviewedBy = await GetCurrentSalesStaffIdAsync();
+            request.SalesReviewedAt = DateTime.Now;
+            await _db.SaveChangesAsync();
+            TempData["SuccessMessage"] = request.Status == "PENDING_ACCOUNTING" ? "ยืนยันแล้ว ส่งต่อฝ่ายบัญชี" : "ปฏิเสธคำขอและแจ้งเหตุผลแล้ว";
+            return RedirectToAction(nameof(BookingRefunds));
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ReturnPosRental(uint saleId, int productId, int quantity, string? damageDescription, IFormFile? damagePhoto)
         {
             if (quantity <= 0)
             {
@@ -339,28 +462,69 @@ namespace Chinnaphat_8272_L005.Controllers
                 return RedirectToAction(nameof(Rentals));
             }
 
-            var alreadyRequested = item.DepositRefunds.Sum(r => r.Quantity);
+            var previousLegacyQty = item.DepositRefunds.Sum(r => r.Quantity);
+            var previousRegisteredQty = await _db.RentalDepositRefundRequests
+                .Where(r => r.SaleId == saleId && r.ProductId == (uint)productId && r.Status != "REJECTED")
+                .SumAsync(r => r.Quantity);
+            var alreadyRequested = previousLegacyQty + previousRegisteredQty;
             if (quantity > item.Qty - alreadyRequested)
             {
                 TempData["ErrorMessage"] = "จำนวนคืนเกินจำนวนที่ยังไม่ได้คืน";
                 return RedirectToAction(nameof(Rentals));
             }
 
-            // Sales confirms physical receipt and condition here. Accounting later confirms the actual refund amount.
-            item.DepositRefunds.Add(new PosDepositRefundRequestDto
+            // ฝ่ายขายรับสินค้าและยืนยันสภาพ บัญชีเป็นผู้บันทึกการคืนเงินจริงภายหลัง
+            uint staffId = await GetCurrentSalesStaffIdAsync();
+            // แนบรูปอย่างเดียวก็ถือเป็นการแจ้งชำรุดได้ เพื่อไม่ให้คำขอถูกตีกลับก่อนส่งถึงบัญชี
+            bool hasDamagePhoto = damagePhoto is { Length: > 0 };
+            bool isDamaged = !string.IsNullOrWhiteSpace(damageDescription) || hasDamagePhoto;
+            if (damagePhoto is { Length: > 0 } && !TryGetDamagePhotoExtension(damagePhoto, out _))
             {
-                RequestId = Guid.NewGuid().ToString("N"),
+                TempData["ErrorMessage"] = "รูปหลักฐานต้องเป็น JPG, PNG หรือ WEBP และมีขนาดไม่เกิน 5 MB";
+                return RedirectToAction(nameof(Rentals));
+            }
+
+            string? damagePhotoName = null;
+            if (damagePhoto is { Length: > 0 })
+            {
+                TryGetDamagePhotoExtension(damagePhoto, out var extension);
+                damagePhotoName = $"damage_pos_{Guid.NewGuid():N}{extension}";
+                var damageDirectory = UploadStorage.GetDamageDirectory(_env);
+                Directory.CreateDirectory(damageDirectory);
+                await using var stream = new FileStream(UploadStorage.GetDamagePath(_env, damagePhotoName), FileMode.CreateNew);
+                await damagePhoto.CopyToAsync(stream);
+            }
+            _db.RentalDepositRefundRequests.Add(new RentalDepositRefundRequest
+            {
+                SaleId = sale.SaleId,
+                ProductId = (uint)item.ProductId,
+                ReceiptCode = sale.ReceiptCode,
+                CustomerName = sale.CustomerName,
+                CustomerPhone = sale.CustomerPhone,
+                ProductName = item.ProductName,
                 Quantity = quantity,
-                Amount = item.Deposit * quantity,
+                DepositAmount = item.Deposit * quantity,
+                DamageDescription = isDamaged
+                    ? (string.IsNullOrWhiteSpace(damageDescription)
+                        ? "แจ้งอุปกรณ์ชำรุดจากรูปหลักฐาน (ฝ่ายขายไม่ได้ระบุรายละเอียดเพิ่มเติม)"
+                        : damageDescription.Trim()[..Math.Min(damageDescription.Trim().Length, 500)])
+                    : null,
+                DamagePhotoUrl = damagePhotoName,
+                DamageAssessmentStatus = isDamaged ? "REPORTED" : null,
                 Status = "PENDING",
+                RequestedBy = staffId,
                 CreatedAt = DateTime.Now
             });
-            product.StockQty += quantity;
-            product.UpdatedAt = DateTime.Now;
-            sale.ItemsJson = System.Text.Json.JsonSerializer.Serialize(items);
+            if (!isDamaged)
+            {
+                product.StockQty += quantity;
+                product.UpdatedAt = DateTime.Now;
+            }
             await _db.SaveChangesAsync();
 
-            TempData["SuccessMessage"] = $"รับคืน {item.ProductName} จำนวน {quantity} แล้ว ส่งยอดมัดจำ {item.Deposit * quantity:N2} ฿ ให้ฝ่ายบัญชีอนุมัติคืน";
+            TempData["SuccessMessage"] = isDamaged
+                ? $"รับคืน {item.ProductName} และส่งรายละเอียดชำรุดให้ฝ่ายบัญชีประเมินก่อนคืนมัดจำ"
+                : $"รับคืน {item.ProductName} จำนวน {quantity} แล้ว ส่งยอดมัดจำ {item.Deposit * quantity:N2} ฿ ให้ฝ่ายบัญชีอนุมัติคืน";
             return RedirectToAction(nameof(Rentals));
         }
 
@@ -389,18 +553,34 @@ namespace Chinnaphat_8272_L005.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> MarkRentalReturned(uint bookingItemId)
         {
-            var item = await _db.BookingItems.Include(i => i.Product).FirstOrDefaultAsync(i => i.BookingItemId == bookingItemId);
+            var item = await _db.BookingItems.Include(i => i.Product).Include(i => i.Booking).ThenInclude(b => b.User)
+                .FirstOrDefaultAsync(i => i.BookingItemId == bookingItemId);
             if (item == null || item.ItemType != "RENT" || item.ItemStatus != "HANDED_OVER")
             {
                 TempData["ErrorMessage"] = "รายการนี้ยังไม่ถูกส่งมอบ หรือรับคืนไปแล้ว";
                 return RedirectToAction(nameof(Rentals));
             }
 
+            uint staffId = await GetCurrentSalesStaffIdAsync();
             item.ItemStatus = "RETURNED";
             item.ReturnedAt = DateTime.Now;
-            item.ReturnedBy = await GetCurrentSalesStaffIdAsync();
+            item.ReturnedBy = staffId;
             item.Product.StockQty += checked((int)item.Quantity);
             item.Product.UpdatedAt = DateTime.Now;
+            _db.RentalDepositRefundRequests.Add(new RentalDepositRefundRequest
+            {
+                BookingItemId = item.BookingItemId,
+                ProductId = item.ProductId,
+                ReceiptCode = item.Booking.BookingCode,
+                CustomerName = item.Booking.User?.FullName ?? "ลูกค้าสมาชิก",
+                CustomerPhone = item.Booking.User?.Phone,
+                ProductName = item.Product.ProductName,
+                Quantity = checked((int)item.Quantity),
+                DepositAmount = item.Product.Deposit * item.Quantity,
+                Status = "PENDING",
+                RequestedBy = staffId,
+                CreatedAt = DateTime.Now
+            });
             await _db.SaveChangesAsync();
             TempData["SuccessMessage"] = "ตรวจรับคืนอุปกรณ์สภาพปกติและคืนเข้าสต็อกแล้ว";
             return RedirectToAction(nameof(Rentals));
@@ -408,9 +588,9 @@ namespace Chinnaphat_8272_L005.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> ReportDamage(uint bookingItemId, string description)
+        public async Task<IActionResult> ReportDamage(uint bookingItemId, string description, IFormFile? damagePhoto)
         {
-            var item = await _db.BookingItems.Include(i => i.Product).Include(i => i.Booking)
+            var item = await _db.BookingItems.Include(i => i.Product).Include(i => i.Booking).ThenInclude(b => b.User)
                 .FirstOrDefaultAsync(i => i.BookingItemId == bookingItemId);
             if (item == null || item.ItemType != "RENT" || item.ItemStatus != "HANDED_OVER")
             {
@@ -423,11 +603,28 @@ namespace Chinnaphat_8272_L005.Controllers
                 return RedirectToAction(nameof(Rentals));
             }
 
+            if (damagePhoto is { Length: > 0 } && !TryGetDamagePhotoExtension(damagePhoto, out _))
+            {
+                TempData["ErrorMessage"] = "รูปหลักฐานต้องเป็น JPG, PNG หรือ WEBP และมีขนาดไม่เกิน 5 MB";
+                return RedirectToAction(nameof(Rentals));
+            }
+
             var staffId = await GetCurrentSalesStaffIdAsync();
+            string? damagePhotoName = null;
+            if (damagePhoto is { Length: > 0 })
+            {
+                TryGetDamagePhotoExtension(damagePhoto, out var extension);
+                damagePhotoName = $"damage_booking_{Guid.NewGuid():N}{extension}";
+                var damageDirectory = UploadStorage.GetDamageDirectory(_env);
+                Directory.CreateDirectory(damageDirectory);
+                await using var stream = new FileStream(UploadStorage.GetDamagePath(_env, damagePhotoName), FileMode.CreateNew);
+                await damagePhoto.CopyToAsync(stream);
+            }
             _db.EquipmentDamages.Add(new EquipmentDamage
             {
                 BookingItemId = item.BookingItemId,
                 Description = description.Trim()[..Math.Min(description.Trim().Length, 500)],
+                PhotoUrl = damagePhotoName,
                 FineAmount = 0m,
                 Status = "REPORTED",
                 ReportedBy = staffId,
@@ -436,15 +633,69 @@ namespace Chinnaphat_8272_L005.Controllers
             item.ItemStatus = "DAMAGED";
             item.ReturnedAt = DateTime.Now;
             item.ReturnedBy = staffId;
+            _db.RentalDepositRefundRequests.Add(new RentalDepositRefundRequest
+            {
+                BookingItemId = item.BookingItemId,
+                ProductId = item.ProductId,
+                ReceiptCode = item.Booking.BookingCode,
+                CustomerName = item.Booking.User?.FullName ?? "ลูกค้าสมาชิก",
+                CustomerPhone = item.Booking.User?.Phone,
+                ProductName = item.Product.ProductName,
+                Quantity = checked((int)item.Quantity),
+                DepositAmount = item.Product.Deposit * item.Quantity,
+                DamageDescription = description.Trim()[..Math.Min(description.Trim().Length, 500)],
+                DamagePhotoUrl = damagePhotoName,
+                DamageAssessmentStatus = "REPORTED",
+                Status = "PENDING",
+                RequestedBy = staffId,
+                CreatedAt = DateTime.Now
+            });
             // Do not return damaged items to available stock; finance first determines the damage charge.
             await _db.SaveChangesAsync();
             TempData["SuccessMessage"] = $"ส่งรายงานความเสียหายของ {item.Product.ProductName} ให้ฝ่ายบัญชีตรวจสอบแล้ว";
             return RedirectToAction(nameof(Rentals));
         }
 
+        [HttpGet]
+        public async Task<IActionResult> DamageEvidence(uint damageId)
+        {
+            var photoName = await _db.EquipmentDamages
+                .Where(d => d.DamageId == damageId)
+                .Select(d => d.PhotoUrl)
+                .FirstOrDefaultAsync();
+            if (string.IsNullOrWhiteSpace(photoName)) return NotFound();
+
+            var filePath = UploadStorage.GetDamagePath(_env, photoName);
+            var contentType = GetDamagePhotoContentType(filePath);
+            if (contentType == null || !System.IO.File.Exists(filePath)) return NotFound();
+            Response.Headers.CacheControl = "no-store, private";
+            return PhysicalFile(filePath, contentType);
+        }
+
+        private static bool TryGetDamagePhotoExtension(IFormFile file, out string extension)
+        {
+            extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+            if (file.Length <= 0 || file.Length > 5 * 1024 * 1024) return false;
+            return extension switch
+            {
+                ".jpg" or ".jpeg" => file.ContentType.Equals("image/jpeg", StringComparison.OrdinalIgnoreCase),
+                ".png" => file.ContentType.Equals("image/png", StringComparison.OrdinalIgnoreCase),
+                ".webp" => file.ContentType.Equals("image/webp", StringComparison.OrdinalIgnoreCase),
+                _ => false
+            };
+        }
+
+        private static string? GetDamagePhotoContentType(string filePath) => Path.GetExtension(filePath).ToLowerInvariant() switch
+        {
+            ".jpg" or ".jpeg" => "image/jpeg",
+            ".png" => "image/png",
+            ".webp" => "image/webp",
+            _ => null
+        };
+
         private async Task<uint> GetCurrentSalesStaffIdAsync()
         {
-            var rawId = HttpContext.Session.GetString("UserId") ?? Request.Cookies["cb_user_id"];
+            var rawId = HttpContext.Session.GetString("UserId");
             if (!uint.TryParse(rawId, out var userId)) throw new InvalidOperationException("ไม่พบผู้ใช้ที่เข้าสู่ระบบ กรุณาเข้าสู่ระบบใหม่");
             var isSalesStaff = await _db.Users.AnyAsync(u => u.UserId == userId && u.Role.RoleCode == "SALES_STAFF");
             if (!isSalesStaff) throw new InvalidOperationException("ผู้ใช้นี้ไม่มีสิทธิ์บันทึกรายการอุปกรณ์เช่า");
@@ -562,12 +813,25 @@ namespace Chinnaphat_8272_L005.Controllers
         public List<PosDepositRefundRequestDto> DepositRefunds { get; set; } = new();
     }
 
+    public class PosSaleProductRefundOption
+    {
+        public uint SaleId { get; set; }
+        public uint ProductId { get; set; }
+        public string ReceiptCode { get; set; } = string.Empty;
+        public string CustomerName { get; set; } = string.Empty;
+        public string ProductName { get; set; } = string.Empty;
+        public uint Quantity { get; set; }
+        public decimal Amount { get; set; }
+    }
+
     public class PosDepositRefundRequestDto
     {
         public string RequestId { get; set; } = string.Empty;
         public int Quantity { get; set; }
         public decimal Amount { get; set; }
         public decimal? RefundedAmount { get; set; }
+        public string? RefundMethod { get; set; }
+        public string? RefundReference { get; set; }
         public string Status { get; set; } = "PENDING";
         public DateTime CreatedAt { get; set; }
         public uint? ProcessedBy { get; set; }
@@ -579,6 +843,7 @@ namespace Chinnaphat_8272_L005.Controllers
         public PosSaleTransaction Sale { get; set; } = null!;
         public PosCartItemDto Item { get; set; } = null!;
         public int RemainingQty { get; set; }
+        public decimal PendingRefundAmount { get; set; }
     }
 
     public class PosDepositRefundViewModel

@@ -36,6 +36,8 @@ public partial class Csi402dbContext : DbContext
 
     public virtual DbSet<EquipmentDamage> EquipmentDamages { get; set; }
 
+    public virtual DbSet<RentalDepositRefundRequest> RentalDepositRefundRequests { get; set; }
+
     public virtual DbSet<Payment> Payments { get; set; }
 
     public virtual DbSet<Permission> Permissions { get; set; }
@@ -51,6 +53,8 @@ public partial class Csi402dbContext : DbContext
     public virtual DbSet<Receipt> Receipts { get; set; }
 
     public virtual DbSet<Refund> Refunds { get; set; }
+
+    public virtual DbSet<BookingRefundRequest> BookingRefundRequests { get; set; }
 
     public virtual DbSet<Role> Roles { get; set; }
 
@@ -577,6 +581,8 @@ public partial class Csi402dbContext : DbContext
             entity.Property(e => e.IssueId)
                 .HasComment("PK")
                 .HasColumnName("issue_id");
+            entity.Property(e => e.MaintenanceBlockId)
+                .HasColumnName("maintenance_block_id");
             entity.Property(e => e.CourtId)
                 .HasComment("FK -> courts.court_id (เธเนเธฒเนเธเธตเนเธขเธงเธเธฑเธเธเธญเธฃเนเธเนเธเธเธญเธฃเนเธเธซเธเธถเนเธ)")
                 .HasColumnName("court_id");
@@ -685,6 +691,40 @@ public partial class Csi402dbContext : DbContext
                 .HasForeignKey(d => d.ReportedBy)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("fk_dmg_reporter");
+        });
+
+        modelBuilder.Entity<RentalDepositRefundRequest>(entity =>
+        {
+            entity.HasKey(e => e.RequestId);
+            entity.ToTable("rental_deposit_refund_requests");
+            entity.Property(e => e.RequestId).HasColumnName("request_id");
+            entity.Property(e => e.BookingItemId).HasColumnName("booking_item_id");
+            entity.Property(e => e.SaleId).HasColumnName("sale_id");
+            entity.Property(e => e.ProductId).HasColumnName("product_id");
+            entity.Property(e => e.ReceiptCode).HasMaxLength(40).HasColumnName("receipt_code");
+            entity.Property(e => e.CustomerName).HasMaxLength(150).HasColumnName("customer_name");
+            entity.Property(e => e.CustomerPhone).HasMaxLength(20).HasColumnName("customer_phone");
+            entity.Property(e => e.RefundDestination).HasMaxLength(100).HasColumnName("refund_destination");
+            entity.Property(e => e.ProductName).HasMaxLength(200).HasColumnName("product_name");
+            entity.Property(e => e.Quantity).HasColumnName("quantity");
+            entity.Property(e => e.DepositAmount).HasPrecision(10, 2).HasColumnName("deposit_amount");
+            entity.Property(e => e.DamageDescription).HasMaxLength(500).HasColumnName("damage_description");
+            entity.Property(e => e.DamagePhotoUrl).HasMaxLength(255).HasColumnName("damage_photo_url");
+            entity.Property(e => e.DamageAssessmentStatus).HasMaxLength(20).HasColumnName("damage_assessment_status");
+            entity.Property(e => e.DamageAssessedBy).HasColumnName("damage_assessed_by");
+            entity.Property(e => e.DamageAssessedAt).HasColumnType("datetime").HasColumnName("damage_assessed_at");
+            entity.Property(e => e.FineAmount).HasPrecision(10, 2).HasColumnName("fine_amount");
+            entity.Property(e => e.RefundedAmount).HasPrecision(10, 2).HasColumnName("refunded_amount");
+            entity.Property(e => e.RefundMethod).HasMaxLength(30).HasColumnName("refund_method");
+            entity.Property(e => e.RefundReference).HasMaxLength(100).HasColumnName("refund_reference");
+            entity.Property(e => e.Status).HasMaxLength(20).HasColumnName("status");
+            entity.Property(e => e.RequestedBy).HasColumnName("requested_by");
+            entity.Property(e => e.ProcessedBy).HasColumnName("processed_by");
+            entity.Property(e => e.CreatedAt).HasColumnType("datetime").HasColumnName("created_at");
+            entity.Property(e => e.ProcessedAt).HasColumnType("datetime").HasColumnName("processed_at");
+            entity.HasIndex(e => e.Status);
+            entity.HasIndex(e => e.BookingItemId);
+            entity.HasIndex(e => e.SaleId);
         });
 
         modelBuilder.Entity<Payment>(entity =>
@@ -881,6 +921,10 @@ public partial class Csi402dbContext : DbContext
             entity.Property(e => e.PromotionId)
                 .HasComment("PK")
                 .HasColumnName("promotion_id");
+            entity.Property(e => e.ActiveDays)
+                .HasMaxLength(32)
+                .HasDefaultValue("1,2,3,4,5")
+                .HasColumnName("active_days");
             entity.Property(e => e.CreatedAt)
                 .HasDefaultValueSql("CURRENT_TIMESTAMP")
                 .HasComment("เธงเธฑเธเธเธตเนเธชเธฃเนเธฒเธ")
@@ -1517,6 +1561,37 @@ public partial class Csi402dbContext : DbContext
             entity.Property(e => e.RejectReason).HasMaxLength(500).HasColumnName("reject_reason");
             entity.Property(e => e.CreatedBy).HasColumnName("created_by");
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP").HasColumnType("datetime").HasColumnName("created_at");
+        });
+
+        modelBuilder.Entity<BookingRefundRequest>(entity =>
+        {
+            entity.HasKey(e => e.RequestId);
+            entity.ToTable("booking_refund_requests");
+            entity.Property(e => e.RequestId).HasColumnName("request_id");
+            entity.Property(e => e.BookingId).HasColumnName("booking_id");
+            entity.Property(e => e.BookingItemId).HasColumnName("booking_item_id");
+            entity.Property(e => e.QueueId).HasColumnName("queue_id");
+            entity.Property(e => e.SaleId).HasColumnName("sale_id");
+            entity.Property(e => e.ProductId).HasColumnName("product_id");
+            entity.Property(e => e.CustomerUserId).HasColumnName("customer_user_id");
+            entity.Property(e => e.ReferenceCode).HasMaxLength(60).HasColumnName("reference_code");
+            entity.Property(e => e.ProductName).HasMaxLength(200).HasColumnName("product_name");
+            entity.Property(e => e.ProductQuantity).HasColumnName("product_quantity");
+            entity.Property(e => e.CustomerName).HasMaxLength(150).HasColumnName("customer_name");
+            entity.Property(e => e.CustomerPhone).HasMaxLength(30).HasColumnName("customer_phone");
+            entity.Property(e => e.ServiceDate).HasColumnType("date").HasColumnName("service_date");
+            entity.Property(e => e.Amount).HasPrecision(10, 2).HasColumnName("amount");
+            entity.Property(e => e.Reason).HasMaxLength(500).HasColumnName("reason");
+            entity.Property(e => e.Status).HasMaxLength(30).HasColumnName("status");
+            entity.Property(e => e.SalesNote).HasMaxLength(500).HasColumnName("sales_note");
+            entity.Property(e => e.SalesReviewedBy).HasColumnName("sales_reviewed_by");
+            entity.Property(e => e.SalesReviewedAt).HasColumnType("datetime").HasColumnName("sales_reviewed_at");
+            entity.Property(e => e.AccountingNote).HasMaxLength(500).HasColumnName("accounting_note");
+            entity.Property(e => e.RefundMethod).HasMaxLength(40).HasColumnName("refund_method");
+            entity.Property(e => e.RefundReference).HasMaxLength(100).HasColumnName("refund_reference");
+            entity.Property(e => e.ProcessedBy).HasColumnName("processed_by");
+            entity.Property(e => e.ProcessedAt).HasColumnType("datetime").HasColumnName("processed_at");
+            entity.Property(e => e.CreatedAt).HasColumnType("datetime").HasColumnName("created_at");
         });
 
         OnModelCreatingPartial(modelBuilder);

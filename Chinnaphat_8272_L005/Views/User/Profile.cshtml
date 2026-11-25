@@ -226,7 +226,7 @@
                                 <th>ยอดชำระสุทธิ</th>
                                 <th>สถานะ</th>
                                 <th>สลิปโอนเงิน</th>
-                                <th class="text-end">ติดตาม</th>
+                                <th>ใบกำกับภาษี</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -234,7 +234,12 @@
                             {
                                 <tr>
                                     <td>
-                                        <strong class="font-monospace text-primary">@b.BookingCode</strong>
+                                        <div class="d-flex align-items-center gap-1">
+                                            <strong class="font-monospace text-success">@b.BookingCode</strong>
+                                            <button type="button" class="btn btn-sm btn-outline-success py-0 px-1" data-booking-code="@b.BookingCode" onclick="copyBookingCode(this)" title="คัดลอกรหัสการจอง" aria-label="คัดลอกรหัสการจอง @b.BookingCode">
+                                                <i class="bi bi-copy"></i>
+                                            </button>
+                                        </div>
                                         <small class="text-muted d-block" style="font-size:0.75rem;">@b.CreatedAt.ToString("dd/MM/yyyy HH:mm")</small>
                                     </td>
                                     <td>
@@ -267,10 +272,24 @@
                                             <span class="badge bg-secondary bg-opacity-10 text-secondary">ไม่มีสลิป</span>
                                         }
                                     </td>
-                                    <td class="text-end">
-                                        <a href="/Home/Customer#myBookingsSection" class="btn btn-sm btn-light border px-2 py-1" style="border-radius:8px;">
-                                            <i class="bi bi-search me-1"></i> ติดตาม
-                                        </a>
+                                    <td>
+                                        @if (!string.IsNullOrEmpty(b.TaxInvoiceUrl))
+                                        {
+                                            <a href="@b.TaxInvoiceUrl" target="_blank" rel="noopener" class="btn btn-sm btn-outline-primary py-1 px-2" style="border-radius:8px;">
+                                                <i class="bi bi-file-earmark-text me-1"></i> ดูใบกำกับภาษี
+                                            </a>
+                                            <small class="text-muted d-block mt-1">@b.TaxInvoiceNo</small>
+                                        }
+                                        else if (b.ReceiptId.HasValue)
+                                        {
+                                            <button type="button" class="btn btn-sm btn-outline-success py-1 px-2" style="border-radius:8px;" onclick="openTaxRequestModal(@b.ReceiptId, '@b.BookingCode')">
+                                                <i class="bi bi-file-earmark-plus me-1"></i> ขอใบกำกับภาษี
+                                            </button>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-secondary bg-opacity-10 text-secondary">ยังไม่มีเอกสาร</span>
+                                        }
                                     </td>
                                 </tr>
                             }
@@ -295,7 +314,7 @@
                 <h6 class="fw-bold mb-0 text-dark">
                     <i class="bi bi-bag-check text-warning me-2"></i>รายการสั่งซื้อสินค้า (ลูกแบดมินตัน, เครื่องดื่ม, กริป)
                 </h6>
-                <a href="/Home/Customer#productSection" class="btn btn-sm btn-outline-warning text-dark" style="border-radius:8px;">
+                <a href="/Home/Customer?section=product#productSection" class="btn btn-sm btn-outline-warning text-dark" style="border-radius:8px;">
                     <i class="bi bi-cart-plus me-1"></i> สั่งซื้อเพิ่ม
                 </a>
             </div>
@@ -314,6 +333,7 @@
                                 <th>ราคาต่อหน่วย</th>
                                 <th>ยอดรวม</th>
                                 <th class="text-end">สถานะสินค้า</th>
+                                <th>ขอคืนเงินสินค้า</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -334,9 +354,20 @@
                                     <td>@p.UnitPrice.ToString("N0") ฿</td>
                                     <td><strong class="text-dark">@p.LineTotal.ToString("N0") ฿</strong></td>
                                     <td class="text-end">
-                                        <span class="badge bg-success bg-opacity-10 text-success border border-success">
-                                            <i class="bi bi-check-circle me-1"></i>ส่งมอบสำเร็จ
+                                        <span class="badge @p.ItemStatusBadgeClass">
+                                            @if (p.ItemStatus is "HANDED_OVER" or "DELIVERED") { <i class="bi bi-check-circle me-1"></i> }
+                                            else if (p.ItemStatusBadgeClass.Contains("warning")) { <i class="bi bi-hourglass-split me-1"></i> }
+                                            else { <i class="bi bi-clock me-1"></i> }
+                                            @p.ItemStatusText
                                         </span>
+                                    </td>
+                                    <td style="min-width:180px">
+                                        @if (p.RefundRequestStatus == "PENDING_SALES") { <span class="badge bg-warning text-dark">รอฝ่ายขายตรวจรับ</span> }
+                                        else if (p.RefundRequestStatus == "PENDING_ACCOUNTING") { <span class="badge bg-info text-dark">รอบัญชีคืนเงิน</span> }
+                                        else if (p.RefundRequestStatus == "COMPLETED") { <span class="badge bg-success">คืนเงินแล้ว</span> }
+                                        else if (p.RefundRequestStatus == "REJECTED") { <span class="badge bg-danger">ไม่อนุมัติ</span><small class="d-block">@p.RefundRequestReviewNote</small>@if(p.CanRequestRefund){<button class="btn btn-sm btn-outline-danger mt-1" type="button" data-bs-toggle="modal" data-bs-target="#cancelRefundModal" data-item-id="@p.BookingItemId" data-booking-code="@p.BookingCode" data-product-name="@p.ProductName" data-amount="@p.LineTotal.ToString("N2")">ส่งคำขออีกครั้ง</button>} }
+                                        else if (p.CanRequestRefund) { <button class="btn btn-sm btn-outline-danger" type="button" data-bs-toggle="modal" data-bs-target="#cancelRefundModal" data-item-id="@p.BookingItemId" data-booking-code="@p.BookingCode" data-product-name="@p.ProductName" data-amount="@p.LineTotal.ToString("N2")">ขอคืนสินค้า</button> }
+                                        else { <span class="text-muted small">ยังไม่มียอดสินค้าที่ชำระแล้วสำหรับคืน</span> }
                                     </td>
                                 </tr>
                             }
@@ -361,7 +392,7 @@
                 <h6 class="fw-bold mb-0 text-dark">
                     <i class="bi bi-arrow-repeat text-info me-2"></i>รายการเช่าอุปกรณ์ (ไม้แบดมินตัน, รองเท้ากีฬา)
                 </h6>
-                <a href="/Home/Customer#productSection" class="btn btn-sm btn-outline-info" style="border-radius:8px;">
+                <a href="/Home/Customer?section=product#productSection" class="btn btn-sm btn-outline-info" style="border-radius:8px;">
                     <i class="bi bi-box-seam me-1"></i> เช่าอุปกรณ์เพิ่ม
                 </a>
             </div>
@@ -429,6 +460,42 @@
 
 </div>
 
+<div class="modal fade" id="cancelRefundModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog"><div class="modal-content">
+    <form asp-action="RequestBookingRefund" method="post">@Html.AntiForgeryToken()
+        <div class="modal-header"><h5 class="modal-title">ขอคืนเงินค่าสินค้า</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body"><p>สินค้า <strong id="refundProductName"></strong><br/>บิล <strong id="refundBookingCode"></strong><br/>ยอดคืนสินค้า <strong id="refundProductAmount"></strong> ฿</p><input type="hidden" name="bookingItemId" id="refundBookingItemId"/><label class="form-label">เหตุผลที่ขอคืนสินค้า</label><textarea name="reason" class="form-control" minlength="3" maxlength="500" required rows="3"></textarea><small class="text-muted">ฝ่ายขายจะตรวจรับสินค้าก่อนส่งให้บัญชีดำเนินการคืนยอดค่าสินค้านี้</small></div>
+        <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">ปิด</button><button class="btn btn-danger">ส่งคำขอคืนสินค้า</button></div>
+    </form>
+</div></div></div>
+<script>
+document.getElementById('cancelRefundModal')?.addEventListener('show.bs.modal', e => {
+ const btn=e.relatedTarget; document.getElementById('refundBookingItemId').value=btn.dataset.itemId; document.getElementById('refundBookingCode').textContent=btn.dataset.bookingCode; document.getElementById('refundProductName').textContent=btn.dataset.productName; document.getElementById('refundProductAmount').textContent=btn.dataset.amount;
+});
+</script>
+
+<!-- Request full tax invoice -->
+<div class="modal fade" id="taxRequestModal" tabindex="-1" aria-labelledby="taxRequestTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow" style="border-radius:16px; overflow:hidden;">
+            <div class="modal-header text-white" style="background:linear-gradient(135deg,#1a472a,#52b788);">
+                <div><h5 class="modal-title fw-bold mb-1" id="taxRequestTitle"><i class="bi bi-file-earmark-text me-2"></i>ขอใบกำกับภาษี</h5><small class="opacity-75">อ้างอิงรายการ <span id="taxRequestBookingCode"></span></small></div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="ปิด"></button>
+            </div>
+            <form method="post" asp-action="RequestTaxInvoice">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="receiptId" id="taxRequestReceiptId" />
+                <div class="modal-body p-4">
+                    <div class="mb-3"><label class="form-label fw-semibold">ชื่อผู้เสียภาษี / บริษัท <span class="text-danger">*</span></label><input type="text" name="companyName" class="form-control" value="@Model.FullName" maxlength="200" required /></div>
+                    <div class="mb-3"><label class="form-label fw-semibold">เลขประจำตัวผู้เสียภาษี 13 หลัก <span class="text-danger">*</span></label><input type="text" name="taxId" class="form-control" inputmode="numeric" pattern="[0-9]{13}" maxlength="13" required /></div>
+                    <div><label class="form-label fw-semibold">ที่อยู่ <span class="text-danger">*</span></label><textarea name="address" class="form-control" rows="3" maxlength="500" required></textarea></div>
+                    <div class="form-text mt-2">ตรวจสอบข้อมูลให้ถูกต้องก่อนส่งคำขอ เมื่อยืนยันแล้วระบบจะแสดงใบกำกับภาษีในประวัติการจอง</div>
+                </div>
+                <div class="modal-footer bg-light"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">ยกเลิก</button><button type="submit" class="btn btn-success"><i class="bi bi-check-circle me-1"></i>ยืนยันขอใบกำกับภาษี</button></div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <!-- Modal: แก้ไขข้อมูลส่วนตัว -->
 <div class="modal fade" id="editProfileModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
@@ -480,6 +547,41 @@
 </div>
 
 <script>
+    async function copyBookingCode(button) {
+        const code = button.dataset.bookingCode;
+        try {
+            if (navigator.clipboard && window.isSecureContext) {
+                await navigator.clipboard.writeText(code);
+            } else {
+                const temporaryInput = document.createElement('textarea');
+                temporaryInput.value = code;
+                temporaryInput.style.position = 'fixed';
+                temporaryInput.style.opacity = '0';
+                document.body.appendChild(temporaryInput);
+                temporaryInput.select();
+                const copied = document.execCommand('copy');
+                temporaryInput.remove();
+                if (!copied) throw new Error('copy failed');
+            }
+
+            const original = button.innerHTML;
+            button.innerHTML = '<i class="bi bi-check2"></i>';
+            button.title = 'คัดลอกรหัสแล้ว';
+            setTimeout(() => {
+                button.innerHTML = original;
+                button.title = 'คัดลอกรหัสการจอง';
+            }, 1500);
+        } catch {
+            alert('คัดลอกรหัสไม่สำเร็จ กรุณาคัดลอกด้วยตนเอง: ' + code);
+        }
+    }
+
+    function openTaxRequestModal(receiptId, bookingCode) {
+        document.getElementById('taxRequestReceiptId').value = receiptId;
+        document.getElementById('taxRequestBookingCode').textContent = bookingCode;
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('taxRequestModal')).show();
+    }
+
     function viewSlipModal(url, code) {
         document.getElementById('modalSlipImg').src = url;
         document.getElementById('modalSlipCode').innerText = code;

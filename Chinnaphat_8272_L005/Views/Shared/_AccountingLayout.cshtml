@@ -16,7 +16,8 @@
 
     <style>
         * { font-family: 'Sarabun', sans-serif; }
-        body { font-size: 0.95rem; background-color: #f8fafc; }
+        html, body { min-height: 100%; }
+        body { min-height: 100vh; display: flex; flex-direction: column; font-size: 0.95rem; background-color: #f8fafc; }
         h1, h2, h3, h4, h5, h6 { font-family: 'Sarabun', sans-serif; font-weight: 700; }
 
         .accounting-navbar {
@@ -76,8 +77,8 @@
             <div class="collapse navbar-collapse" id="accountingNav">
                 @{
                     string action = ViewContext.RouteData.Values["action"]?.ToString() ?? "";
-                    string? rawName = Context.Session.GetString("FullName") ?? Context.Request.Cookies["cb_user_name"];
-                    string accountantName = !string.IsNullOrEmpty(rawName) ? System.Net.WebUtility.UrlDecode(rawName) : "ฝ่ายบัญชี";
+                    string? rawName = Context.Session.GetString("FullName");
+                    string accountantName = !string.IsNullOrEmpty(rawName) ? rawName : "ฝ่ายบัญชี";
                 }
                 <ul class="navbar-nav me-auto mb-2 mb-lg-0 ms-lg-3 gap-1">
                     <li class="nav-item">
@@ -140,12 +141,12 @@
     </div>
 
     <!-- ================= MAIN CONTENT ================= -->
-    <main class="container-fluid px-4 py-2">
+    <main class="container-fluid px-4 py-2 flex-grow-1">
         @RenderBody()
     </main>
 
     <!-- ================= FOOTER ================= -->
-    <footer class="bg-white border-top text-center text-muted py-3 mt-5">
+    <footer class="bg-white border-top text-center text-muted py-3 mt-auto">
         <div class="container">
             <small>
                 © 2026 CourtBook Badminton Arena | ฝ่ายบัญชีและการเงิน (Accounting & Finance)

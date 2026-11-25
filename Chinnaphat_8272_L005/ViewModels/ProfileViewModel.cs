@@ -45,6 +45,10 @@ public class ProfileBookingItem
     public string StatusText { get; set; } = string.Empty;
     public string StatusBadgeClass { get; set; } = "bg-warning text-dark";
     public string? SlipImageUrl { get; set; }
+    public string? TaxInvoiceUrl { get; set; }
+    public string? TaxInvoiceNo { get; set; }
+    public uint? ReceiptId { get; set; }
+    public bool HasTaxInvoice { get; set; }
     public DateTime CreatedAt { get; set; }
 }
 
@@ -58,7 +62,14 @@ public class ProfileOrderItem
     public decimal UnitPrice { get; set; }
     public decimal LineTotal { get; set; }
     public string ItemStatus { get; set; } = "RESERVED";
+    public string ItemStatusText { get; set; } = string.Empty;
+    public string ItemStatusBadgeClass { get; set; } = "bg-secondary";
     public DateTime OrderDate { get; set; }
+    public uint? RefundRequestId { get; set; }
+    public string? RefundRequestStatus { get; set; }
+    public string? RefundRequestReason { get; set; }
+    public string? RefundRequestReviewNote { get; set; }
+    public bool CanRequestRefund { get; set; }
 }
 
 public class ProfileRentalItem

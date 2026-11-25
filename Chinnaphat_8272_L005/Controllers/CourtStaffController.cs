@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -11,22 +10,11 @@ using Chinnaphat_8272_L005.Helpers;
 
 namespace Chinnaphat_8272_L005.Controllers
 {
-    public class CourtAmenityState
-    {
-        public bool LightsOn { get; set; } = false;
-        public bool FansOn { get; set; } = false;
-        public DateTime? LightsTurnedOnAt { get; set; }
-        public DateTime? FansTurnedOnAt { get; set; }
-    }
-
     [RequireRole("COURT_STAFF")]
     public class CourtStaffController : Controller
     {
         private readonly Csi402dbContext _db;
         private readonly IWebHostEnvironment _env;
-
-        // In-memory thread-safe state for Court Amenities (Lights & Fans)
-        private static readonly ConcurrentDictionary<ushort, CourtAmenityState> _courtAmenities = new();
 
         public CourtStaffController(Csi402dbContext db, IWebHostEnvironment env)
         {
@@ -35,7 +23,7 @@ namespace Chinnaphat_8272_L005.Controllers
         }
 
         // ============================================================
-        // 1. DAILY SCHEDULE & AMENITY CONTROL (ดูตารางการจองประจำวัน & ควบคุมไฟ/พัดลม)
+        // 1. DAILY SCHEDULE (ดูตารางการจองประจำวัน)
         // ============================================================
         [HttpGet]
         public async Task<IActionResult> Index(string? date)
@@ -44,13 +32,13 @@ namespace Chinnaphat_8272_L005.Controllers
             await EnsureCourtStaffRoleAndUserAsync();
 
             string selectedDateStr = string.IsNullOrWhiteSpace(date)
-                ? DateTime.Today.ToString("yyyy-MM-dd")
+                ? DateFormatHelper.ToIsoDate(DateTime.Today)
                 : date.Trim();
 
-            if (!DateOnly.TryParse(selectedDateStr, out DateOnly targetDate))
+            if (!DateFormatHelper.TryParseIsoDate(selectedDateStr, out DateOnly targetDate))
             {
                 targetDate = DateOnly.FromDateTime(DateTime.Today);
-                selectedDateStr = targetDate.ToString("yyyy-MM-dd");
+                selectedDateStr = DateFormatHelper.ToIsoDate(targetDate);
             }
 
             ViewBag.SelectedDate = selectedDateStr;
@@ -156,9 +144,7 @@ namespace Chinnaphat_8272_L005.Controllers
         {
             try
             {
-                var booking = await _db.Bookings
-                    .Include(b => b.BookingSlots)
-                    .FirstOrDefaultAsync(b => b.BookingId == bookingId);
+                var booking = await _db.Bookings.FirstOrDefaultAsync(b => b.BookingId == bookingId);
 
                 if (booking == null)
                 {
@@ -172,25 +158,13 @@ namespace Chinnaphat_8272_L005.Controllers
                 booking.CheckedInBy = staffId;
                 booking.UpdatedAt = DateTime.Now;
 
-                // เปิดไฟและพัดลมของคอร์ทที่จองโดยอัตโนมัติเพื่อเตรียมความพร้อม
-                var affectedCourts = booking.BookingSlots.Select(bs => bs.CourtId).Distinct().ToList();
-                foreach (var cId in affectedCourts)
-                {
-                    var state = _courtAmenities.GetOrAdd(cId, _ => new CourtAmenityState());
-                    state.LightsOn = true;
-                    state.FansOn = true;
-                    state.LightsTurnedOnAt = DateTime.Now;
-                    state.FansTurnedOnAt = DateTime.Now;
-                }
-
                 await _db.SaveChangesAsync();
 
                 return Json(new
                 {
                     success = true,
-                    message = $"เช็คอินสำเร็จ! ระบบเปิดไฟและพัดลมสำหรับ {string.Join(", ", affectedCourts.Select(id => $"Court {id}"))} เรียบร้อยแล้ว",
-                    checkedInTime = booking.CheckedInAt?.ToString("HH:mm:ss"),
-                    affectedCourts = affectedCourts
+                    message = "เช็คอินสำเร็จ",
+                    checkedInTime = booking.CheckedInAt?.ToString("HH:mm:ss")
                 });
             }
             catch (Exception ex)
@@ -205,7 +179,6 @@ namespace Chinnaphat_8272_L005.Controllers
             try
             {
                 var booking = await _db.Bookings
-                    .Include(b => b.BookingSlots)
                     .Include(b => b.BookingItems)
                     .FirstOrDefaultAsync(b => b.BookingId == bookingId);
 
@@ -226,69 +199,20 @@ namespace Chinnaphat_8272_L005.Controllers
                 // ตรวจสอบว่ามีอุปกรณ์เช่าที่ต้องตรวจรับคืนหรือไม่
                 int rentalItemsCount = booking.BookingItems.Count(bi => bi.ItemType == "RENT");
 
-                var affectedCourts = booking.BookingSlots.Select(bs => bs.CourtId).Distinct().ToList();
-
                 return Json(new
                 {
                     success = true,
                     message = "Check-out เรียบร้อยแล้ว! ขอบคุณที่ใช้บริการ",
                     checkedOutTime = booking.CheckedOutAt?.ToString("HH:mm:ss"),
                     rentalItemsCount = rentalItemsCount,
-                    affectedCourts = affectedCourts,
                     reminder = rentalItemsCount > 0
                         ? $"ลูกค้ามีรายการเช่าอุปกรณ์ {rentalItemsCount} ชิ้น กรุณาตรวจสอบการคืนอุปกรณ์ที่เคาน์เตอร์"
-                        : "อย่าลืมตรวจสอบความเรียบร้อยและปิดไฟ/พัดลมหากไม่มีคิวต่อไป"
+                        : "ตรวจสอบความเรียบร้อยของสนามก่อนให้บริการคิวถัดไป"
                 });
             }
             catch (Exception ex)
             {
                 return Json(new { success = false, message = "เกิดข้อผิดพลาดในการ Check-out: " + ex.Message });
-            }
-        }
-
-        // ============================================================
-        // 3. TOGGLE COURT AMENITIES (ควบคุมสวิตช์ไฟ / พัดลม)
-        // ============================================================
-        [HttpPost]
-        public IActionResult ToggleAmenity(ushort courtId, string amenityType, bool? state)
-        {
-            try
-            {
-                var amenityState = _courtAmenities.GetOrAdd(courtId, _ => new CourtAmenityState());
-                string typeLower = amenityType?.ToLower() ?? "";
-
-                if (typeLower == "light" || typeLower == "lights")
-                {
-                    amenityState.LightsOn = state ?? !amenityState.LightsOn;
-                    amenityState.LightsTurnedOnAt = amenityState.LightsOn ? DateTime.Now : null;
-                    return Json(new
-                    {
-                        success = true,
-                        courtId = courtId,
-                        amenity = "light",
-                        isOn = amenityState.LightsOn,
-                        message = amenityState.LightsOn ? $"เปิดไฟส่องสว่าง Court {courtId} เรียบร้อย" : $"ปิดไฟ Court {courtId} แล้ว"
-                    });
-                }
-                else if (typeLower == "fan" || typeLower == "fans")
-                {
-                    amenityState.FansOn = state ?? !amenityState.FansOn;
-                    amenityState.FansTurnedOnAt = amenityState.FansOn ? DateTime.Now : null;
-                    return Json(new
-                    {
-                        success = true,
-                        courtId = courtId,
-                        amenity = "fan",
-                        isOn = amenityState.FansOn,
-                        message = amenityState.FansOn ? $"เปิดพัดลมระบายอากาศ Court {courtId} เรียบร้อย" : $"ปิดพัดลม Court {courtId} แล้ว"
-                    });
-                }
-
-                return Json(new { success = false, message = "ประเภทอุปกรณ์ไม่ถูกต้อง" });
-            }
-            catch (Exception ex)
-            {
-                return Json(new { success = false, message = ex.Message });
             }
         }
 
@@ -302,13 +226,13 @@ namespace Chinnaphat_8272_L005.Controllers
             await EnsureCourtStaffRoleAndUserAsync();
 
             string selectedDateStr = string.IsNullOrWhiteSpace(date)
-                ? DateTime.Today.ToString("yyyy-MM-dd")
+                ? DateFormatHelper.ToIsoDate(DateTime.Today)
                 : date.Trim();
 
-            if (!DateOnly.TryParse(selectedDateStr, out DateOnly targetDate))
+            if (!DateFormatHelper.TryParseIsoDate(selectedDateStr, out DateOnly targetDate))
             {
                 targetDate = DateOnly.FromDateTime(DateTime.Today);
-                selectedDateStr = targetDate.ToString("yyyy-MM-dd");
+                selectedDateStr = DateFormatHelper.ToIsoDate(targetDate);
             }
 
             ViewBag.SelectedDate = selectedDateStr;
@@ -583,10 +507,16 @@ namespace Chinnaphat_8272_L005.Controllers
         // 5. MAINTENANCE & COURT BLOCKING (ล็อกคอร์ทชั่วคราวกรณีซ่อมบำรุง)
         // ============================================================
         [HttpGet]
-        public async Task<IActionResult> Maintenance()
+        public async Task<IActionResult> Maintenance(string? date)
         {
             ViewData["Title"] = "ล็อกคอร์ทชั่วคราวกรณีซ่อมบำรุง";
             await EnsureCourtStaffRoleAndUserAsync();
+
+            var selectedDate = DateFormatHelper.TryParseIsoDate(date, out var parsedDate)
+                ? parsedDate.ToDateTime(TimeOnly.MinValue)
+                : DateTime.Today;
+            if (selectedDate < DateTime.Today) selectedDate = DateTime.Today;
+            var selectedPlayDate = DateOnly.FromDateTime(selectedDate);
 
             var blocks = await _db.CourtBlocks
                 .Include(cb => cb.Court)
@@ -595,39 +525,79 @@ namespace Chinnaphat_8272_L005.Controllers
                 .ToListAsync();
 
             ViewBag.Courts = await _db.Courts.OrderBy(c => c.CourtId).ToListAsync();
+            ViewBag.TimeSlots = await _db.TimeSlots
+                .Where(s => s.IsActive == true || s.IsActive == null)
+                .OrderBy(s => s.StartTime)
+                .ToListAsync();
+            ViewBag.SelectedDate = selectedDate;
+            ViewBag.DailyBookings = await _db.BookingSlots
+                .Include(s => s.Court)
+                .Include(s => s.Slot)
+                .Include(s => s.Booking).ThenInclude(b => b.User)
+                .Where(s => s.PlayDate == selectedPlayDate && s.LockKey == 1 &&
+                    s.Booking.Status != "CANCELLED" && s.Booking.Status != "REJECTED" && s.Booking.Status != "EXPIRED")
+                .OrderBy(s => s.CourtId)
+                .ThenBy(s => s.Slot.StartTime)
+                .ToListAsync();
 
             return View(blocks);
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> AddCourtBlock(ushort courtId, DateTime blockStart, DateTime blockEnd, string reason, bool setCourtMaintenance)
+        public async Task<IActionResult> AddCourtBlock(ushort courtId, string blockDate, byte startSlotId, byte endSlotId, string reason)
         {
+            var redirectDate = DateFormatHelper.TryParseIsoDate(blockDate, out var requestedBlockDate)
+                ? requestedBlockDate.ToDateTime(TimeOnly.MinValue)
+                : DateTime.Today;
             try
             {
+                if (!DateFormatHelper.TryParseIsoDate(blockDate, out var parsedBlockDate))
+                {
+                    TempData["ErrorMessage"] = "วันที่ล็อกคอร์ทไม่ถูกต้อง กรุณาเลือกวันที่ใหม่";
+                    return RedirectToAction("Maintenance");
+                }
+                var blockDateValue = parsedBlockDate.ToDateTime(TimeOnly.MinValue);
                 var court = await _db.Courts.FindAsync(courtId);
                 if (court == null)
                 {
                     TempData["ErrorMessage"] = "ไม่พบคอร์ทที่เลือก กรุณาเลือกสนามใหม่";
-                    return RedirectToAction("Maintenance");
+                    return RedirectToAction("Maintenance", new { date = DateFormatHelper.ToIsoDate(blockDateValue) });
                 }
 
-                if (blockStart < DateTime.Now)
+                if (blockDateValue.Date < DateTime.Today)
                 {
-                    TempData["ErrorMessage"] = "เวลาเริ่มล็อกต้องไม่เป็นเวลาในอดีต";
-                    return RedirectToAction("Maintenance");
+                    TempData["ErrorMessage"] = "วันที่ล็อกคอร์ทต้องไม่ผ่านไปแล้ว";
+                    return RedirectToAction("Maintenance", new { date = DateFormatHelper.ToIsoDate(blockDateValue) });
                 }
 
-                if (blockEnd <= blockStart)
+                var timeSlots = await _db.TimeSlots
+                    .Where(s => s.IsActive == true || s.IsActive == null)
+                    .OrderBy(s => s.StartTime)
+                    .ToListAsync();
+                var startIndex = timeSlots.FindIndex(s => s.SlotId == startSlotId);
+                var endIndex = timeSlots.FindIndex(s => s.SlotId == endSlotId);
+                if (startIndex < 0 || endIndex < startIndex ||
+                    timeSlots.Skip(startIndex).Take(endIndex - startIndex + 1)
+                        .Zip(timeSlots.Skip(startIndex + 1).Take(endIndex - startIndex), (a, b) => a.EndTime == b.StartTime)
+                        .Any(isAdjacent => !isAdjacent))
                 {
-                    TempData["ErrorMessage"] = "เวลาสิ้นสุดการล็อกคอร์ทต้องอยู่หลังเวลาเริ่มต้น";
-                    return RedirectToAction("Maintenance");
+                    TempData["ErrorMessage"] = "กรุณาเลือกช่วงเวลาเรียงต่อเนื่องกันตามตารางสนาม";
+                    return RedirectToAction("Maintenance", new { date = DateFormatHelper.ToIsoDate(blockDateValue) });
+                }
+
+                var blockStart = blockDateValue.Date.Add(timeSlots[startIndex].StartTime.ToTimeSpan());
+                var blockEnd = blockDateValue.Date.Add(timeSlots[endIndex].EndTime.ToTimeSpan());
+                if (blockStart <= DateTime.Now)
+                {
+                    TempData["ErrorMessage"] = "รอบเวลาเริ่มต้นผ่านไปแล้ว กรุณาเลือกเวลาในอนาคต";
+                    return RedirectToAction("Maintenance", new { date = DateFormatHelper.ToIsoDate(blockDateValue) });
                 }
 
                 if (string.IsNullOrWhiteSpace(reason) || reason.Trim().Length > 255)
                 {
                     TempData["ErrorMessage"] = "กรุณาระบุเหตุผลในการล็อกคอร์ทไม่เกิน 255 ตัวอักษร";
-                    return RedirectToAction("Maintenance");
+                    return RedirectToAction("Maintenance", new { date = DateFormatHelper.ToIsoDate(blockDateValue) });
                 }
 
                 bool overlapsExistingBlock = await _db.CourtBlocks.AnyAsync(b =>
@@ -635,7 +605,7 @@ namespace Chinnaphat_8272_L005.Controllers
                 if (overlapsExistingBlock)
                 {
                     TempData["ErrorMessage"] = "ช่วงเวลานี้มีรายการล็อกคอร์ทอยู่แล้ว กรุณาเลือกเวลาใหม่";
-                    return RedirectToAction("Maintenance");
+                    return RedirectToAction("Maintenance", new { date = DateFormatHelper.ToIsoDate(blockDateValue) });
                 }
 
                 var firstDate = DateOnly.FromDateTime(blockStart);
@@ -655,7 +625,7 @@ namespace Chinnaphat_8272_L005.Controllers
                 if (overlapsBooking)
                 {
                     TempData["ErrorMessage"] = "ช่วงเวลานี้มีลูกค้าจองคอร์ทแล้ว ไม่สามารถล็อกทับได้";
-                    return RedirectToAction("Maintenance");
+                    return RedirectToAction("Maintenance", new { date = DateFormatHelper.ToIsoDate(blockDateValue) });
                 }
 
                 uint staffId = await GetCurrentStaffIdAsync();
@@ -672,21 +642,15 @@ namespace Chinnaphat_8272_L005.Controllers
 
                 _db.CourtBlocks.Add(block);
 
-                if (court != null && setCourtMaintenance)
-                {
-                    court.Status = "MAINTENANCE";
-                    court.UpdatedAt = DateTime.Now;
-                }
-
                 await _db.SaveChangesAsync();
 
-                TempData["SuccessMessage"] = $"บันทึกล็อกคอร์ท {(court?.CourtName ?? $"Court {courtId}")} ช่วง {blockStart:dd/MM HH:mm} ถึง {blockEnd:dd/MM HH:mm} สำเร็จ!";
-                return RedirectToAction("Maintenance");
+                TempData["SuccessMessage"] = $"ล็อก {(court?.CourtName ?? $"Court {courtId}")} เฉพาะช่วง {blockStart:dd/MM/yyyy HH:mm} ถึง {blockEnd:HH:mm} สำเร็จ!";
+                return RedirectToAction("Maintenance", new { date = DateFormatHelper.ToIsoDate(redirectDate) });
             }
             catch (Exception ex)
             {
                 TempData["ErrorMessage"] = "เกิดข้อผิดพลาดในการล็อกคอร์ท: " + ex.Message;
-                return RedirectToAction("Maintenance");
+                return RedirectToAction("Maintenance", new { date = DateFormatHelper.ToIsoDate(redirectDate) });
             }
         }
 
@@ -795,7 +759,7 @@ namespace Chinnaphat_8272_L005.Controllers
         // ============================================================
         private async Task<uint> GetCurrentStaffIdAsync()
         {
-            string? uidStr = HttpContext.Session.GetString("UserId") ?? Request.Cookies["cb_user_id"];
+            string? uidStr = HttpContext.Session.GetString("UserId");
             if (!string.IsNullOrEmpty(uidStr) && uint.TryParse(uidStr, out uint uid))
             {
                 var existingUser = await _db.Users.FindAsync(uid);
@@ -819,7 +783,7 @@ namespace Chinnaphat_8272_L005.Controllers
                 {
                     RoleCode = "COURT_STAFF",
                     RoleName = "ฝ่ายดูแลคอร์ท",
-                    Description = "ดูตารางการจองประจำวัน ควบคุมไฟ/พัดลม เช็คอิน/เช็คเอาท์ จัดการ Walk-in ล็อกคอร์ทซ่อมบำรุง และแจ้งอุปกรณ์ชำรุด"
+                    Description = "ดูตารางการจองประจำวัน เช็คอิน/เช็คเอาท์ จัดการ Walk-in ล็อกคอร์ทซ่อมบำรุง และแจ้งอุปกรณ์ชำรุด"
                 };
                 _db.Roles.Add(courtRole);
                 await _db.SaveChangesAsync();

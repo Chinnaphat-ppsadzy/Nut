@@ -5,8 +5,8 @@ namespace Chinnaphat_8272_L005.Helpers
     /// </summary>
     public static class SessionHelper
     {
-        public static int? GetUserId(this ISession session)
-            => session.GetInt32("UserId");
+        public static uint? GetUserId(this ISession session)
+            => uint.TryParse(session.GetString("UserId"), out var userId) ? userId : null;
 
         public static string? GetRoleCode(this ISession session)
             => session.GetString("RoleCode");

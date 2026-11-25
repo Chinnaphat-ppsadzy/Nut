@@ -4,8 +4,9 @@
     ViewData["Title"] = "ล็อกคอร์ทชั่วคราวกรณีซ่อมบำรุง";
 
     var courts = ViewBag.Courts as List<Chinnaphat_8272_L005.Models.Court> ?? new();
-    var defaultBlockStart = DateTime.Now.AddHours(1);
-    var defaultBlockEnd = DateTime.Now.AddHours(3);
+    var timeSlots = ViewBag.TimeSlots as List<Chinnaphat_8272_L005.Models.TimeSlot> ?? new();
+    var dailyBookings = ViewBag.DailyBookings as List<Chinnaphat_8272_L005.Models.BookingSlot> ?? new();
+    var selectedDate = ViewBag.SelectedDate is DateTime date ? date : DateTime.Today;
 }
 
 <div class="row g-4">
@@ -16,7 +17,7 @@
                 <h5 class="fw-bold mb-0 d-flex align-items-center">
                     <i class="bi bi-tools me-2 fs-4"></i>ล็อกคอร์ทชั่วคราว (ซ่อมบำรุง)
                 </h5>
-                <small class="text-white-50">ระงับการจองเพื่อซ่อมแซมหรือทำความสะอาด</small>
+                <small class="text-white-50">ปิดรับจองเฉพาะช่วงเวลาที่เลือกจากตารางสนาม</small>
             </div>
 
             <div class="card-body p-4 bg-white">
@@ -35,16 +36,38 @@
 
                     <div class="mb-3">
                         <label class="form-label fw-bold small text-secondary">
-                            เวลาเริ่มต้นล็อกคอร์ท <span class="text-danger">*</span>
+                            วันที่ล็อกคอร์ท <span class="text-danger">*</span>
                         </label>
-                        <input type="datetime-local" name="blockStart" class="form-control" value="@defaultBlockStart.ToString("yyyy-MM-ddTHH:00")" required />
+                        <input type="date" name="blockDate" class="form-control" value="@DateFormatHelper.ToIsoDate(selectedDate)" min="@DateFormatHelper.ToIsoDate(DateTime.Today)" lang="th-TH" required />
                     </div>
 
                     <div class="mb-3">
                         <label class="form-label fw-bold small text-secondary">
-                            เวลาสิ้นสุดการล็อกคอร์ท <span class="text-danger">*</span>
+                            รอบเวลาเริ่มต้น <span class="text-danger">*</span>
                         </label>
-                        <input type="datetime-local" name="blockEnd" class="form-control" value="@defaultBlockEnd.ToString("yyyy-MM-ddTHH:00")" required />
+                        <select name="startSlotId" id="blockStartSlot" class="form-select" required>
+                            <option value="">-- เลือกรอบเริ่มต้น --</option>
+                            @for (var index = 0; index < timeSlots.Count; index++)
+                            {
+                                var slot = timeSlots[index];
+                                <option value="@slot.SlotId" data-index="@index">@slot.StartTime.ToString("HH:mm")–@slot.EndTime.ToString("HH:mm")</option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-secondary">
+                            รอบเวลาสิ้นสุด <span class="text-danger">*</span>
+                        </label>
+                        <select name="endSlotId" id="blockEndSlot" class="form-select" required>
+                            <option value="">-- เลือกรอบสุดท้าย --</option>
+                            @for (var index = 0; index < timeSlots.Count; index++)
+                            {
+                                var slot = timeSlots[index];
+                                <option value="@slot.SlotId" data-index="@index">@slot.StartTime.ToString("HH:mm")–@slot.EndTime.ToString("HH:mm")</option>
+                            }
+                        </select>
+                        <small class="text-muted">คอร์ทจะปิดตั้งแต่รอบเริ่มต้นจนจบรอบสุดท้ายที่เลือก</small>
                     </div>
 
                     <div class="mb-3">
@@ -54,23 +77,14 @@
                         <select class="form-select mb-2" onchange="document.getElementById('reasonInput').value = this.value">
                             <option value="">-- เลือกเหตุผลทั่วไป --</option>
                             <option value="พื้นยาง BWF หลุดลอก / ซ่อมแซมพื้นผิว">พื้นยาง BWF หลุดลอก / ซ่อมแซมพื้นผิว</option>
-                            <option value="หลอดไฟ LED ดับ / เปลี่ยนชุดโคมไฟส่องสว่าง">หลอดไฟ LED ดับ / เปลี่ยนชุดโคมไฟส่องสว่าง</option>
                             <option value="ตาข่ายชำรุด / เสาตาข่ายหลวม">ตาข่ายชำรุด / เสาตาข่ายหลวม</option>
                             <option value="ทำความสะอาดใหญ่และฆ่าเชื้อประจำรอบ">ทำความสะอาดใหญ่และฆ่าเชื้อประจำรอบ</option>
-                            <option value="ซ่อมบำรุงพัดลมและระบบหมุนเวียนอากาศ">ซ่อมบำรุงพัดลมและระบบหมุนเวียนอากาศ</option>
                         </select>
-                        <textarea name="reason" id="reasonInput" class="form-control" rows="3" maxlength="255" placeholder="ระบุเหตุผล เช่น ซ่อมระบบไฟส่องสว่าง BWF ชั่วคราว" required></textarea>
-                    </div>
-
-                    <div class="form-check form-switch mb-4">
-                        <input class="form-check-input" type="checkbox" name="setCourtMaintenance" value="true" id="setMaintSwitch" checked>
-                        <label class="form-check-label small fw-semibold" for="setMaintSwitch">
-                            เปลี่ยนสถานะคอร์ทเป็น <span class="badge bg-danger-subtle text-danger">MAINTENANCE</span> ในระบบทันที
-                        </label>
+                        <textarea name="reason" id="reasonInput" class="form-control" rows="3" maxlength="255" placeholder="ระบุเหตุผลในการล็อกสนาม" required></textarea>
                     </div>
 
                     <button type="submit" class="btn btn-success w-100 py-2 fw-bold" style="border-radius:10px; background:linear-gradient(135deg, #1a472a, #2d6a4f); border:none;">
-                        <i class="bi bi-lock-fill me-1"></i> บันทึกล็อกคอร์ท
+                        <i class="bi bi-lock-fill me-1"></i> ล็อกเฉพาะช่วงเวลานี้
                     </button>
                 </form>
             </div>
@@ -105,6 +119,48 @@
                             <small class="text-secondary fw-semibold">@c.PricePerHour.ToString("N0") ฿/ชม.</small>
                         </div>
                     </div>
+                </div>
+            }
+        </div>
+
+        <div class="card border-0 shadow-sm mb-4" style="border-radius:18px; overflow:hidden;">
+            <div class="p-3 bg-white border-bottom d-flex justify-content-between align-items-center flex-wrap gap-3">
+                <div>
+                    <h5 class="fw-bold mb-1 text-dark"><i class="bi bi-calendar2-week text-success me-2"></i>รายการจองสนามของวันที่เลือก</h5>
+                    <small class="text-muted">ตรวจสอบรอบที่มีลูกค้าจองแล้วก่อนกำหนดเวลาซ่อม</small>
+                </div>
+                <form method="get" asp-action="Maintenance" class="d-flex gap-2 align-items-center">
+                    <input type="date" name="date" class="form-control form-control-sm" value="@DateFormatHelper.ToIsoDate(selectedDate)" min="@DateFormatHelper.ToIsoDate(DateTime.Today)" lang="th-TH" onchange="this.form.requestSubmit()" aria-label="เลือกวันที่ดูรายการจอง" />
+                    <button type="submit" class="btn btn-sm btn-outline-success text-nowrap"><i class="bi bi-search me-1"></i>ดูวัน</button>
+                </form>
+            </div>
+            @if (dailyBookings.Any())
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr class="small text-secondary"><th>สนาม</th><th>ช่วงเวลาที่จอง</th><th>ลูกค้า</th><th>รหัสจอง</th><th>สถานะ</th></tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var bookingSlot in dailyBookings)
+                            {
+                                <tr>
+                                    <td><span class="badge bg-dark">@(bookingSlot.Court?.CourtName ?? $"Court {bookingSlot.CourtId}")</span></td>
+                                    <td class="fw-semibold">@bookingSlot.Slot.StartTime.ToString("HH:mm")–@bookingSlot.Slot.EndTime.ToString("HH:mm")</td>
+                                    <td>@(bookingSlot.Booking.User?.FullName ?? "ลูกค้า")</td>
+                                    <td class="font-monospace small">@bookingSlot.Booking.BookingCode</td>
+                                    <td><span class="badge bg-primary-subtle text-primary">@bookingSlot.Booking.Status</span></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <div class="text-center text-muted py-4">
+                    <i class="bi bi-calendar-check fs-3 d-block mb-2 text-success"></i>
+                    ไม่มีรายการจองในวันที่ @selectedDate.ToString("dd/MM/yyyy")
                 </div>
             }
         </div>
@@ -183,7 +239,7 @@
                                         }
                                     </td>
                                     <td class="text-end">
-                                        <form method="post" asp-action="RemoveCourtBlock" class="d-inline" onsubmit="return confirm('ยืนยันการปลดล็อกคอร์ทนี้และเปิดให้กลับมาให้บริการตามปกติ?')">
+                                        <form method="post" asp-action="RemoveCourtBlock" class="d-inline" onsubmit="return confirm('ยืนยันยกเลิกการล็อกเฉพาะช่วงเวลานี้?')">
                                             <input type="hidden" name="blockId" value="@b.BlockId" />
                                             <input type="hidden" name="restoreCourtAvailable" value="true" />
                                             <button type="submit" class="btn btn-sm btn-outline-success fw-bold" style="border-radius:8px;">
@@ -208,3 +264,25 @@
         </div>
     </div>
 </div>
+
+@section Scripts {
+    <script>
+        (() => {
+            const start = document.getElementById('blockStartSlot');
+            const end = document.getElementById('blockEndSlot');
+            if (!start || !end) return;
+            start.addEventListener('change', () => {
+                const startOption = start.selectedOptions[0];
+                const startIndex = startOption ? Number(startOption.dataset.index) : -1;
+                [...end.options].forEach(option => {
+                    const index = Number(option.dataset.index);
+                    option.disabled = option.value !== '' && index < startIndex;
+                });
+                const endOption = end.selectedOptions[0];
+                if (!endOption || endOption.value === '' || Number(endOption.dataset.index) < startIndex) {
+                    end.value = start.value;
+                }
+            });
+        })();
+    </script>
+}

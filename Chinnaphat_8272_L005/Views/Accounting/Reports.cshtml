@@ -4,7 +4,7 @@
     ViewData["Title"] = "รายงานสรุปยอดขาย & วิเคราะห์รายได้";
 
     string reportType = ViewBag.ReportType as string ?? "daily";
-    string selectedDate = ViewBag.SelectedDate as string ?? DateTime.Today.ToString("yyyy-MM-dd");
+    string selectedDate = ViewBag.SelectedDate as string ?? DateFormatHelper.ToIsoDate(DateTime.Today);
     int selectedMonth = ViewBag.SelectedMonth ?? DateTime.Today.Month;
     int selectedYear = ViewBag.SelectedYear ?? DateTime.Today.Year;
 
@@ -83,7 +83,7 @@
                 @if (reportType == "daily")
                 {
                     <label class="text-muted small fw-bold mb-0">เลือกวันที่:</label>
-                    <input type="date" name="date" class="form-control" value="@selectedDate" style="max-width:180px;" />
+                    <input type="date" name="date" class="form-control" value="@selectedDate" lang="th-TH" style="max-width:180px;" />
                 }
                 else
                 {

@@ -2,13 +2,11 @@
 <html lang="th">
 
 @{
-    string? userId = Context.Session.GetString("UserId") ?? Context.Request.Cookies["cb_user_id"];
-    string? rawName = Context.Session.GetString("FullName") ?? Context.Request.Cookies["cb_user_name"];
-    string? fullName = !string.IsNullOrEmpty(rawName) ? System.Net.WebUtility.UrlDecode(rawName) : null;
-    string? userEmail = Context.Session.GetString("Email") ?? Context.Request.Cookies["cb_email"];
-    string? rawRole = Context.Session.GetString("RoleName") ?? Context.Request.Cookies["cb_role_name"] ?? "สมาชิก";
-    string? roleName = !string.IsNullOrEmpty(rawRole) ? System.Net.WebUtility.UrlDecode(rawRole) : "สมาชิก";
-    string? roleCode = Context.Session.GetString("RoleCode") ?? Context.Request.Cookies["cb_role_code"];
+    string? userId = Context.Session.GetString("UserId");
+    string? fullName = Context.Session.GetString("FullName");
+    string? userEmail = Context.Session.GetString("Email");
+    string? roleName = Context.Session.GetString("RoleName") ?? "สมาชิก";
+    string? roleCode = Context.Session.GetString("RoleCode");
     bool isLoggedIn = !string.IsNullOrEmpty(userId);
 }
 
@@ -38,7 +36,10 @@
     <style>
         * { font-family: 'Sarabun', sans-serif; }
         html { scroll-behavior: smooth; }
-        body { font-size: 1rem; }
+        body { min-height: 100vh; font-size: 1rem; }
+        .customer-shell { min-height: 100vh; }
+        .customer-main { min-height: 100vh; display: flex; flex-direction: column; }
+        .customer-content { flex: 1 0 auto; }
         h1, h2, h3, h4, h5, h6 { font-family: 'Sarabun', sans-serif; font-weight: 700; }
         .navbar, .btn, .form-control, .form-select, .badge, .alert, .table {
             font-family: 'Sarabun', sans-serif;
@@ -55,7 +56,7 @@
 
     <div class="container-fluid">
 
-        <div class="row">
+        <div class="row customer-shell">
 
 
             <!-- ================= SIDEBAR ================= -->
@@ -202,7 +203,7 @@
 
             <!-- ================= MAIN ================= -->
 
-            <main class="col-md-9 col-lg-10 p-0">
+            <main class="col-md-9 col-lg-10 p-0 customer-main">
 
 
                 <!-- ================= TOPBAR ================= -->
@@ -249,7 +250,7 @@
 
                 <!-- ================= CONTENT ================= -->
 
-                <div class="p-4">
+                <div class="p-4 customer-content">
 
                     @RenderBody()
 
@@ -259,7 +260,7 @@
 
                 <!-- ================= FOOTER ================= -->
 
-                <footer class="bg-white border-top text-center text-muted py-2">
+                <footer class="bg-white border-top text-center text-muted py-2 mt-auto">
 
                     <small>
 

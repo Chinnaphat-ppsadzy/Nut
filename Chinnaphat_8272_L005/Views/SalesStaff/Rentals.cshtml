@@ -113,7 +113,7 @@
                         }
                         @foreach (var row in posRentalItems)
                         {
-                            var pendingRefund = row.Item.DepositRefunds.Where(r => r.Status == "PENDING").Sum(r => r.Amount);
+                            var pendingRefund = row.PendingRefundAmount;
                             <tr>
                                 <td>
                                     <div class="fw-bold text-primary">@row.Sale.ReceiptCode <span class="badge bg-secondary">POS</span></div>
@@ -128,11 +128,13 @@
                                 <td class="text-end">
                                     @if (row.RemainingQty > 0)
                                     {
-                                        <form asp-action="ReturnPosRental" method="post" class="d-flex gap-2 align-items-center justify-content-end" onsubmit="return confirm('ยืนยันรับอุปกรณ์คืนสภาพปกติ และส่งยอดมัดจำให้ฝ่ายบัญชีตรวจสอบ?')">
+                                        <form asp-action="ReturnPosRental" method="post" enctype="multipart/form-data" class="d-flex flex-wrap gap-2 align-items-center justify-content-end" onsubmit="return confirm('ยืนยันรับอุปกรณ์คืนและส่งคำขอคืนมัดจำ/รายงานชำรุดให้ฝ่ายบัญชี?')">
                                             @Html.AntiForgeryToken()
                                             <input type="hidden" name="saleId" value="@row.Sale.SaleId" />
                                             <input type="hidden" name="productId" value="@row.Item.ProductId" />
                                             <input type="number" name="quantity" min="1" max="@row.RemainingQty" value="1" class="form-control form-control-sm" style="width:72px" aria-label="จำนวนที่รับคืน" />
+                                            <input type="text" name="damageDescription" maxlength="500" class="form-control form-control-sm" style="width:190px" placeholder="ถ้าชำรุด ระบุจุดที่เสีย" aria-label="รายละเอียดความเสียหาย ถ้ามี" />
+                                            <input type="file" name="damagePhoto" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" class="form-control form-control-sm" style="width:190px" aria-label="แนบรูปอุปกรณ์ชำรุด" />
                                             <button class="btn btn-sm btn-outline-success text-nowrap"><i class="bi bi-box-arrow-in-down me-1"></i>รับคืน / ส่งบัญชี</button>
                                         </form>
                                     }
@@ -195,7 +197,7 @@
 <div class="modal fade" id="damageModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content" style="border-radius:18px; border:none; box-shadow:0 20px 50px rgba(0,0,0,0.2);">
-            <form asp-action="ReportDamage" asp-controller="SalesStaff" method="post">
+                            <form asp-action="ReportDamage" asp-controller="SalesStaff" method="post" enctype="multipart/form-data">
                 @Html.AntiForgeryToken()
                 <input type="hidden" name="bookingItemId" id="dmgBookingItemId" />
 
@@ -216,6 +218,12 @@
                     <div class="mb-3">
                         <label class="form-label fw-semibold small">ลักษณะความเสียหาย: <span class="text-danger">*</span></label>
                         <textarea name="description" class="form-control" rows="3" placeholder="เช่น ก้านไม้แบดหัก, เอ็นขาด, พื้นรองเท้าฉีกขาด..." required></textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold small">รูปหลักฐาน (ถ้ามี)</label>
+                        <input type="file" name="damagePhoto" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" class="form-control" />
+                        <small class="text-muted">รองรับ JPG, PNG, WEBP ขนาดไม่เกิน 5 MB</small>
                     </div>
 
                     <div class="alert alert-info small mb-0">ฝ่ายบัญชีจะเป็นผู้ตรวจสอบและกำหนดค่าปรับ รายการนี้จะยังไม่คืนเข้าสต็อก</div>

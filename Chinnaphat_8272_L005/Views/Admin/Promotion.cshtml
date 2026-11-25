@@ -3,6 +3,7 @@
 @{
     ViewData["Title"] = "จัดการโปรโมชั่น (Admin)";
     Layout = "_AdminLayout";
+    var dayNames = new[] { "อาทิตย์", "จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์" };
 }
 
 <style>
@@ -112,6 +113,11 @@
         border-color: #52b788;
         box-shadow: 0 0 0 3px rgba(82,183,136,0.2);
     }
+    .promo-day-choice { position:relative; cursor:pointer; }
+    .promo-day-choice input { position:absolute; opacity:0; pointer-events:none; }
+    .promo-day-choice span { display:inline-flex; align-items:center; justify-content:center; min-width:76px; padding:.55rem .8rem; border:1px solid #d7e3dc; border-radius:999px; background:#fff; color:#496154; font-size:.88rem; font-weight:600; transition:all .15s ease; }
+    .promo-day-choice input:checked + span { border-color:#198754; background:#e8f5ee; color:#146c43; box-shadow:0 0 0 2px rgba(25,135,84,.1); }
+    .promo-day-choice input:focus-visible + span { outline:3px solid rgba(13,110,253,.25); }
 </style>
 
 <!-- Header Banner -->
@@ -170,6 +176,16 @@
     @foreach (var promo in Model)
     {
         bool isActive = promo.IsActive == true;
+        var activeDayValues = (promo.ActiveDays ?? "1,2,3,4,5").Split(',', StringSplitOptions.RemoveEmptyEntries)
+            .Select(value => int.TryParse(value, out var day) ? day : -1).Where(day => day >= 0 && day <= 6).Distinct().OrderBy(day => day).ToArray();
+        if (activeDayValues.Length == 0) activeDayValues = new[] { 1, 2, 3, 4, 5 };
+        var activeDayLabels = string.Join(", ", activeDayValues.Select(day => dayNames[day]));
+        string displayDescription = promo.PromoType switch
+        {
+            "TOTAL_BILL" => $"สำหรับบัญชีที่ยังไม่มีการจองที่อนุมัติ/ชำระสำเร็จมาก่อน (ไม่อิงวันสมัคร) ยอดบิลตั้งแต่ {promo.MinBillAmount?.ToString("N0") ?? "600"} บาท รับส่วนลดท้ายบิล {promo.DiscountValue:N0} บาท",
+            "TIME_BASED" => $"ลดค่าเช่าสนาม {promo.DiscountValue:N0}% เวลา {promo.TimeStart?.ToString("HH:mm") ?? "09:00"}–{promo.TimeEnd?.ToString("HH:mm") ?? "15:00"} น. เฉพาะวัน{activeDayLabels}",
+            _ => promo.Description ?? string.Empty
+        };
         var conditionRules = promo.PromotionRules.Where(r => r.RuleKind == "CONDITION").ToList();
         string RuleDescription(Chinnaphat_8272_L005.Models.PromotionRule rule)
         {
@@ -207,7 +223,7 @@
                 iconBg = "#e0f2fe"; iconColor = "#0284c7";
                 typeBadgeBg = "#e0f2fe"; typeBadgeColor = "#0369a1";
                 typeLabel = "โปรฯ ที่ 1 — เช่าสนาม (Time-based)";
-                conditionSummary = $"จองคอร์ทช่วง {promo.TimeStart?.ToString("HH:mm") ?? "09:00"} – {promo.TimeEnd?.ToString("HH:mm") ?? "15:00"} น. (จันทร์–ศุกร์)";
+                conditionSummary = $"จองสนาม {promo.TimeStart?.ToString("HH:mm") ?? "09:00"}–{promo.TimeEnd?.ToString("HH:mm") ?? "15:00"} น. เฉพาะวัน{activeDayLabels}";
                 rewardText = $"ลดค่าเช่าคอร์ท {promo.DiscountValue.ToString("N0")}%";
                 rewardBg = "#e0f2fe"; rewardColor = "#0369a1";
                 break;
@@ -245,7 +261,7 @@
                 iconBg = "#dcfce7"; iconColor = "#16a34a";
                 typeBadgeBg = "#dcfce7"; typeBadgeColor = "#15803d";
                 typeLabel = "โปรฯ ที่ 5 — ยอดซื้อรวม (Total Bill)";
-                conditionSummary = $"สมาชิกใหม่จองครั้งแรก ยอดรวมบิลตั้งแต่ {promo.MinBillAmount?.ToString("N0") ?? "600"} บาทขึ้นไป";
+                conditionSummary = $"บัญชีที่ยังไม่มีการจองที่อนุมัติ/ชำระสำเร็จมาก่อน (ไม่อิงวันสมัคร) และยอดบิลตั้งแต่ {promo.MinBillAmount?.ToString("N0") ?? "600"} บาทขึ้นไป";
                 rewardText = $"ลดท้ายบิลทันที {promo.DiscountValue.ToString("N0")} บาท";
                 rewardBg = "#dcfce7"; rewardColor = "#15803d";
                 break;
@@ -308,10 +324,10 @@
                     </div>
 
                     <!-- Description (ถ้ามี) -->
-                    @if (!string.IsNullOrWhiteSpace(promo.Description))
+                    @if (!string.IsNullOrWhiteSpace(displayDescription))
                     {
                         <p class="text-muted mb-3" style="font-size:0.83rem; line-height:1.5; border-left:3px solid #e2e8f0; padding-left:0.75rem;">
-                            @promo.Description
+                            @displayDescription
                         </p>
                     }
                 </div>
@@ -327,7 +343,7 @@
                                 name: '@Html.Raw(promo.PromoName)',
                                 code: '@Html.Raw(promo.PromoCode)',
                                 type: '@promo.PromoType',
-                                desc: '@Html.Raw(promo.Description?.Replace("'", "\\'"))',
+                                desc: '@Html.Raw(displayDescription.Replace("'", "\\'"))',
                                 discount: @promo.DiscountValue,
                                 discountType: '@promo.DiscountType',
                                 requiredQty: @(conditionRules.FirstOrDefault()?.RequiredQty ?? 2),
@@ -335,6 +351,7 @@
                                 minBill: @(promo.MinBillAmount ?? 0),
                                 timeStart: '@(promo.TimeStart?.ToString("HH:mm") ?? "09:00")',
                                 timeEnd: '@(promo.TimeEnd?.ToString("HH:mm") ?? "15:00")',
+                                activeDays: [@Html.Raw(string.Join(",", activeDayValues))],
                                 isActive: @(isActive ? "true" : "false")
                             })">
                         <i class="bi bi-pencil-square me-1"></i> แก้ไขเงื่อนไข
@@ -420,17 +437,28 @@
                                 <h6 class="fw-bold text-primary mb-2 small">
                                     <i class="bi bi-clock me-1"></i>กำหนดช่วงเวลา (Time-based)
                                 </h6>
-                                <div class="row g-2">
-                                    <div class="col-6">
+                                <div class="row g-3">
+                                    <div class="col-md-6">
                                         <label class="small text-muted">เวลาเริ่มต้น</label>
-                                        <input type="time" name="timeStart" id="modalTimeStart" class="form-control form-control-sm" />
+                                        <input type="time" name="timeStart" id="modalTimeStart" class="form-control" required />
                                     </div>
-                                    <div class="col-6">
+                                    <div class="col-md-6">
                                         <label class="small text-muted">เวลาสิ้นสุด</label>
-                                        <input type="time" name="timeEnd" id="modalTimeEnd" class="form-control form-control-sm" />
+                                        <input type="time" name="timeEnd" id="modalTimeEnd" class="form-control" required />
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="small text-muted fw-semibold d-block mb-2">วันที่ใช้ส่วนลด</label>
+                                        <div class="d-flex flex-wrap gap-2">
+                                            @for (var day = 0; day < dayNames.Length; day++)
+                                            {
+                                                <label class="promo-day-choice">
+                                                    <input type="checkbox" name="activeDays" value="@day" class="form-check-input time-promo-day" />
+                                                    <span>@dayNames[day]</span>
+                                                </label>
+                                            }
+                                        </div>
                                     </div>
                                 </div>
-                                <small class="text-muted mt-1 d-block">เช่น 09:00 – 15:00 น. เฉพาะวันจันทร์–ศุกร์</small>
                             </div>
                         </div>
 
@@ -539,6 +567,9 @@
             if (data.type === 'TIME_BASED') {
                 document.getElementById('modalTimeStart').value = data.timeStart || '09:00';
                 document.getElementById('modalTimeEnd').value   = data.timeEnd   || '15:00';
+                document.querySelectorAll('.time-promo-day').forEach(input => {
+                    input.checked = (data.activeDays || [1, 2, 3, 4, 5]).includes(Number(input.value));
+                });
             }
             if (data.type === 'TOTAL_BILL') {
                 document.getElementById('modalMinBillAmount').value = data.minBill || 600;

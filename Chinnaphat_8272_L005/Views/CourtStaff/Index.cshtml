@@ -3,8 +3,8 @@
     Layout = "_CourtStaffLayout";
     ViewData["Title"] = "ตารางการจองคอร์ทประจำวัน";
 
-    string selectedDateStr = ViewBag.SelectedDate as string ?? DateTime.Today.ToString("yyyy-MM-dd");
-    DateTime selectedDate = DateTime.TryParse(selectedDateStr, out var d) ? d : DateTime.Today;
+    string selectedDateStr = ViewBag.SelectedDate as string ?? DateFormatHelper.ToIsoDate(DateTime.Today);
+    DateTime selectedDate = DateFormatHelper.TryParseIsoDate(selectedDateStr, out var d) ? d.ToDateTime(TimeOnly.MinValue) : DateTime.Today;
 
     var courts = ViewBag.Courts as List<Court> ?? new();
     var timeSlots = ViewBag.TimeSlots as List<TimeSlot> ?? new();
@@ -132,10 +132,10 @@
 
             <div class="col-lg-6">
                 <form method="get" asp-action="Index" class="d-flex justify-content-lg-end align-items-center gap-2 flex-wrap">
-                    <button type="button" class="btn btn-light btn-sm fw-semibold text-success" onclick="setScheduleDate('@DateTime.Today.ToString("yyyy-MM-dd")')">
+                    <button type="button" class="btn btn-light btn-sm fw-semibold text-success" onclick="setScheduleDate('@DateFormatHelper.ToIsoDate(DateTime.Today)')">
                         <i class="bi bi-clock-history me-1"></i> วันนี้
                     </button>
-                    <button type="button" class="btn btn-outline-light btn-sm fw-semibold" onclick="setScheduleDate('@DateTime.Today.AddDays(1).ToString("yyyy-MM-dd")')">
+                    <button type="button" class="btn btn-outline-light btn-sm fw-semibold" onclick="setScheduleDate('@DateFormatHelper.ToIsoDate(DateTime.Today.AddDays(1))')">
                         พรุ่งนี้
                     </button>
                     <input type="hidden" id="scheduleDateInput" name="date" value="@selectedDateStr" />
@@ -567,7 +567,7 @@
 
         // Check-in via AJAX
         function doCheckIn(bookingId) {
-            if (!confirm('ยืนยันการทำรายการ Check-in เมื่อลูกค้ามาถึงสนาม? (ระบบจะเปิดไฟและพัดลมให้อัตโนมัติ)')) return;
+            if (!confirm('ยืนยันการทำรายการ Check-in เมื่อลูกค้ามาถึงสนาม?')) return;
 
             fetch('/CourtStaff/CheckIn', {
                 method: 'POST',
@@ -625,7 +625,7 @@
             if (status === 'CONFIRMED' || status === 'PENDING_VERIFY') {
                 btnContainer.innerHTML = `
                     <button type="button" class="btn btn-success fw-bold py-2" onclick="doCheckIn(${id})">
-                        <i class="bi bi-box-arrow-in-right me-1"></i> ทำการ Check-in (เปิดไฟ/พัดลม)
+                        <i class="bi bi-box-arrow-in-right me-1"></i> ทำการ Check-in
                     </button>
                 `;
             } else if (status === 'CHECKED_IN' || status === 'IN_USE') {

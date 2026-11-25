@@ -85,6 +85,11 @@
                             <i class="bi bi-arrow-repeat"></i> ตรวจรับคืน & บันทึกชำรุด
                         </a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-pill-custom @(action == "BookingRefunds" ? "active" : "")" asp-action="BookingRefunds" asp-controller="SalesStaff">
+                            <i class="bi bi-box-seam"></i> ตรวจรับสินค้าคืน
+                        </a>
+                    </li>
                 </ul>
 
                 <!-- User & Role Info + Logout -->

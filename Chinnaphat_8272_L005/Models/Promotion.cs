@@ -64,6 +64,11 @@ public partial class Promotion
     public TimeOnly? TimeEnd { get; set; }
 
     /// <summary>
+    /// Comma-separated DayOfWeek values (0=Sunday through 6=Saturday) for time-based promotions.
+    /// </summary>
+    public string ActiveDays { get; set; } = "1,2,3,4,5";
+
+    /// <summary>
     /// เธงเธฑเธเนเธฃเธดเนเธกเนเธเธกเนเธเธ
     /// </summary>
     public DateOnly? StartDate { get; set; }

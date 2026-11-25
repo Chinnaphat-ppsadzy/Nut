@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
 using Chinnaphat_8272_L005.Models;
 using Chinnaphat_8272_L005.Helpers;
+using Chinnaphat_8272_L005.Database;
 
 namespace Chinnaphat_8272_L005.Controllers
 {
@@ -383,37 +384,6 @@ namespace Chinnaphat_8272_L005.Controllers
             return View(receipts);
         }
 
-        [HttpPost]
-        public async Task<IActionResult> IssueTaxInvoice(uint receiptId, string companyName, string taxId, string address)
-        {
-            try
-            {
-                var receipt = await _db.Receipts.FindAsync(receiptId);
-                if (receipt == null)
-                {
-                    TempData["ErrorMessage"] = "ไม่พบใบเสร็จรับเงิน";
-                    return RedirectToAction(nameof(Receipts));
-                }
-
-                receipt.DocType = "TAX_INVOICE";
-                receipt.CustomerName = string.IsNullOrWhiteSpace(companyName) ? receipt.CustomerName : companyName.Trim();
-                receipt.TaxId = taxId?.Trim();
-                receipt.Address = address?.Trim();
-                receipt.ReceiptNo = receipt.ReceiptNo.Replace("RC-", "TAX-");
-                receipt.IssuedAt = DateTime.Now;
-
-                await _db.SaveChangesAsync();
-
-                TempData["SuccessMessage"] = $"ออกใบกำกับภาษีเต็มรูป {receipt.ReceiptNo} ให้ {receipt.CustomerName} สำเร็จ!";
-                return RedirectToAction(nameof(Receipts));
-            }
-            catch (Exception ex)
-            {
-                TempData["ErrorMessage"] = "เกิดข้อผิดพลาดในการออกใบกำกับภาษี: " + ex.Message;
-                return RedirectToAction(nameof(Receipts));
-            }
-        }
-
         [HttpGet]
         public async Task<IActionResult> PrintReceipt(uint id)
         {
@@ -441,6 +411,8 @@ namespace Chinnaphat_8272_L005.Controllers
         {
             ViewData["Title"] = "คิดค่าปรับอุปกรณ์เสียหาย & จัดการคืนเงิน";
             await EnsureAccountingRoleAndUserAsync();
+            await WalkInPaymentSchemaInitializer.EnsureRentalDepositRefundTableAsync(_db);
+            await BookingRefundSchemaInitializer.EnsureAsync(_db);
 
             ViewBag.ActiveTab = tab ?? "damages";
 
@@ -481,6 +453,25 @@ namespace Chinnaphat_8272_L005.Controllers
             }
             ViewBag.PosDepositRefunds = posDepositRefunds.OrderByDescending(r => r.Request.CreatedAt).ToList();
 
+            var rentalDepositRequests = await _db.RentalDepositRefundRequests
+                .OrderByDescending(r => r.CreatedAt)
+                .ToListAsync();
+            ViewBag.RentalDepositRefundRequests = rentalDepositRequests;
+            ViewBag.PosDamageRequests = rentalDepositRequests
+                .Where(r => r.SaleId.HasValue && !string.IsNullOrWhiteSpace(r.DamageDescription))
+                .OrderByDescending(r => r.CreatedAt)
+                .ToList();
+            var onlineBookingItemIds = rentalDepositRequests
+                .Where(r => r.BookingItemId.HasValue)
+                .Select(r => r.BookingItemId!.Value)
+                .Distinct()
+                .ToList();
+            ViewBag.DepositFineByBookingItem = await _db.EquipmentDamages
+                .Where(d => onlineBookingItemIds.Contains(d.BookingItemId) && d.Status != "REPORTED")
+                .GroupBy(d => d.BookingItemId)
+                .Select(g => new { BookingItemId = g.Key, Fine = g.Sum(d => d.FineAmount) })
+                .ToDictionaryAsync(x => x.BookingItemId, x => x.Fine);
+
             // 2. ข้อมูลรายการคืนเงิน (Refunds)
             var refunds = await _db.Refunds
                 .Include(r => r.Booking).ThenInclude(b => b.User)
@@ -491,18 +482,83 @@ namespace Chinnaphat_8272_L005.Controllers
 
             ViewBag.Refunds = refunds;
 
-            // 3. รายการจองที่ลูกค้ายกเลิกที่อาจต้องคืนเงิน
-            var cancelledBookings = await _db.Bookings
-                .Include(b => b.User)
-                .Include(b => b.Payments)
-                .Include(b => b.Refunds)
-                .Where(b => (b.Status == "CANCELLED" || b.Status == "REJECTED") && b.Payments.Any(p => p.Status == "PAID"))
-                .OrderByDescending(b => b.UpdatedAt)
-                .ToListAsync();
-
-            ViewBag.CancelledBookings = cancelledBookings;
+            ViewBag.BookingRefundRequests = await _db.BookingRefundRequests
+                .Where(r => r.BookingItemId.HasValue || r.SaleId.HasValue)
+                .OrderByDescending(r => r.CreatedAt).ToListAsync();
 
             return View();
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ProcessBookingRefundRequest(uint requestId, bool approve, string? refundMethod, string? refundReference, string? accountingNote, string? rejectNote)
+        {
+            await BookingRefundSchemaInitializer.EnsureAsync(_db);
+            var request = await _db.BookingRefundRequests.FirstOrDefaultAsync(r => r.RequestId == requestId && r.Status == "PENDING_ACCOUNTING");
+            if (request == null) { TempData["ErrorMessage"] = "ไม่พบคำขอที่รอฝ่ายบัญชี"; return RedirectToAction(nameof(DamagesAndRefunds), new { tab = "refunds" }); }
+            var note = (approve ? accountingNote : rejectNote ?? accountingNote ?? string.Empty)?.Trim() ?? string.Empty;
+            if (note.Length > 500) { TempData["ErrorMessage"] = "บันทึกได้ไม่เกิน 500 ตัวอักษร"; return RedirectToAction(nameof(DamagesAndRefunds), new { tab = "refunds" }); }
+            if (!approve)
+            {
+                if (note.Length < 3) { TempData["ErrorMessage"] = "กรุณาระบุเหตุผลที่ปฏิเสธ"; return RedirectToAction(nameof(DamagesAndRefunds), new { tab = "refunds" }); }
+                request.Status = "REJECTED";
+                request.AccountingNote = note;
+            }
+            else
+            {
+                refundMethod = (refundMethod ?? string.Empty).Trim();
+                refundReference = (refundReference ?? string.Empty).Trim();
+                if (refundMethod.Length > 40 || refundReference.Length > 100)
+                { TempData["ErrorMessage"] = "ช่องทางคืนเงินไม่เกิน 40 ตัวอักษร และเลขอ้างอิงไม่เกิน 100 ตัวอักษร"; return RedirectToAction(nameof(DamagesAndRefunds), new { tab = "refunds" }); }
+                if (refundMethod.Length < 2 || refundReference.Length < 2)
+                { TempData["ErrorMessage"] = "เมื่อคืนเงินจริง กรุณาบันทึกช่องทางและเลขอ้างอิง"; return RedirectToAction(nameof(DamagesAndRefunds), new { tab = "refunds" }); }
+
+                if (request.BookingItemId.HasValue && request.BookingId.HasValue)
+                {
+                    var item = await _db.BookingItems.Include(i => i.Booking).ThenInclude(b => b.Payments)
+                        .FirstOrDefaultAsync(i => i.BookingItemId == request.BookingItemId.Value && i.BookingId == request.BookingId.Value && i.ItemType == "SALE");
+                    var booking = item?.Booking;
+                    if (item == null || booking == null || item.LineTotal != request.Amount)
+                    { TempData["ErrorMessage"] = "ไม่พบสินค้าที่ขอคืน หรือยอดสินค้าไม่ตรง"; return RedirectToAction(nameof(DamagesAndRefunds), new { tab = "refunds" }); }
+                    var paid = booking.Payments.Where(p => p.Status is "APPROVED" or "PAID").OrderByDescending(p => p.PaymentId).ToList();
+                    var paidTotal = paid.Sum(p => p.Amount);
+                    var alreadyRefunded = await _db.Refunds.Where(r => r.BookingId == booking.BookingId).SumAsync(r => (decimal?)r.Amount) ?? 0m;
+                    var duplicateProductRefund = await _db.BookingRefundRequests.AnyAsync(r => r.RequestId != requestId && r.BookingItemId == item.BookingItemId && r.Status == "COMPLETED");
+                    if (paidTotal <= 0 || duplicateProductRefund || paidTotal - alreadyRefunded < request.Amount)
+                    { TempData["ErrorMessage"] = "ไม่พบยอดชำระคงเหลือพอคืน หรือสินค้านี้คืนเงินไปแล้ว"; return RedirectToAction(nameof(DamagesAndRefunds), new { tab = "refunds" }); }
+                    var now = DateTime.Now;
+                    var accountantId = await GetCurrentAccountantIdAsync();
+                    _db.Refunds.Add(new Refund { BookingId = booking.BookingId, PaymentId = paid[0].PaymentId, Amount = request.Amount, Reason = $"คืนสินค้า {request.ProductName}", Status = "REFUNDED", ProcessedBy = accountantId, ProcessedAt = now, CreatedAt = now });
+                }
+                else if (request.SaleId.HasValue && request.ProductId.HasValue)
+                {
+                    var sale = await _db.PosSaleTransactions.FirstOrDefaultAsync(s => s.SaleId == request.SaleId.Value && s.PaymentStatus == "PAID");
+                    var lines = sale == null || string.IsNullOrWhiteSpace(sale.ItemsJson)
+                        ? new List<PosCartItemDto>()
+                        : System.Text.Json.JsonSerializer.Deserialize<List<PosCartItemDto>>(sale.ItemsJson) ?? new();
+                    var line = lines.FirstOrDefault(i => i.ProductId == (int)request.ProductId.Value && i.ProductType == "SALE");
+                    if (sale == null || line == null)
+                    { TempData["ErrorMessage"] = "ไม่พบรายการสินค้าที่ชำระแล้วใน POS"; return RedirectToAction(nameof(DamagesAndRefunds), new { tab = "refunds" }); }
+                    var gross = line.Price * line.Qty;
+                    var grossAll = sale.SaleAmount + sale.RentalAmount;
+                    var expected = Math.Max(0m, decimal.Round(gross - (grossAll > 0 ? sale.DiscountAmount * gross / grossAll : 0m), 2, MidpointRounding.AwayFromZero));
+                    var alreadyReturned = await _db.BookingRefundRequests.AnyAsync(r => r.RequestId != requestId && r.SaleId == request.SaleId && r.ProductId == request.ProductId && r.Status == "COMPLETED");
+                    var refundedSaleTotal = await _db.BookingRefundRequests.Where(r => r.RequestId != requestId && r.SaleId == request.SaleId && r.Status == "COMPLETED").SumAsync(r => (decimal?)r.Amount) ?? 0m;
+                    var saleGoodsNet = Math.Max(0m, decimal.Round(sale.SaleAmount - (grossAll > 0 ? sale.DiscountAmount * sale.SaleAmount / grossAll : 0m), 2, MidpointRounding.AwayFromZero));
+                    if (alreadyReturned || expected != request.Amount || refundedSaleTotal + request.Amount > saleGoodsNet)
+                    { TempData["ErrorMessage"] = "ยอดคืนสินค้าไม่ตรงกับบิล หรือบันทึกคืนสินค้านี้ไปแล้ว"; return RedirectToAction(nameof(DamagesAndRefunds), new { tab = "refunds" }); }
+                }
+                else { TempData["ErrorMessage"] = "ระบบนี้คืนเงินได้เฉพาะสินค้าที่ซื้อเท่านั้น"; return RedirectToAction(nameof(DamagesAndRefunds), new { tab = "refunds" }); }
+                request.Status = "COMPLETED";
+                request.RefundMethod = refundMethod;
+                request.RefundReference = refundReference;
+                request.AccountingNote = note;
+                request.ProcessedBy = await GetCurrentAccountantIdAsync();
+                request.ProcessedAt = DateTime.Now;
+            }
+            await _db.SaveChangesAsync();
+            TempData["SuccessMessage"] = approve ? $"บันทึกคืนเงินเต็มจำนวน {request.Amount:N2} ฿ ให้ {request.ReferenceCode} แล้ว" : "ปฏิเสธคำขอ พร้อมบันทึกเหตุผลแล้ว";
+            return RedirectToAction(nameof(DamagesAndRefunds), new { tab = "refunds" });
         }
 
         [HttpPost]
@@ -548,6 +604,19 @@ namespace Chinnaphat_8272_L005.Controllers
                 damage.ProcessedBy = accountantId;
                 damage.ProcessedAt = DateTime.Now;
 
+                var relatedDepositRequests = await _db.RentalDepositRefundRequests
+                    .Where(r => r.BookingItemId == damage.BookingItemId && r.Status == "PENDING")
+                    .ToListAsync();
+                foreach (var request in relatedDepositRequests)
+                {
+                    request.DamageAssessmentStatus = status == "WAIVED" ? "WAIVED" : "ASSESSED";
+                    request.FineAmount = await _db.EquipmentDamages
+                        .Where(d => d.BookingItemId == damage.BookingItemId && d.Status != "REPORTED")
+                        .SumAsync(d => (decimal?)d.FineAmount) ?? 0m;
+                    request.DamageAssessedBy = accountantId;
+                    request.DamageAssessedAt = DateTime.Now;
+                }
+
                 await _db.SaveChangesAsync();
 
                 string statusText = damage.Status switch
@@ -570,7 +639,7 @@ namespace Chinnaphat_8272_L005.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> ProcessPosRentalDepositRefund(uint saleId, int productId, string requestId, decimal refundedAmount, bool approve)
+        public async Task<IActionResult> ProcessPosRentalDepositRefund(uint saleId, int productId, string requestId, decimal refundedAmount, string refundMethod, string? refundReference, bool approve)
         {
             await EnsureAccountingRoleAndUserAsync();
             var sale = await _db.PosSaleTransactions.FirstOrDefaultAsync(s => s.SaleId == saleId);
@@ -593,9 +662,17 @@ namespace Chinnaphat_8272_L005.Controllers
                 TempData["ErrorMessage"] = "ยอดคืนต้องมากกว่า 0 และไม่เกินยอดมัดจำที่ฝ่ายขายแจ้ง";
                 return RedirectToAction(nameof(DamagesAndRefunds), new { tab = "depositRefunds" });
             }
+            refundMethod = (refundMethod ?? string.Empty).Trim().ToUpperInvariant();
+            if (approve && (refundMethod is not ("PROMPTPAY" or "BANK") || string.IsNullOrWhiteSpace(refundReference)))
+            {
+                TempData["ErrorMessage"] = "กรุณาระบุช่องทางและเลขอ้างอิงการคืนเงินจริง";
+                return RedirectToAction(nameof(DamagesAndRefunds), new { tab = "depositRefunds" });
+            }
 
             request.Status = approve ? "COMPLETED" : "REJECTED";
             request.RefundedAmount = approve ? refundedAmount : 0m;
+            request.RefundMethod = approve ? refundMethod : null;
+            request.RefundReference = approve ? refundReference!.Trim()[..Math.Min(refundReference.Trim().Length, 100)] : null;
             request.ProcessedBy = await GetCurrentAccountantIdAsync();
             request.ProcessedAt = DateTime.Now;
             sale.ItemsJson = System.Text.Json.JsonSerializer.Serialize(items);
@@ -608,56 +685,149 @@ namespace Chinnaphat_8272_L005.Controllers
         }
 
         [HttpPost]
-        public async Task<IActionResult> CreateRefund(uint bookingId, decimal amount, string reason)
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> UpdatePosRentalDamageFine(uint requestId, decimal fineAmount)
         {
-            try
+            await EnsureAccountingRoleAndUserAsync();
+            var request = await _db.RentalDepositRefundRequests
+                .FirstOrDefaultAsync(r => r.RequestId == requestId && r.SaleId.HasValue);
+            if (request == null || request.Status != "PENDING" || string.IsNullOrWhiteSpace(request.DamageDescription))
             {
-                var booking = await _db.Bookings
-                    .Include(b => b.Payments)
-                    .FirstOrDefaultAsync(b => b.BookingId == bookingId);
-
-                if (booking == null)
-                {
-                    TempData["ErrorMessage"] = "ไม่พบข้อมูลการจอง";
-                    return RedirectToAction(nameof(DamagesAndRefunds), new { tab = "refunds" });
-                }
-
-                var payment = booking.Payments.OrderByDescending(p => p.PaymentId).FirstOrDefault();
-                if (payment == null)
-                {
-                    TempData["ErrorMessage"] = "ไม่พบข้อมูลการชำระเงินของบิลนี้";
-                    return RedirectToAction(nameof(DamagesAndRefunds), new { tab = "refunds" });
-                }
-
-                uint accountantId = await GetCurrentAccountantIdAsync();
-
-                var refund = new Refund
-                {
-                    BookingId = booking.BookingId,
-                    PaymentId = payment.PaymentId,
-                    Amount = amount > 0 ? amount : booking.NetAmount,
-                    Reason = string.IsNullOrWhiteSpace(reason) ? "ลูกค้ายกเลิกการจองตามเงื่อนไข" : reason.Trim(),
-                    Status = "COMPLETED",
-                    ProcessedBy = accountantId,
-                    ProcessedAt = DateTime.Now,
-                    CreatedAt = DateTime.Now
-                };
-
-                _db.Refunds.Add(refund);
-
-                booking.Status = "CANCELLED";
-                booking.UpdatedAt = DateTime.Now;
-
-                await _db.SaveChangesAsync();
-
-                TempData["SuccessMessage"] = $"บันทึกการคืนเงิน {refund.Amount:N2} ฿ สำหรับบิล {booking.BookingCode} สำเร็จเรียบร้อย!";
-                return RedirectToAction(nameof(DamagesAndRefunds), new { tab = "refunds" });
+                TempData["ErrorMessage"] = "ไม่พบรายการอุปกรณ์ชำรุด POS ที่รอประเมิน";
+                return RedirectToAction(nameof(DamagesAndRefunds), new { tab = "damages" });
             }
-            catch (Exception ex)
+            if (fineAmount < 0 || fineAmount > request.DepositAmount)
             {
-                TempData["ErrorMessage"] = "เกิดข้อผิดพลาดในการคืนเงิน: " + ex.Message;
-                return RedirectToAction(nameof(DamagesAndRefunds), new { tab = "refunds" });
+                TempData["ErrorMessage"] = "ค่าปรับต้องอยู่ระหว่าง 0 ถึงยอดมัดจำ";
+                return RedirectToAction(nameof(DamagesAndRefunds), new { tab = "damages" });
             }
+
+            request.FineAmount = fineAmount;
+            request.DamageAssessmentStatus = fineAmount > 0 ? "ASSESSED" : "WAIVED";
+            request.DamageAssessedBy = await GetCurrentAccountantIdAsync();
+            request.DamageAssessedAt = DateTime.Now;
+            await _db.SaveChangesAsync();
+            TempData["SuccessMessage"] = fineAmount > 0
+                ? $"บันทึกค่าประเมิน {request.ProductName} {fineAmount:N2} ฿ แล้ว ยอดมัดจำส่วนที่เหลือจะไปแสดงในรายการคืนมัดจำ"
+                : $"บันทึกยกเว้นค่าปรับ {request.ProductName} แล้ว";
+            return RedirectToAction(nameof(DamagesAndRefunds), new { tab = "damages" });
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> DamageEvidence(uint? damageId, uint? requestId)
+        {
+            await EnsureAccountingRoleAndUserAsync();
+            string? photoName = null;
+            if (damageId.HasValue)
+            {
+                photoName = await _db.EquipmentDamages
+                    .Where(d => d.DamageId == damageId.Value)
+                    .Select(d => d.PhotoUrl)
+                    .FirstOrDefaultAsync();
+            }
+            else if (requestId.HasValue)
+            {
+                photoName = await _db.RentalDepositRefundRequests
+                    .Where(r => r.RequestId == requestId.Value)
+                    .Select(r => r.DamagePhotoUrl)
+                    .FirstOrDefaultAsync();
+            }
+
+            if (string.IsNullOrWhiteSpace(photoName)) return NotFound();
+            var filePath = UploadStorage.GetDamagePath(_env, photoName);
+            var contentType = Path.GetExtension(filePath).ToLowerInvariant() switch
+            {
+                ".jpg" or ".jpeg" => "image/jpeg",
+                ".png" => "image/png",
+                ".webp" => "image/webp",
+                _ => null
+            };
+            if (contentType == null || !System.IO.File.Exists(filePath)) return NotFound();
+            Response.Headers.CacheControl = "no-store, private";
+            return PhysicalFile(filePath, contentType);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ProcessRentalDepositRefund(uint requestId, string refundMethod, string? refundReference)
+        {
+            await EnsureAccountingRoleAndUserAsync();
+            var request = await _db.RentalDepositRefundRequests.FirstOrDefaultAsync(r => r.RequestId == requestId);
+            if (request == null || request.Status != "PENDING")
+            {
+                TempData["ErrorMessage"] = "ไม่พบคำขอ หรือคำขอนี้ถูกดำเนินการแล้ว";
+                return RedirectToAction(nameof(DamagesAndRefunds), new { tab = "depositRefunds" });
+            }
+
+            decimal fineAmount = 0m;
+            List<EquipmentDamage> bookingDamages = new();
+            if (!string.IsNullOrWhiteSpace(request.DamageDescription))
+            {
+                if (request.SaleId.HasValue)
+                {
+                    if (request.DamageAssessmentStatus is not ("ASSESSED" or "WAIVED"))
+                    {
+                        TempData["ErrorMessage"] = "กรุณาให้บัญชีประเมินค่าปรับก่อนดำเนินการคืนมัดจำ";
+                        return RedirectToAction(nameof(DamagesAndRefunds), new { tab = "damages" });
+                    }
+                    fineAmount = request.DamageAssessmentStatus == "WAIVED" ? 0m : request.FineAmount;
+                }
+                else if (request.BookingItemId.HasValue)
+                {
+                    bookingDamages = await _db.EquipmentDamages
+                        .Where(d => d.BookingItemId == request.BookingItemId.Value)
+                        .ToListAsync();
+                    if (bookingDamages.Any(d => d.Status == "REPORTED"))
+                    {
+                        TempData["ErrorMessage"] = "กรุณาให้บัญชีกำหนดค่าปรับในแท็บอุปกรณ์ชำรุดก่อน แล้วจึงดำเนินการคืนมัดจำ";
+                        return RedirectToAction(nameof(DamagesAndRefunds), new { tab = "damages" });
+                    }
+                    fineAmount = bookingDamages.Where(d => d.Status is "CHARGED" or "PAID").Sum(d => d.FineAmount);
+                }
+                else
+                {
+                    TempData["ErrorMessage"] = "ไม่พบรายการประเมินค่าปรับที่เชื่อมกับคำขอคืนมัดจำนี้";
+                    return RedirectToAction(nameof(DamagesAndRefunds), new { tab = "depositRefunds" });
+                }
+            }
+
+            refundMethod = (refundMethod ?? string.Empty).Trim().ToUpperInvariant();
+            fineAmount = Math.Max(0m, fineAmount);
+            var depositDeduction = Math.Min(request.DepositAmount, fineAmount);
+            var expectedRefund = Math.Max(0m, request.DepositAmount - depositDeduction);
+            bool requiresTransfer = expectedRefund > 0;
+            if (requiresTransfer && refundMethod is not ("PROMPTPAY" or "BANK"))
+            {
+                TempData["ErrorMessage"] = "ตรวจสอบยอดค่าปรับและช่องทางคืนเงินอีกครั้ง";
+                return RedirectToAction(nameof(DamagesAndRefunds), new { tab = "depositRefunds" });
+            }
+            if (requiresTransfer && string.IsNullOrWhiteSpace(refundReference))
+            {
+                TempData["ErrorMessage"] = "กรุณาระบุเลขอ้างอิงการโอนหรือหมายเหตุการคืนเงิน";
+                return RedirectToAction(nameof(DamagesAndRefunds), new { tab = "depositRefunds" });
+            }
+
+            var accountantId = await GetCurrentAccountantIdAsync();
+            foreach (var damage in bookingDamages.Where(d => d.Status == "CHARGED" && fineAmount <= request.DepositAmount))
+            {
+                damage.Status = "PAID";
+                damage.ProcessedBy = accountantId;
+                damage.ProcessedAt = DateTime.Now;
+            }
+            request.FineAmount = fineAmount;
+            request.RefundedAmount = expectedRefund;
+            request.RefundMethod = requiresTransfer ? refundMethod : "DEPOSIT_OFFSET";
+            request.RefundReference = requiresTransfer
+                ? refundReference!.Trim()[..Math.Min(refundReference.Trim().Length, 100)]
+                : $"หักค่าปรับจากมัดจำ {depositDeduction:N2} ฿";
+            request.Status = "COMPLETED";
+            request.ProcessedBy = accountantId;
+            request.ProcessedAt = DateTime.Now;
+            await _db.SaveChangesAsync();
+
+            TempData["SuccessMessage"] = $"บันทึกการคืนมัดจำ {request.ReceiptCode}: หักจากมัดจำ {depositDeduction:N2} ฿ คืน {expectedRefund:N2} ฿" +
+                (fineAmount > request.DepositAmount ? $" และยังมีค่าปรับคงเหลือ {fineAmount - request.DepositAmount:N2} ฿" : string.Empty);
+            return RedirectToAction(nameof(DamagesAndRefunds), new { tab = "depositRefunds" });
         }
 
         // ============================================================
@@ -674,7 +844,7 @@ namespace Chinnaphat_8272_L005.Controllers
 
             int currentYear = year ?? DateTime.Today.Year;
             int currentMonth = month ?? DateTime.Today.Month;
-            string selectedDateStr = string.IsNullOrWhiteSpace(date) ? DateTime.Today.ToString("yyyy-MM-dd") : date.Trim();
+            string selectedDateStr = string.IsNullOrWhiteSpace(date) ? DateFormatHelper.ToIsoDate(DateTime.Today) : date.Trim();
 
             ViewBag.SelectedYear = currentYear;
             ViewBag.SelectedMonth = currentMonth;
@@ -682,7 +852,7 @@ namespace Chinnaphat_8272_L005.Controllers
 
             if (currentType == "daily")
             {
-                DateOnly targetDate = DateOnly.TryParse(selectedDateStr, out var pd) ? pd : DateOnly.FromDateTime(DateTime.Today);
+                DateOnly targetDate = DateFormatHelper.TryParseIsoDate(selectedDateStr, out var pd) ? pd : DateOnly.FromDateTime(DateTime.Today);
 
                 var dailyBookings = await _db.Bookings
                     .Include(b => b.User)
@@ -787,7 +957,7 @@ namespace Chinnaphat_8272_L005.Controllers
         // ============================================================
         private async Task<uint> GetCurrentAccountantIdAsync()
         {
-            string? uidStr = HttpContext.Session.GetString("UserId") ?? Request.Cookies["cb_user_id"];
+            string? uidStr = HttpContext.Session.GetString("UserId");
             if (!string.IsNullOrEmpty(uidStr) && uint.TryParse(uidStr, out uint uid))
             {
                 var existingUser = await _db.Users.FindAsync(uid);

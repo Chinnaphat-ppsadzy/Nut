@@ -615,6 +615,7 @@ namespace Chinnaphat_8272_L005.Controllers
             decimal? minBillAmount,
             string? timeStart,
             string? timeEnd,
+            int[]? activeDays,
             bool isActive,
             uint? requiredQty,
             uint? nthItem)
@@ -647,6 +648,17 @@ namespace Chinnaphat_8272_L005.Controllers
                 return RedirectToAction(nameof(Promotion));
             }
 
+            if (promo.PromoType == "TIME_BASED")
+            {
+                var validDays = (activeDays ?? Array.Empty<int>()).Distinct().Where(day => day >= 0 && day <= 6).OrderBy(day => day).ToArray();
+                if (validDays.Length == 0 || !TimeOnly.TryParse(timeStart, out _) || !TimeOnly.TryParse(timeEnd, out _))
+                {
+                    TempData["ErrorMessage"] = "โปรดเลือกอย่างน้อย 1 วัน และกำหนดเวลาเริ่มต้นกับเวลาสิ้นสุด";
+                    return RedirectToAction(nameof(Promotion));
+                }
+                activeDays = validDays;
+            }
+
             var requiredDiscountType = promo.PromoType switch
             {
                 "TIME_BASED" or "VOLUME_SALE" or "BUNDLE_RENTAL" => "PERCENT",
@@ -663,7 +675,9 @@ namespace Chinnaphat_8272_L005.Controllers
             // อัปเดตข้อมูลโปรโมชั่นหลัก
             promo.PromoName = promoName.Trim();
             promo.PromoCode = promoCode.Trim().ToUpper();
-            promo.Description = description?.Trim();
+            promo.Description = promo.PromoType == "TOTAL_BILL"
+                ? $"สำหรับบัญชีที่ยังไม่มีการจองที่อนุมัติ/ชำระสำเร็จมาก่อน (ไม่อิงวันสมัคร) ยอดบิลตั้งแต่ {minBillAmount ?? 600m:N0} บาท รับส่วนลดท้ายบิล {discountValue:N0} บาท"
+                : description?.Trim();
             promo.DiscountValue = discountValue;
             promo.DiscountType = discountType;
             promo.MinBillAmount = minBillAmount;
@@ -678,6 +692,11 @@ namespace Chinnaphat_8272_L005.Controllers
             if (!string.IsNullOrWhiteSpace(timeEnd) && TimeOnly.TryParse(timeEnd, out var tEnd))
             {
                 promo.TimeEnd = tEnd;
+            }
+            if (promo.PromoType == "TIME_BASED")
+            {
+                promo.ActiveDays = string.Join(',', activeDays!);
+                promo.Description = $"จองสนามเวลา {promo.TimeStart:HH\\:mm}–{promo.TimeEnd:HH\\:mm} เฉพาะ{string.Join(", ", activeDays!.Select(day => new[] { "อาทิตย์", "จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์" }[day]))} ลดค่าเช่าสนาม {promo.DiscountValue:N0}%";
             }
 
             // อัปเดตกฎเงื่อนไข (PromotionRules)
@@ -901,7 +920,7 @@ namespace Chinnaphat_8272_L005.Controllers
                 {
                     PromoCode = "NEW_MEMBER_100",
                     PromoName = "โปรฯ ยอดซื้อรวม (Total Bill Discount)",
-                    Description = "สมาชิกใหม่ที่จองคอร์ทครั้งแรก และมียอดรวมในบิล (ทั้งค่าเช่าคอร์ท + ค่าซื้อของ + ค่าเช่าของ) ตั้งแต่ 600 บาทขึ้นไป รับส่วนลดหักท้ายบิลทันที 100 บาท",
+                    Description = "สำหรับบัญชีที่ยังไม่มีการจองที่อนุมัติ/ชำระสำเร็จมาก่อน (ไม่อิงวันสมัคร) ยอดบิลตั้งแต่ 600 บาท รับส่วนลดท้ายบิล 100 บาท",
                     PromoType = "TOTAL_BILL",
                     DiscountType = "FIXED_AMOUNT",
                     DiscountValue = 100,
@@ -940,6 +959,10 @@ namespace Chinnaphat_8272_L005.Controllers
                 .ToListAsync();
 
             ViewBag.Courts = await _db.Courts.OrderBy(c => c.CourtId).ToListAsync();
+            ViewBag.TimeSlots = await _db.TimeSlots
+                .Where(s => s.IsActive == true || s.IsActive == null)
+                .OrderBy(s => s.StartTime)
+                .ToListAsync();
 
             ViewBag.PendingCount = issues.Count(i => i.Status == "OPEN");
             ViewBag.InProgressCount = issues.Count(i => i.Status == "IN_PROGRESS");
@@ -950,85 +973,167 @@ namespace Chinnaphat_8272_L005.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> UpdateIssueStatus(uint issueId, string status)
+        public async Task<IActionResult> UpdateIssueStatus(uint issueId, string status, string? blockDate, byte? startSlotId, byte? endSlotId)
         {
             status = (status ?? string.Empty).Trim().ToUpperInvariant();
-            if (status is not ("OPEN" or "IN_PROGRESS" or "RESOLVED"))
+            if (status is not ("IN_PROGRESS" or "RESOLVED"))
             {
                 TempData["ErrorMessage"] = "สถานะรายการแจ้งซ่อมไม่ถูกต้อง";
                 return RedirectToAction(nameof(CourtIssues));
             }
 
             var issue = await _db.CourtIssues.FindAsync(issueId);
-            if (issue != null)
+            if (issue == null)
+            {
+                TempData["ErrorMessage"] = "ไม่พบรายการแจ้งซ่อมที่ต้องการ";
+                return RedirectToAction(nameof(CourtIssues));
+            }
+
+            if (status == "IN_PROGRESS" && issue.Status != "OPEN" ||
+                status == "RESOLVED" && issue.Status != "IN_PROGRESS")
+            {
+                TempData["ErrorMessage"] = "สถานะรายการเปลี่ยนไปแล้ว กรุณารีเฟรชหน้าและตรวจสอบอีกครั้ง";
+                return RedirectToAction(nameof(CourtIssues));
+            }
+
+            DateTime? scheduledStart = null;
+            DateTime? scheduledEnd = null;
+            if (status == "IN_PROGRESS" && issue.CourtId.HasValue)
+            {
+                if (!DateFormatHelper.TryParseIsoDate(blockDate, out var parsedBlockDate) || !startSlotId.HasValue || !endSlotId.HasValue || parsedBlockDate < DateOnly.FromDateTime(DateTime.Today))
+                {
+                    TempData["ErrorMessage"] = "กรุณาเลือกวันที่และช่วงเวลาซ่อมจากตารางสนาม";
+                    return Redirect($"/Admin/CourtIssues#issue-{issueId}");
+                }
+
+                var timeSlots = await _db.TimeSlots
+                    .Where(s => s.IsActive == true || s.IsActive == null)
+                    .OrderBy(s => s.StartTime)
+                    .ToListAsync();
+                var startIndex = timeSlots.FindIndex(s => s.SlotId == startSlotId.Value);
+                var endIndex = timeSlots.FindIndex(s => s.SlotId == endSlotId.Value);
+                if (startIndex < 0 || endIndex < startIndex ||
+                    timeSlots.Skip(startIndex).Take(endIndex - startIndex + 1)
+                        .Zip(timeSlots.Skip(startIndex + 1).Take(endIndex - startIndex), (a, b) => a.EndTime == b.StartTime)
+                        .Any(isAdjacent => !isAdjacent))
+                {
+                    TempData["ErrorMessage"] = "ช่วงเวลาที่เลือกไม่ต่อเนื่องกัน กรุณาเลือกเวลาใหม่จากตารางสนาม";
+                    return Redirect($"/Admin/CourtIssues#issue-{issueId}");
+                }
+
+                var blockDateValue = parsedBlockDate.ToDateTime(TimeOnly.MinValue);
+                scheduledStart = blockDateValue.Add(timeSlots[startIndex].StartTime.ToTimeSpan());
+                scheduledEnd = blockDateValue.Add(timeSlots[endIndex].EndTime.ToTimeSpan());
+                if (scheduledStart.Value <= DateTime.Now)
+                {
+                    TempData["ErrorMessage"] = "เวลาเริ่มซ่อมผ่านไปแล้ว กรุณาเลือกช่วงเวลาในอนาคต";
+                    return Redirect($"/Admin/CourtIssues#issue-{issueId}");
+                }
+            }
+
+            var adminIdText = HttpContext.Session.GetString("UserId");
+            if (!uint.TryParse(adminIdText, out var adminId) || !await _db.Users.AnyAsync(u => u.UserId == adminId))
+            {
+                TempData["ErrorMessage"] = "ไม่พบข้อมูลผู้ดูแลระบบ กรุณาเข้าสู่ระบบใหม่";
+                return RedirectToAction(nameof(CourtIssues));
+            }
+
+            await using var transaction = await _db.Database.BeginTransactionAsync();
+            try
             {
                 Court? affectedCourt = issue.CourtId.HasValue
                     ? await _db.Courts.FindAsync(issue.CourtId.Value)
                     : null;
 
-                // A report stays informational until Admin accepts it. Only the
-                // OPEN -> IN_PROGRESS transition closes the court for maintenance.
-                if ((issue.Status == "OPEN" && status == "RESOLVED") ||
-                    (issue.Status == "IN_PROGRESS" && status == "OPEN"))
+                if (status == "IN_PROGRESS" && affectedCourt != null)
                 {
-                    TempData["ErrorMessage"] = issue.Status == "OPEN"
-                        ? "กรุณารับเรื่องก่อน จึงจะปิดงานซ่อมได้"
-                        : "รายการที่รับเรื่องแล้วไม่สามารถย้อนกลับเป็นรอตรวจสอบได้";
-                    return RedirectToAction(nameof(CourtIssues));
+                    var start = scheduledStart!.Value;
+                    var end = scheduledEnd!.Value;
+                    bool overlapsBlock = await _db.CourtBlocks.AnyAsync(b =>
+                        b.CourtId == affectedCourt.CourtId && b.BlockStart < end && b.BlockEnd > start);
+                    if (overlapsBlock)
+                    {
+                        await transaction.RollbackAsync();
+                        TempData["ErrorMessage"] = "ช่วงเวลานี้มีรายการล็อกคอร์ทอยู่แล้ว กรุณาเลือกช่วงเวลาอื่น";
+                        return Redirect($"/Admin/CourtIssues#issue-{issueId}");
+                    }
+
+                    var firstDate = DateOnly.FromDateTime(start);
+                    var lastDate = DateOnly.FromDateTime(end.AddTicks(-1));
+                    var bookings = await _db.BookingSlots
+                        .Include(s => s.Booking)
+                        .Include(s => s.Slot)
+                        .Where(s => s.CourtId == affectedCourt.CourtId && s.PlayDate >= firstDate && s.PlayDate <= lastDate &&
+                            s.LockKey == 1 && s.Booking.Status != "CANCELLED" && s.Booking.Status != "REJECTED" && s.Booking.Status != "EXPIRED")
+                        .ToListAsync();
+                    bool overlapsBooking = bookings.Any(s =>
+                    {
+                        var slotStart = s.PlayDate.ToDateTime(s.Slot.StartTime);
+                        var slotEnd = s.PlayDate.ToDateTime(s.Slot.EndTime);
+                        return slotStart < end && slotEnd > start;
+                    });
+                    if (overlapsBooking)
+                    {
+                        await transaction.RollbackAsync();
+                        TempData["ErrorMessage"] = "ช่วงเวลาที่เลือกมีลูกค้าจองแล้ว กรุณาเลือกเวลาซ่อมช่วงอื่น";
+                        return Redirect($"/Admin/CourtIssues#issue-{issueId}");
+                    }
+
+                    var reason = $"แจ้งซ่อม #ISSUE-{issue.IssueId:D3}: {issue.Description}";
+                    var maintenanceBlock = new CourtBlock
+                    {
+                        CourtId = affectedCourt.CourtId,
+                        BlockStart = start,
+                        BlockEnd = end,
+                        Reason = reason.Length > 255 ? reason[..255] : reason,
+                        CreatedBy = adminId,
+                        CreatedAt = DateTime.Now
+                    };
+                    _db.CourtBlocks.Add(maintenanceBlock);
+                    await _db.SaveChangesAsync();
+                    issue.MaintenanceBlockId = maintenanceBlock.BlockId;
                 }
-                if (issue.Status == "RESOLVED" && status != "RESOLVED")
+                else if (status == "RESOLVED" && issue.MaintenanceBlockId.HasValue)
                 {
-                    TempData["ErrorMessage"] = "รายการที่ปิดงานแล้วไม่สามารถเปิดกลับได้ กรุณาสร้างรายการแจ้งใหม่";
-                    return RedirectToAction(nameof(CourtIssues));
+                    var block = await _db.CourtBlocks.FindAsync(issue.MaintenanceBlockId.Value);
+                    if (block != null) _db.CourtBlocks.Remove(block);
+                    issue.MaintenanceBlockId = null;
                 }
 
                 issue.Status = status;
-                if (status == "IN_PROGRESS" && affectedCourt != null)
-                {
-                    affectedCourt.Status = "MAINTENANCE";
-                    affectedCourt.UpdatedAt = DateTime.Now;
-                }
-
-                if (issue.Status == "RESOLVED")
+                if (status == "RESOLVED")
                 {
                     issue.ResolvedAt = DateTime.Now;
-                    string? uidStr = HttpContext.Session.GetString("UserId") ?? Request.Cookies["cb_user_id"];
-                    if (!string.IsNullOrEmpty(uidStr) && uint.TryParse(uidStr, out uint uid))
-                    {
-                        issue.ResolvedBy = uid;
-                    }
+                    issue.ResolvedBy = adminId;
 
-                    // OPEN reports await review and must not keep a court closed.
-                    if (affectedCourt != null && affectedCourt.Status == "MAINTENANCE")
+                    if (affectedCourt?.Status == "MAINTENANCE")
                     {
-                        bool hasOtherAcceptedIssues = await _db.CourtIssues.AnyAsync(i =>
-                            i.IssueId != issue.IssueId && i.CourtId == issue.CourtId &&
-                            i.Status == "IN_PROGRESS");
-                        if (!hasOtherAcceptedIssues)
+                        bool hasOtherActiveIssue = await _db.CourtIssues.AnyAsync(i =>
+                            i.IssueId != issue.IssueId && i.CourtId == issue.CourtId && i.Status == "IN_PROGRESS");
+                        bool hasCurrentBlock = await _db.CourtBlocks.AnyAsync(b =>
+                            b.CourtId == affectedCourt.CourtId && b.BlockStart <= DateTime.Now && b.BlockEnd > DateTime.Now);
+                        if (!hasOtherActiveIssue && !hasCurrentBlock)
                         {
                             affectedCourt.Status = "AVAILABLE";
                             affectedCourt.UpdatedAt = DateTime.Now;
                         }
                     }
                 }
-                else
-                {
-                    issue.ResolvedAt = null;
-                    issue.ResolvedBy = null;
-                }
+
                 await _db.SaveChangesAsync();
-                var courtMessage = affectedCourt == null
-                    ? string.Empty
-                    : issue.Status == "RESOLVED" && affectedCourt.Status == "AVAILABLE"
-                        ? $" และเปิด {affectedCourt.CourtName} ให้บริการแล้ว"
-                        : issue.Status != "RESOLVED"
-                            ? $" และปิด {affectedCourt.CourtName} ปรับปรุงอัตโนมัติ"
-                            : string.Empty;
-                TempData["SuccessMessage"] = $"อัปเดตสถานะเรื่องแจ้งซ่อม #ISSUE-{issueId:D3} เป็น {status} เรียบร้อยแล้ว{courtMessage}";
+                await transaction.CommitAsync();
+                TempData["SuccessMessage"] = status == "IN_PROGRESS"
+                    ? issue.CourtId.HasValue
+                        ? $"รับเรื่อง #ISSUE-{issueId:D3} แล้ว และล็อกคอร์ทเฉพาะช่วง {scheduledStart:dd/MM/yyyy HH:mm}–{scheduledEnd:HH:mm}"
+                        : $"รับเรื่อง #ISSUE-{issueId:D3} แล้ว (ปัญหาส่วนกลาง ไม่มีการปิดคอร์ท)"
+                    : issue.CourtId.HasValue
+                        ? $"ปิดงาน #ISSUE-{issueId:D3} แล้ว และปลดล็อกช่วงซ่อมที่เชื่อมกับรายการนี้"
+                        : $"ปิดงาน #ISSUE-{issueId:D3} แล้ว";
             }
-            else
+            catch
             {
-                TempData["ErrorMessage"] = "ไม่พบรายการแจ้งซ่อมที่ต้องการ";
+                await transaction.RollbackAsync();
+                throw;
             }
             return RedirectToAction(nameof(CourtIssues));
         }

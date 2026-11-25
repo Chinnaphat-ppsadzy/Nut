@@ -38,6 +38,9 @@ public partial class CourtIssue
     /// </summary>
     public uint? ResolvedBy { get; set; }
 
+    /// <summary>Related scheduled court block created when Admin accepts this repair report.</summary>
+    public uint? MaintenanceBlockId { get; set; }
+
     /// <summary>
     /// เธงเธฑเธเธเธตเนเนเธเนเนเธเนเธชเธฃเนเธ
     /// </summary>

@@ -327,7 +327,7 @@
                             <input type="text" name="customerName" id="posCustomerName" class="form-control form-control-sm" placeholder="ชื่อลูกค้า (Walk-in)" />
                         </div>
                         <div class="col-5">
-                            <input type="text" name="customerPhone" class="form-control form-control-sm" placeholder="เบอร์โทร" />
+                            <input type="tel" name="customerPhone" id="posCustomerPhone" class="form-control form-control-sm" placeholder="เบอร์โทร 10 หลัก" inputmode="numeric" autocomplete="tel-national" pattern="[0-9]{10}" minlength="10" maxlength="10" title="กรุณากรอกเบอร์โทรศัพท์เป็นตัวเลข 10 หลัก" />
                         </div>
                     </div>
                 </div>
@@ -387,6 +387,16 @@
         </div>
     </div>
 </div>
+
+<script>
+    (() => {
+        const phoneInput = document.getElementById('posCustomerPhone');
+        if (!phoneInput) return;
+        phoneInput.addEventListener('input', () => {
+            phoneInput.value = phoneInput.value.replace(/[^0-9]/g, '').slice(0, 10);
+        });
+    })();
+</script>
 
 <!-- Keep modal outside the sticky cart panel so its backdrop stays behind the dialog. -->
 <div class="modal fade" id="posPaymentModal" tabindex="-1" aria-labelledby="posPaymentModalTitle" aria-hidden="true" data-bs-backdrop="true" data-bs-keyboard="true">

@@ -100,8 +100,22 @@ public class HomeController : Controller
         }
     }
 
-    public IActionResult Index()
+    public async Task<IActionResult> Index()
     {
+        var userIdText = HttpContext.Session.GetString("UserId");
+        if (uint.TryParse(userIdText, out var userId))
+        {
+            var roleCode = await _db.Users.Where(u => u.UserId == userId)
+                .Select(u => u.Role.RoleCode).FirstOrDefaultAsync();
+            return roleCode switch
+            {
+                "ACCOUNTING" => RedirectToAction("Index", "Accounting"),
+                "SALES_STAFF" => RedirectToAction("Index", "SalesStaff"),
+                "COURT_STAFF" => RedirectToAction("Index", "CourtStaff"),
+                "ADMIN" => RedirectToAction("Admin", "Home"),
+                _ => RedirectToAction(nameof(Customer))
+            };
+        }
         return RedirectToAction(nameof(Customer));
     }
 
@@ -110,9 +124,24 @@ public class HomeController : Controller
         return View();
     }
 
-    public async Task<IActionResult> Customer(string? date, string? section, string? showpromo)
+    public async Task<IActionResult> Customer(string? date, string? section, string? showpromo, string? code)
     {
+        if (uint.TryParse(HttpContext.Session.GetString("UserId"), out var signedInUserId))
+        {
+            var roleCode = await _db.Users.Where(u => u.UserId == signedInUserId)
+                .Select(u => u.Role.RoleCode).FirstOrDefaultAsync();
+            var roleHome = roleCode switch
+            {
+                "ACCOUNTING" => Url.Action("Index", "Accounting"),
+                "SALES_STAFF" => Url.Action("Index", "SalesStaff"),
+                "COURT_STAFF" => Url.Action("Index", "CourtStaff"),
+                "ADMIN" => Url.Action("Admin", "Home"),
+                _ => null
+            };
+            if (roleHome != null) return Redirect(roleHome);
+        }
         ViewBag.ShowPromoPopup = showpromo == "1";
+        ViewBag.TrackingCode = code?.Trim();
         // Set section-specific title
         string sectionLower = section?.ToLower()?.Trim() ?? "";
         ViewBag.Section = sectionLower;
@@ -125,11 +154,10 @@ public class HomeController : Controller
             _            => "หน้าหลัก - ระบบจองและซื้ออุปกรณ์"
         };
         var today = DateOnly.FromDateTime(DateTime.Today);
-        var selectedDate = DateOnly.TryParseExact(date?.Trim(), "yyyy-MM-dd",
-                System.Globalization.CultureInfo.InvariantCulture,
-                System.Globalization.DateTimeStyles.None, out var requestedDate) && requestedDate >= today
-            ? requestedDate.ToString("yyyy-MM-dd")
-            : today.ToString("yyyy-MM-dd");
+        var lastBookableDate = today.AddDays(7);
+        var selectedDate = DateFormatHelper.TryParseIsoDate(date, out var requestedDate) && requestedDate >= today && requestedDate <= lastBookableDate
+            ? DateFormatHelper.ToIsoDate(requestedDate)
+            : DateFormatHelper.ToIsoDate(today);
         ViewBag.SelectedDate = selectedDate;
 
         try
@@ -157,8 +185,9 @@ public class HomeController : Controller
 
             string? customerId = HttpContext.Session.GetString("UserId");
             ViewBag.IsFirstCourtBooking = uint.TryParse(customerId, out var customerUid) &&
-                !await _db.BookingSlots.AnyAsync(bs => bs.Booking.UserId == customerUid &&
-                    bs.Booking.Status != "CANCELLED" && bs.Booking.Status != "REJECTED" && bs.Booking.Status != "EXPIRED");
+                !await _db.Bookings.AnyAsync(b => b.UserId == customerUid &&
+                    (b.Status == "CONFIRMED" || b.Status == "CHECKED_IN" || b.Status == "COMPLETED" ||
+                     b.Payments.Any(p => p.Status == "APPROVED" || p.Status == "PAID")));
 
             // ดึงรายการสินค้าและอุปกรณ์สำหรับซื้อ/เช่าจากฐานข้อมูล
             var products = await _db.Products
@@ -170,7 +199,7 @@ public class HomeController : Controller
             ViewBag.Products = products;
 
             var bookedSlotKeys = new HashSet<string>();
-            if (DateOnly.TryParse(selectedDate, out DateOnly targetDate))
+            if (DateFormatHelper.TryParseIsoDate(selectedDate, out DateOnly targetDate))
             {
                 var booked = await _db.BookingSlots
                                       .Include(bs => bs.Booking)
@@ -183,7 +212,7 @@ public class HomeController : Controller
             ViewBag.BookedSlots = bookedSlotKeys;
 
             // ตรวจสอบข้อมูลผู้ใช้งานที่ล็อกอิน
-            string? loggedInUidStr = HttpContext.Session.GetString("UserId") ?? Request.Cookies["cb_user_id"];
+            string? loggedInUidStr = HttpContext.Session.GetString("UserId");
             if (!string.IsNullOrEmpty(loggedInUidStr) && uint.TryParse(loggedInUidStr, out uint currentUid))
             {
                 var currentUser = await _db.Users.FindAsync(currentUid);
@@ -221,7 +250,7 @@ public class HomeController : Controller
                     {
                         BookingId = b.BookingId,
                         BookingCode = b.BookingCode,
-                        PlayDate = b.PlayDate.ToString("yyyy-MM-dd"),
+                        PlayDate = DateFormatHelper.ToIsoDate(b.PlayDate),
                         CustomerName = b.User?.FullName ?? "คุณลูกค้า",
                         CustomerPhone = b.User?.Phone ?? "-",
                         CourtAmount = b.CourtAmount,
@@ -327,6 +356,8 @@ public class HomeController : Controller
             }
             if (targetPlayDate < DateOnly.FromDateTime(DateTime.Today))
                 return Json(new { success = false, message = "วันที่เลือกผ่านไปแล้ว ไม่สามารถจองย้อนหลังได้ กรุณาเลือกวันนี้หรือวันถัดไป" });
+            if (targetPlayDate > DateOnly.FromDateTime(DateTime.Today).AddDays(7))
+                return Json(new { success = false, message = "จองล่วงหน้าได้ไม่เกิน 7 วัน กรุณาเลือกวันที่ภายในช่วงที่กำหนด" });
 
             // 1. ตรวจสอบสิทธิ์ผู้ใช้งาน (Guest ไม่สามารถจองหรือชำระเงินได้ ต้องเข้าสู่ระบบด้วยบัญชี Customer ก่อน)
             string? loggedInUidStr = HttpContext.Session.GetString("UserId");
@@ -478,6 +509,8 @@ public class HomeController : Controller
 
             var activePromotions = await _db.Promotions.Include(p => p.PromotionRules)
                 .Where(p => p.IsActive == true && (p.StartDate == null || p.StartDate <= targetPlayDate) && (p.EndDate == null || p.EndDate >= targetPlayDate))
+                .OrderByDescending(p => p.UpdatedAt)
+                .ThenByDescending(p => p.PromotionId)
                 .ToListAsync();
             Promotion? GetPromotion(string type) => activePromotions.FirstOrDefault(p => p.PromoType == type);
             var appliedPromotionAmounts = new List<(Promotion Promotion, decimal Amount)>();
@@ -487,10 +520,14 @@ public class HomeController : Controller
 
             // --- โปรโมชั่นที่ 1: Time-based Court Discount ---
             var timePromotion = GetPromotion("TIME_BASED");
-            var dayOfWeek = targetPlayDate.DayOfWeek;
-            bool isWeekday = dayOfWeek >= DayOfWeek.Monday && dayOfWeek <= DayOfWeek.Friday;
+            var timePromoDays = (timePromotion?.ActiveDays ?? "1,2,3,4,5")
+                .Split(',', StringSplitOptions.RemoveEmptyEntries)
+                .Select(value => int.TryParse(value, out var day) ? day : -1)
+                .Where(day => day >= 0 && day <= 6)
+                .ToHashSet();
+            bool isPromoDay = timePromoDays.Contains((int)targetPlayDate.DayOfWeek);
             decimal courtDiscount = 0m;
-            if (timePromotion != null && CanApplyPromotion(timePromotion) && isWeekday && timePromotion.TimeStart.HasValue && timePromotion.TimeEnd.HasValue)
+            if (timePromotion != null && CanApplyPromotion(timePromotion) && isPromoDay && timePromotion.TimeStart.HasValue && timePromotion.TimeEnd.HasValue)
             {
                 foreach (var s in slotsList)
                 {
@@ -560,11 +597,12 @@ public class HomeController : Controller
                 appliedPromoNames.Add($"{crossPromotion.PromoName} (รับฟรี {freeQty} ชิ้น มูลค่า {freeItemDiscount:N2} ฿)");
             }
 
-            // --- โปรโมชั่นที่ 5: Total Bill Discount (ยอดรวม >= 600 บาท ลดท้ายบิล 100 บาท) ---
+            // --- Promotion 5: first successful booking; account registration date is not used. ---
             decimal currentSubtotal = (courtAmount + saleAmount + rentalAmount) - totalDiscounts;
             var totalBillPromotion = GetPromotion("TOTAL_BILL");
-            bool isFirstBooking = !await _db.BookingSlots.AnyAsync(bs => bs.Booking.UserId == user.UserId &&
-                bs.Booking.Status != "CANCELLED" && bs.Booking.Status != "REJECTED" && bs.Booking.Status != "EXPIRED");
+            bool isFirstBooking = !await _db.Bookings.AnyAsync(b => b.UserId == user.UserId &&
+                (b.Status == "CONFIRMED" || b.Status == "CHECKED_IN" || b.Status == "COMPLETED" ||
+                 b.Payments.Any(p => p.Status == "APPROVED" || p.Status == "PAID")));
             decimal minimumBill = totalBillPromotion?.MinBillAmount ?? 600m;
             bool promoCodeMatch = string.IsNullOrWhiteSpace(promoCode) ||
                 promoCode.Trim().Equals(totalBillPromotion?.PromoCode, StringComparison.OrdinalIgnoreCase) ||
@@ -745,10 +783,13 @@ public class HomeController : Controller
             return Json(new { success = false, message = $"ไม่พบข้อมูลการจองสำหรับ '{code}'" });
         }
 
-        if (!uint.TryParse(HttpContext.Session.GetString("UserId"), out var trackingUserId) || b.UserId != trackingUserId)
-            return Json(new { success = false, requireLogin = true, message = "กรุณาเข้าสู่ระบบด้วยบัญชีเจ้าของรายการเพื่อดูรายละเอียดและสถานะ" });
+        bool isOwner = uint.TryParse(HttpContext.Session.GetString("UserId"), out var trackingUserId)
+            && b.UserId == trackingUserId;
+        bool searchedByBookingCode = string.Equals(b.BookingCode, searchStr, StringComparison.OrdinalIgnoreCase);
+        if (!isOwner && !searchedByBookingCode)
+            return Json(new { success = false, requireLogin = true, message = "ค้นหาด้วยเบอร์โทรศัพท์ได้เมื่อเข้าสู่ระบบบัญชีเจ้าของรายการเท่านั้น กรุณาใช้รหัสการจองหรือเข้าสู่ระบบ" });
 
-        int step = 1; // 1: ยื่นจอง, 2: แนบสลิป, 3: บัญชียืนยัน, 4: เช็คอินเข้าสนาม
+        int step = 2; // 1: จองแล้ว, 2: รอชำระ, 3: รอตรวจสอบ, 4: สำเร็จ
         bool hasCourtBooking = b.BookingSlots.Any();
         string statusText = "รอชำระเงิน";
         string badgeClass = "bg-warning text-dark";
@@ -756,12 +797,12 @@ public class HomeController : Controller
         switch (b.Status?.ToUpper())
         {
             case "PENDING_VERIFY":
-                step = 2;
+                step = 3;
                 statusText = "รอฝ่ายบัญชีตรวจสอบสลิป";
                 badgeClass = "bg-warning text-dark";
                 break;
             case "CONFIRMED":
-                step = 3;
+                step = 4;
                 statusText = hasCourtBooking
                     ? "อนุมัติการชำระเงินแล้ว (ยืนยันคิวสนามเรียบร้อย)"
                     : "อนุมัติการชำระเงินแล้ว (รอรับสินค้า/อุปกรณ์)";
@@ -783,7 +824,7 @@ public class HomeController : Controller
                 badgeClass = "bg-danger text-white";
                 break;
             default:
-                step = 1;
+                step = 2;
                 statusText = "รอชำระเงิน/แนบสลิป";
                 badgeClass = "bg-info text-dark";
                 break;
@@ -791,8 +832,22 @@ public class HomeController : Controller
 
         var latestPayment = b.Payments.OrderByDescending(p => p.PaymentId).FirstOrDefault();
 
-        // Privacy masking: ถ้าผู้ค้นหาไม่ใช่เจ้าของการจอง จะปิดบังข้อมูลส่วนตัว
-        bool isOwner = true;
+        // ผู้ไม่ใช่เจ้าของเห็นได้เฉพาะสถานะจากรหัสการจอง ไม่ส่งข้อมูลส่วนตัวหรือข้อมูลการชำระเงินกลับไป
+        if (!isOwner)
+        {
+            return Json(new
+            {
+                success = true,
+                isOwner = false,
+                bookingCode = b.BookingCode,
+                playDate = b.PlayDate.ToString("dd/MM/yyyy"),
+                hasCourtBooking,
+                statusText,
+                badgeClass,
+                step,
+                createdAt = b.CreatedAt.ToString("dd/MM/yyyy HH:mm")
+            });
+        }
 
         string displayName = b.User?.FullName ?? "คุณลูกค้า";
         string displayPhone = b.User?.Phone ?? "-";

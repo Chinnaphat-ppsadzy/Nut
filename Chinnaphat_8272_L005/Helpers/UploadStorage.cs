@@ -21,4 +21,10 @@ public static class UploadStorage
         var legacyDirectory = Path.Combine(environment.WebRootPath, "uploads", "slips");
         return Path.Combine(legacyDirectory, fileName);
     }
+
+    public static string GetDamageDirectory(IWebHostEnvironment environment) =>
+        Path.Combine(environment.ContentRootPath, "App_Data", "uploads", "damages");
+
+    public static string GetDamagePath(IWebHostEnvironment environment, string fileName) =>
+        Path.Combine(GetDamageDirectory(environment), Path.GetFileName(fileName));
 }

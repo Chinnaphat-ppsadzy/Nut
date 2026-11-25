@@ -49,22 +49,6 @@
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
         }
 
-        /* Ambient glow for lights & fan indicator */
-        .glow-light {
-            box-shadow: 0 0 12px rgba(234, 179, 8, 0.6);
-        }
-        .glow-fan {
-            box-shadow: 0 0 12px rgba(59, 130, 246, 0.6);
-        }
-
-        /* Pulse animation */
-        @@keyframes spin-fan {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
-        }
-        .fan-spinning {
-            animation: spin-fan 1.5s linear infinite;
-        }
     </style>
 </head>
 <body>
@@ -94,8 +78,8 @@
             <div class="collapse navbar-collapse" id="supervisorNav">
                 @{
                     string action = ViewContext.RouteData.Values["action"]?.ToString() ?? "";
-                    string? rawName = Context.Session.GetString("FullName") ?? Context.Request.Cookies["cb_user_name"];
-                    string supervisorName = !string.IsNullOrEmpty(rawName) ? System.Net.WebUtility.UrlDecode(rawName) : "เจ้าหน้าที่ดูแลคอร์ท";
+                    string? rawName = Context.Session.GetString("FullName");
+                    string supervisorName = !string.IsNullOrEmpty(rawName) ? rawName : "เจ้าหน้าที่ดูแลคอร์ท";
                 }
                 <ul class="navbar-nav me-auto mb-2 mb-lg-0 ms-lg-3 gap-1">
                     <li class="nav-item">

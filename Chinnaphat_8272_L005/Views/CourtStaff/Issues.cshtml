@@ -38,10 +38,8 @@
                         </label>
                         <select class="form-select mb-2" onchange="if(this.value){document.getElementById('issueDesc').value=this.value;}">
                             <option value="">-- เลือกข้อความรวดเร็ว --</option>
-                            <option value="หลอดไฟ LED ส่องสว่างบนคอร์ทดับ 1 แผง (มุมทิศเหนือ) รบกวนการเล่น">หลอดไฟ LED ดับ 1 แผง</option>
                             <option value="ตาข่ายแบดมินตันชำรุด เชือกขึงขาด เสาตาข่ายเอียง">ตาข่ายแบดมินตันชำรุด</option>
                             <option value="พื้นยาง BWF มีรอยปริแตกหรือหลุดลอก อาจทำให้ลูกค้าสะดุดล้ม">พื้นยางมีรอยปริแตก</option>
-                            <option value="พัดลมระบายอากาศบนเพดานมีเสียงดังผิดปกติและไม่หมุน">พัดลมระบายอากาศไม่หมุน</option>
                             <option value="เก้าอี้พักนักกีฬา / สกอร์บอร์ดประจำสนามชำรุดเสียหาย">เก้าอี้พัก/สกอร์บอร์ดชำรุด</option>
                         </select>
                     </div>
@@ -50,7 +48,7 @@
                         <label class="form-label fw-bold small text-secondary">
                             รายละเอียดปัญหา / อาการที่พบ <span class="text-danger">*</span>
                         </label>
-                        <textarea name="description" id="issueDesc" class="form-control" rows="4" placeholder="ระบุรายละเอียด เช่น หลอดไฟ LED ช่อง 3 กระพริบดับ, เสาเน็ตหลวม..." required></textarea>
+                        <textarea name="description" id="issueDesc" class="form-control" rows="4" placeholder="ระบุรายละเอียดปัญหา เช่น เสาเน็ตหลวม หรือพื้นสนามชำรุด..." required></textarea>
                     </div>
 
                     <button type="submit" class="btn btn-success w-100 py-2 fw-bold" style="border-radius:10px; background:linear-gradient(135deg, #1a472a, #2d6a4f); border:none;">

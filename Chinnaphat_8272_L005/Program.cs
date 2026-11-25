@@ -2,6 +2,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
 using Chinnaphat_8272_L005.Models;
 using Chinnaphat_8272_L005.Database;
+using System.Globalization;
+using Microsoft.AspNetCore.Localization;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
@@ -9,9 +11,12 @@ builder.Services.AddControllersWithViews();
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession(options =>
 {
-    options.IdleTimeout = TimeSpan.FromHours(8);
+    options.IdleTimeout = TimeSpan.FromHours(2);
+    options.Cookie.Name = "CourtBook.Session";
     options.Cookie.HttpOnly = true;
     options.Cookie.IsEssential = true;
+    options.Cookie.SameSite = SameSiteMode.Lax;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
 });
 
 builder.Services.AddDbContext<Csi402dbContext>(
@@ -22,6 +27,14 @@ builder.Services.AddDbContext<Csi402dbContext>(
 );
 
 var app = builder.Build();
+
+var thaiCulture = CultureInfo.GetCultureInfo("th-TH");
+app.UseRequestLocalization(new RequestLocalizationOptions
+{
+    DefaultRequestCulture = new RequestCulture(thaiCulture),
+    SupportedCultures = new[] { thaiCulture },
+    SupportedUICultures = new[] { thaiCulture }
+});
 
 if (app.Environment.IsDevelopment())
 {
@@ -34,6 +47,45 @@ if (app.Environment.IsDevelopment())
     catch (Exception ex)
     {
         app.Logger.LogError(ex, "Could not prepare the Walk-in payment columns. Apply Database/WalkInPayments.sql to the configured database.");
+    }
+}
+
+using (var promoSchemaScope = app.Services.CreateScope())
+{
+    var db = promoSchemaScope.ServiceProvider.GetRequiredService<Csi402dbContext>();
+    try
+    {
+        await WalkInPaymentSchemaInitializer.EnsurePromotionDaysColumnAsync(db);
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "Could not prepare the active_days column for time-based promotions.");
+    }
+}
+
+using (var issueSchemaScope = app.Services.CreateScope())
+{
+    var db = issueSchemaScope.ServiceProvider.GetRequiredService<Csi402dbContext>();
+    try
+    {
+        await WalkInPaymentSchemaInitializer.EnsureCourtIssueBlockColumnAsync(db);
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "Could not prepare the court issue maintenance block column.");
+    }
+}
+
+using (var rentalRefundSchemaScope = app.Services.CreateScope())
+{
+    var db = rentalRefundSchemaScope.ServiceProvider.GetRequiredService<Csi402dbContext>();
+    try
+    {
+        await WalkInPaymentSchemaInitializer.EnsureRentalDepositRefundTableAsync(db);
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "Could not prepare the rental deposit refund request table.");
     }
 }
 
@@ -77,7 +129,7 @@ app.MapStaticAssets();
 
 app.MapControllerRoute(
     name: "default",
-    pattern: "{controller=Home}/{action=Customer}/{id?}")
+    pattern: "{controller=Home}/{action=Index}/{id?}")
     .WithStaticAssets();
 
 

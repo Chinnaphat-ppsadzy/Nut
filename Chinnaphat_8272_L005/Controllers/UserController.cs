@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Http;
 using System.Net;
 using Chinnaphat_8272_L005.Helpers;
+using Chinnaphat_8272_L005.Database;
 
 namespace Chinnaphat_8272_L005.Controllers
 {
@@ -65,48 +66,19 @@ namespace Chinnaphat_8272_L005.Controllers
                 user.LastLoginAt = DateTime.Now;
                 _db.SaveChanges();
 
-                // เก็บข้อมูลผู้ใช้ที่ล็อกอินผ่าน Session และ Cookies
-                try
-                {
-                    HttpContext.Session.SetString("UserId", user.UserId.ToString());
-                    HttpContext.Session.SetString("FullName", user.FullName);
-                    HttpContext.Session.SetString("Email", user.Email);
-                    HttpContext.Session.SetString("RoleCode", roleCode);
-                    HttpContext.Session.SetString("RoleName", userRole?.RoleName ?? roleCode);
-                    if (!string.IsNullOrEmpty(user.Phone))
-                    {
-                        HttpContext.Session.SetString("Phone", user.Phone);
-                    }
-                }
-                catch {}
-
-                var cookieOptions = new CookieOptions
-                {
-                    Expires = model.RememberMe ? DateTimeOffset.Now.AddDays(30) : DateTimeOffset.Now.AddHours(24),
-                    HttpOnly = false,
-                    IsEssential = true,
-                    SameSite = SameSiteMode.Lax
-                };
-                Response.Cookies.Append("cb_user_id", user.UserId.ToString(), cookieOptions);
-                Response.Cookies.Append("cb_user_name", WebUtility.UrlEncode(user.FullName), cookieOptions);
-                Response.Cookies.Append("cb_email", user.Email, cookieOptions);
-                Response.Cookies.Append("cb_role_code", roleCode, cookieOptions);
-                Response.Cookies.Append("cb_role_name", WebUtility.UrlEncode(userRole?.RoleName ?? roleCode), cookieOptions);
+                // ล้าง Session เดิมก่อนเริ่มการเข้าสู่ระบบครั้งใหม่
+                HttpContext.Session.Clear();
+                HttpContext.Session.SetString("UserId", user.UserId.ToString());
+                HttpContext.Session.SetString("FullName", user.FullName);
+                HttpContext.Session.SetString("Email", user.Email);
+                HttpContext.Session.SetString("RoleCode", roleCode);
+                HttpContext.Session.SetString("RoleName", userRole?.RoleName ?? roleCode);
                 if (!string.IsNullOrEmpty(user.Phone))
                 {
-                    Response.Cookies.Append("cb_phone", user.Phone, cookieOptions);
+                    HttpContext.Session.SetString("Phone", user.Phone);
                 }
 
-                // เก็บข้อมูลผู้ใช้ที่ล็อกอินผ่าน TempData
-                TempData["IsLoggedIn"]  = true;
-                TempData["UserId"]      = user.UserId.ToString();
-                TempData["Username"]    = user.Email;
-                TempData["FullName"]    = user.FullName;
-                TempData["Email"]       = user.Email;
-                TempData["RoleCode"]    = roleCode;
-                TempData["RoleName"]    = userRole?.RoleName ?? roleCode;
-                TempData["LoginTime"]   = DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss");
-                TempData["RememberMe"]  = model.RememberMe;
+                ClearLegacyIdentityCookies();
 
                 TempData["SuccessMessage"] =
                     $"เข้าสู่ระบบสำเร็จ! ยินดีต้อนรับ {user.FullName} ({userRole?.RoleName ?? roleCode})";
@@ -413,7 +385,7 @@ namespace Chinnaphat_8272_L005.Controllers
             try
             {
                 // ตรวจสอบห้ามลบบัญชีที่กำลังล็อกอินอยู่
-                string? currentUidStr = HttpContext.Session.GetString("UserId") ?? Request.Cookies["cb_user_id"];
+                string? currentUidStr = HttpContext.Session.GetString("UserId");
                 if (uint.TryParse(currentUidStr, out uint currentUid) && currentUid == (uint)id)
                 {
                     TempData["ErrorMessage"] = "ไม่สามารถลบบัญชีของตนเองที่กำลังเข้าสู่ระบบอยู่ได้";
@@ -682,29 +654,19 @@ namespace Chinnaphat_8272_L005.Controllers
             TempData.Remove("RoleName");
             TempData.Clear();
 
-            // ล้างคุกกี้ทั้งหมดพร้อมระบุ Path = "/"
-            var deleteOptions = new CookieOptions
-            {
-                Expires = DateTimeOffset.Now.AddDays(-1),
-                Path = "/"
-            };
-
-            Response.Cookies.Delete("cb_user_id", deleteOptions);
-            Response.Cookies.Delete("cb_user_name", deleteOptions);
-            Response.Cookies.Delete("cb_email", deleteOptions);
-            Response.Cookies.Delete("cb_role_code", deleteOptions);
-            Response.Cookies.Delete("cb_role_name", deleteOptions);
-            Response.Cookies.Delete("cb_phone", deleteOptions);
-
-            Response.Cookies.Delete("cb_user_id");
-            Response.Cookies.Delete("cb_user_name");
-            Response.Cookies.Delete("cb_email");
-            Response.Cookies.Delete("cb_role_code");
-            Response.Cookies.Delete("cb_role_name");
-            Response.Cookies.Delete("cb_phone");
+            ClearLegacyIdentityCookies();
 
             TempData["SuccessMessage"] = "ออกจากระบบเรียบร้อยแล้ว เข้าสู่โหมดผู้เยี่ยมชม (Guest)";
             return RedirectToAction("Customer", "Home");
+        }
+
+        private void ClearLegacyIdentityCookies()
+        {
+            var options = new CookieOptions { Path = "/", Secure = Request.IsHttps, SameSite = SameSiteMode.Lax };
+            foreach (var name in new[] { "cb_user_id", "cb_user_name", "cb_email", "cb_role_code", "cb_role_name", "cb_phone" })
+            {
+                Response.Cookies.Delete(name, options);
+            }
         }
 
         // ============================================================
@@ -714,9 +676,10 @@ namespace Chinnaphat_8272_L005.Controllers
         public async Task<IActionResult> Profile()
         {
             ViewData["Title"] = "โปรไฟล์ของฉัน & ประวัติการใช้งาน";
+            await BookingRefundSchemaInitializer.EnsureAsync(_db);
 
-            // 1. ตรวจสอบ User ID จาก Session หรือ Cookies
-            string? uidStr = HttpContext.Session.GetString("UserId") ?? Request.Cookies["cb_user_id"];
+            // ตรวจสอบ User ID จาก Session เท่านั้น
+            string? uidStr = HttpContext.Session.GetString("UserId");
             uint targetUid = 0;
             if (!string.IsNullOrEmpty(uidStr))
             {
@@ -727,15 +690,6 @@ namespace Chinnaphat_8272_L005.Controllers
             if (targetUid > 0)
             {
                 user = await _db.Users.Include(u => u.Role).FirstOrDefaultAsync(u => u.UserId == targetUid);
-            }
-
-            if (user == null)
-            {
-                var cookieEmail = Request.Cookies["cb_email"];
-                if (!string.IsNullOrEmpty(cookieEmail))
-                {
-                    user = await _db.Users.Include(u => u.Role).FirstOrDefaultAsync(u => u.Email == cookieEmail);
-                }
             }
 
             if (user == null)
@@ -763,14 +717,19 @@ namespace Chinnaphat_8272_L005.Controllers
                 .Include(b => b.BookingSlots).ThenInclude(bs => bs.Slot)
                 .Include(b => b.BookingItems).ThenInclude(bi => bi.Product).ThenInclude(p => p.Category)
                 .Include(b => b.Payments)
+                .Include(b => b.Receipts)
                 .OrderByDescending(b => b.CreatedAt)
                 .ToListAsync();
+            var refundRequests = await _db.BookingRefundRequests
+                .Where(r => r.CustomerUserId == user.UserId)
+                .OrderByDescending(r => r.CreatedAt).ToListAsync();
 
             model.TotalBookingsCount = bookings.Count;
             model.TotalSpending = bookings.Sum(b => b.NetAmount);
 
             foreach (var b in bookings)
             {
+                var latestReceipt = b.Receipts.OrderByDescending(r => r.IssuedAt).FirstOrDefault();
                 var cNames = string.Join(", ", b.BookingSlots.Select(s => s.Court?.CourtName ?? $"Court {s.CourtId}").Distinct());
                 var tSlots = string.Join(", ", b.BookingSlots.Select(s => s.Slot != null ? $"{s.Slot.StartTime:HH:mm}-{s.Slot.EndTime:HH:mm}" : $"Slot {s.SlotId}"));
 
@@ -815,6 +774,18 @@ namespace Chinnaphat_8272_L005.Controllers
                     StatusBadgeClass = sBadge,
                     SlipImageUrl = b.Payments.Any(p => !string.IsNullOrEmpty(p.SlipImageUrl))
                         ? Url.Action("ViewSlip", "Home", new { bookingCode = b.BookingCode }) : null,
+                    TaxInvoiceUrl = b.Receipts
+                        .Where(r => r.DocType == "TAX_INVOICE")
+                        .OrderByDescending(r => r.IssuedAt)
+                        .Select(r => Url.Action(nameof(PrintTaxInvoice), "User", new { id = r.ReceiptId }))
+                        .FirstOrDefault(),
+                    TaxInvoiceNo = b.Receipts
+                        .Where(r => r.DocType == "TAX_INVOICE")
+                        .OrderByDescending(r => r.IssuedAt)
+                        .Select(r => r.ReceiptNo)
+                        .FirstOrDefault(),
+                    ReceiptId = latestReceipt?.ReceiptId,
+                    HasTaxInvoice = latestReceipt?.DocType == "TAX_INVOICE",
                     CreatedAt = b.CreatedAt
                 });
 
@@ -862,13 +833,161 @@ namespace Chinnaphat_8272_L005.Controllers
                             UnitPrice = itm.UnitPrice,
                             LineTotal = itm.LineTotal,
                             ItemStatus = itm.ItemStatus,
-                            OrderDate = b.CreatedAt
+                            ItemStatusText = GetPurchaseStatusText(b.Status ?? string.Empty, itm.ItemStatus),
+                            ItemStatusBadgeClass = GetPurchaseStatusBadge(b.Status ?? string.Empty, itm.ItemStatus),
+                            OrderDate = b.CreatedAt,
+                            CanRequestRefund = itm.ItemType == "SALE" && itm.LineTotal > 0
+                                && (itm.ItemStatus is "HANDED_OVER" or "DELIVERED")
+                                && b.Payments.Any(p => p.Status is "APPROVED" or "PAID")
+                                && b.Payments.Where(p => p.Status is "APPROVED" or "PAID").Sum(p => p.Amount) >= itm.LineTotal
+                                && b.Status is not ("CANCELLED" or "REJECTED" or "EXPIRED"),
+                            RefundRequestId = refundRequests.FirstOrDefault(r => r.BookingItemId == itm.BookingItemId)?.RequestId,
+                            RefundRequestStatus = refundRequests.FirstOrDefault(r => r.BookingItemId == itm.BookingItemId)?.Status,
+                            RefundRequestReason = refundRequests.FirstOrDefault(r => r.BookingItemId == itm.BookingItemId)?.Reason,
+                            RefundRequestReviewNote = refundRequests.FirstOrDefault(r => r.BookingItemId == itm.BookingItemId)?.AccountingNote
+                                ?? refundRequests.FirstOrDefault(r => r.BookingItemId == itm.BookingItemId)?.SalesNote
                         });
                     }
                 }
             }
 
             return View(model);
+        }
+
+        private static string GetPurchaseStatusText(string bookingStatus, string itemStatus)
+        {
+            if (bookingStatus == "PENDING_PAYMENT") return "รอชำระเงิน";
+            if (bookingStatus == "PENDING_VERIFY") return "รอบัญชีตรวจสอบการชำระ";
+            if (bookingStatus is "REJECTED" or "SLIP_REJECTED") return "การชำระเงินไม่ผ่าน";
+            if (bookingStatus is "CANCELLED" or "EXPIRED") return "ยกเลิกรายการ";
+            if (itemStatus is "HANDED_OVER" or "DELIVERED") return "ส่งมอบสำเร็จ";
+            if (bookingStatus is "CONFIRMED" or "CHECKED_IN" or "COMPLETED") return "ชำระแล้ว · รอฝ่ายขายส่งมอบสินค้า";
+            return "กำลังดำเนินการ";
+        }
+
+        private static string GetPurchaseStatusBadge(string bookingStatus, string itemStatus)
+        {
+            if (itemStatus is "HANDED_OVER" or "DELIVERED") return "bg-success bg-opacity-10 text-success border border-success";
+            if (bookingStatus == "PENDING_VERIFY") return "bg-warning-subtle text-warning-emphasis border border-warning";
+            if (bookingStatus is "REJECTED" or "SLIP_REJECTED" or "CANCELLED" or "EXPIRED") return "bg-danger-subtle text-danger border border-danger";
+            if (bookingStatus == "PENDING_PAYMENT") return "bg-secondary bg-opacity-10 text-secondary border";
+            if (bookingStatus is "CONFIRMED" or "CHECKED_IN" or "COMPLETED") return "bg-info-subtle text-info-emphasis border border-info";
+            return "bg-secondary bg-opacity-10 text-secondary border";
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> RequestBookingRefund(uint bookingItemId, string reason)
+        {
+            await BookingRefundSchemaInitializer.EnsureAsync(_db);
+            var rawId = HttpContext.Session.GetString("UserId");
+            if (!uint.TryParse(rawId, out var userId) || userId == 0) return RedirectToAction(nameof(Login));
+            reason = (reason ?? string.Empty).Trim();
+            if (reason.Length < 3 || reason.Length > 500)
+            {
+                TempData["ErrorMessage"] = "กรุณาระบุเหตุผลอย่างน้อย 3 ตัวอักษร (ไม่เกิน 500 ตัวอักษร)";
+                return RedirectToAction(nameof(Profile));
+            }
+
+            var item = await _db.BookingItems.Include(i => i.Booking).ThenInclude(b => b.Payments)
+                .FirstOrDefaultAsync(i => i.BookingItemId == bookingItemId && i.Booking.UserId == userId);
+            var booking = item?.Booking;
+            if (item == null || booking == null || item.ItemType != "SALE" || booking.Status is "CANCELLED" or "REJECTED" or "EXPIRED"
+                || item.ItemStatus is not ("HANDED_OVER" or "DELIVERED"))
+            {
+                TempData["ErrorMessage"] = "ขอคืนได้เฉพาะสินค้าที่ซื้อ ชำระแล้ว และฝ่ายขายส่งมอบให้แล้ว";
+                return RedirectToAction(nameof(Profile));
+            }
+            var paidTotal = booking.Payments.Where(p => p.Status is "APPROVED" or "PAID").Sum(p => p.Amount);
+            var amount = item.LineTotal;
+            var exists = await _db.BookingRefundRequests.AnyAsync(r => r.BookingItemId == bookingItemId && r.Status != "REJECTED");
+            if (amount <= 0 || paidTotal < amount || exists)
+            {
+                TempData["ErrorMessage"] = "สินค้านี้ไม่มีการชำระที่คืนได้ หรือมีคำขอคืนเงินอยู่แล้ว";
+                return RedirectToAction(nameof(Profile));
+            }
+
+            _db.BookingRefundRequests.Add(new BookingRefundRequest
+            {
+                BookingId = booking.BookingId, BookingItemId = item.BookingItemId, CustomerUserId = userId, ReferenceCode = booking.BookingCode,
+                ProductName = item.Product?.ProductName, ProductQuantity = item.Quantity,
+                CustomerName = (await _db.Users.Where(u => u.UserId == userId).Select(u => u.FullName).FirstAsync()),
+                CustomerPhone = await _db.Users.Where(u => u.UserId == userId).Select(u => u.Phone).FirstOrDefaultAsync(),
+                ServiceDate = booking.PlayDate, Amount = amount, Reason = reason, Status = "PENDING_SALES", CreatedAt = DateTime.Now
+            });
+            await _db.SaveChangesAsync();
+            TempData["SuccessMessage"] = "ส่งคำขอคืนสินค้าแล้ว ฝ่ายขายจะตรวจรับสินค้าก่อนส่งให้ฝ่ายบัญชี";
+            return RedirectToAction(nameof(Profile));
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> PrintTaxInvoice(uint id)
+        {
+            string? uidStr = HttpContext.Session.GetString("UserId");
+            if (!uint.TryParse(uidStr, out var userId) || userId == 0)
+            {
+                return RedirectToAction(nameof(Login));
+            }
+
+            var receipt = await _db.Receipts
+                .Include(r => r.Booking).ThenInclude(b => b.User)
+                .Include(r => r.Booking).ThenInclude(b => b.BookingSlots).ThenInclude(bs => bs.Court)
+                .Include(r => r.Booking).ThenInclude(b => b.BookingSlots).ThenInclude(bs => bs.Slot)
+                .Include(r => r.Booking).ThenInclude(b => b.BookingItems).ThenInclude(bi => bi.Product)
+                .Include(r => r.IssuedByNavigation)
+                .FirstOrDefaultAsync(r => r.ReceiptId == id && r.DocType == "TAX_INVOICE" && r.Booking.UserId == userId);
+
+            if (receipt == null)
+            {
+                return NotFound();
+            }
+
+            return View("~/Views/Accounting/PrintReceipt.cshtml", receipt);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> RequestTaxInvoice(uint receiptId, string companyName, string taxId, string address)
+        {
+            string? uidStr = HttpContext.Session.GetString("UserId");
+            if (!uint.TryParse(uidStr, out var userId) || userId == 0)
+            {
+                return RedirectToAction(nameof(Login));
+            }
+
+            var normalizedTaxId = new string((taxId ?? string.Empty).Where(char.IsAsciiDigit).ToArray());
+            if (string.IsNullOrWhiteSpace(companyName) || normalizedTaxId.Length != 13 || string.IsNullOrWhiteSpace(address))
+            {
+                TempData["ErrorMessage"] = "กรุณากรอกชื่อผู้เสียภาษี เลขประจำตัวผู้เสียภาษี 13 หลัก และที่อยู่ให้ครบถ้วน";
+                return RedirectToAction(nameof(Profile));
+            }
+
+            var receipt = await _db.Receipts
+                .Include(r => r.Booking)
+                .FirstOrDefaultAsync(r => r.ReceiptId == receiptId && r.Booking.UserId == userId);
+            if (receipt == null)
+            {
+                return NotFound();
+            }
+            if (receipt.DocType == "TAX_INVOICE")
+            {
+                TempData["ErrorMessage"] = "รายการนี้ออกใบกำกับภาษีแล้ว";
+                return RedirectToAction(nameof(Profile));
+            }
+
+            receipt.CustomerName = companyName.Trim();
+            receipt.TaxId = normalizedTaxId;
+            receipt.Address = address.Trim();
+            receipt.DocType = "TAX_INVOICE";
+            if (receipt.ReceiptNo.StartsWith("RC-", StringComparison.OrdinalIgnoreCase))
+            {
+                receipt.ReceiptNo = "TAX-" + receipt.ReceiptNo[3..];
+            }
+            receipt.IssuedAt = DateTime.Now;
+            await _db.SaveChangesAsync();
+
+            TempData["SuccessMessage"] = "ออกใบกำกับภาษีแล้ว สามารถดูและดาวน์โหลดได้จากประวัติการจอง";
+            return RedirectToAction(nameof(Profile));
         }
 
         // ============================================================
@@ -878,7 +997,7 @@ namespace Chinnaphat_8272_L005.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> UpdateProfile(string fullName, string phone)
         {
-            string? uidStr = HttpContext.Session.GetString("UserId") ?? Request.Cookies["cb_user_id"];
+            string? uidStr = HttpContext.Session.GetString("UserId");
             if (string.IsNullOrEmpty(uidStr) || !uint.TryParse(uidStr, out uint uid))
             {
                 return RedirectToAction("Login");
@@ -897,7 +1016,6 @@ namespace Chinnaphat_8272_L005.Controllers
                     HttpContext.Session.SetString("FullName", user.FullName);
                 }
                 catch {}
-                Response.Cookies.Append("cb_user_name", WebUtility.UrlEncode(user.FullName));
 
                 TempData["SuccessMessage"] = "อัปเดตข้อมูลส่วนตัวสำเร็จเรียบร้อย!";
             }

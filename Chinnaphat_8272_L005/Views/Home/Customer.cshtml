@@ -2,8 +2,8 @@
     ViewData["Title"] = "หน้าหลัก - จองสนามกีฬา";
     Layout = "_CustomerLayout";
 
-    string selectedDateStr = ViewBag.SelectedDate as string ?? DateTime.Today.ToString("yyyy-MM-dd");
-    DateTime selectedDate = DateTime.TryParse(selectedDateStr, out var pDate) ? pDate : DateTime.Today;
+    string selectedDateStr = ViewBag.SelectedDate as string ?? DateFormatHelper.ToIsoDate(DateTime.Today);
+    DateTime selectedDate = DateFormatHelper.TryParseIsoDate(selectedDateStr, out var pDate) ? pDate.ToDateTime(TimeOnly.MinValue) : DateTime.Today;
 
     var courts = ViewBag.Courts as List<Chinnaphat_8272_L005.Models.Court>;
     if (courts == null || !courts.Any())
@@ -43,10 +43,10 @@
     var myBookings = ViewBag.MyBookings as List<Chinnaphat_8272_L005.ViewModels.BookingTrackItem> ?? new();
     var bookedSlots = ViewBag.BookedSlots as HashSet<string> ?? new HashSet<string>();
 
-    string? userId = Context.Session.GetString("UserId") ?? Context.Request.Cookies["cb_user_id"];
-    string? rawUserName = ViewBag.CurrentUserName as string ?? Context.Session.GetString("FullName") ?? Context.Request.Cookies["cb_user_name"];
+    string? userId = Context.Session.GetString("UserId");
+    string? rawUserName = ViewBag.CurrentUserName as string ?? Context.Session.GetString("FullName");
     string? currentUserName = !string.IsNullOrEmpty(rawUserName) ? System.Net.WebUtility.UrlDecode(rawUserName) : null;
-    string? currentUserPhone = ViewBag.CurrentUserPhone as string ?? Context.Session.GetString("Phone") ?? Context.Request.Cookies["cb_phone"];
+    string? currentUserPhone = ViewBag.CurrentUserPhone as string ?? Context.Session.GetString("Phone");
     bool isLoggedIn = !string.IsNullOrEmpty(userId);
 }
 
@@ -346,6 +346,28 @@
         border-top-right-radius: 20px;
         padding: 1.5rem;
     }
+    .customer-promo-card {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 230px;
+        align-items: start;
+        gap: 1.25rem;
+        padding: 1rem 1.15rem;
+        border: 1px solid #dce5e2;
+        border-left: 4px solid #198754;
+        border-radius: 14px;
+        background: #fff;
+        box-shadow: 0 3px 10px rgba(20, 55, 40, .06);
+    }
+    .customer-promo-main { min-width: 0; }
+    .customer-promo-heading { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem .7rem; margin-bottom: .35rem; }
+    .customer-promo-description { margin: 0; color: #667085; line-height: 1.55; }
+    .customer-promo-side { display: flex; flex-direction: column; align-items: flex-end; gap: .45rem; text-align: right; }
+    .customer-promo-reward { min-width: 92px; text-align: center; font-weight: 700; }
+    .customer-promo-note { color: #667085; line-height: 1.4; }
+    @@media (max-width: 575.98px) {
+        .customer-promo-card { grid-template-columns: minmax(0, 1fr); gap: .75rem; }
+        .customer-promo-side { align-items: flex-start; text-align: left; }
+    }
 </style>
 
 @{
@@ -451,10 +473,6 @@
                 </div>
             </div>
         </div>
-        @if (!isLoggedIn)
-        {
-            <div class="alert alert-warning py-2 px-3 small mt-3 mb-0 rounded-3"><i class="bi bi-info-circle me-1"></i>เข้าสู่ระบบสมาชิกก่อนยืนยันการจองและชำระเงิน</div>
-        }
     </div>
 </section>
 
@@ -576,15 +594,7 @@
                         <h5 class="fw-bold mb-0 text-success">
                             <i class="bi bi-calendar3 me-2"></i>เลือกวันที่ต้องการจอง
                         </h5>
-                        <small class="text-muted">เลือกวันเพื่อดูตารางคอร์ทว่างแบบเรียลไทม์</small>
-                    </div>
-                    <div class="d-flex align-items-center gap-2">
-                        <label for="datePickerInput" class="small text-muted mb-0 fw-semibold">เลือกวัน:</label>
-                        <input type="date" id="datePickerInput" class="form-control form-control-sm"
-                               style="border-radius:8px; border:1.5px solid #cbd5e1; width:auto; cursor:pointer;"
-                               value="@selectedDate.ToString("yyyy-MM-dd")"
-                               min="@DateTime.Today.ToString("yyyy-MM-dd")"
-                               onchange="onDateInputChange(this.value)" />
+                        <small class="text-muted">เลือกวันเพื่อดูตารางคอร์ทว่างแบบเรียลไทม์ · จองล่วงหน้าได้ไม่เกิน 7 วัน</small>
                     </div>
                 </div>
 
@@ -594,13 +604,13 @@
                         string[] thaiDayNames = { "อา.", "จ.", "อ.", "พ.", "พฤ.", "ศ.", "ส." };
                         string[] thaiMonthNames = { "", "ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค." };
 
-                        for (int i = 0; i < 7; i++)
+                        for (int i = 0; i <= 7; i++)
                         {
                             var loopDate = DateTime.Today.AddDays(i);
                             bool isActive = loopDate.Date == selectedDate.Date;
                             string dayName = thaiDayNames[(int)loopDate.DayOfWeek];
                             string monthName = thaiMonthNames[loopDate.Month];
-                            string dateIso = loopDate.ToString("yyyy-MM-dd");
+                            string dateIso = DateFormatHelper.ToIsoDate(loopDate);
 
                             <div class="date-pill @(isActive ? "active" : "")"
                                  data-date="@dateIso"
@@ -989,13 +999,13 @@
                 </label>
                 <div class="input-group">
                     <span class="input-group-text bg-light border-end-0"><i class="bi bi-search text-muted"></i></span>
-                    <input type="text" id="trackSearchInput" class="form-control border-start-0" placeholder="เช่น BK-20261116-8842 หรือ 0812345678" onkeydown="if(event.key==='Enter')trackBookingLive()" />
+                    <input type="text" id="trackSearchInput" class="form-control border-start-0" value="@(ViewBag.TrackingCode as string ?? "")" placeholder="เช่น BK-20261116-8842 หรือ 0812345678" onkeydown="if(event.key==='Enter')trackBookingLive()" />
                     <button class="btn btn-primary px-4 fw-bold" type="button" onclick="trackBookingLive()">
                         <i class="bi bi-arrow-right-circle me-1"></i> ตรวจสอบสถานะ
                     </button>
                 </div>
                 <small class="text-muted mt-2 d-block">
-                    <i class="bi bi-info-circle me-1"></i>เพื่อปกป้องข้อมูลคำสั่งซื้อและสลิป กรุณาเข้าสู่ระบบบัญชีเจ้าของรายการก่อนติดตาม
+                    <i class="bi bi-info-circle me-1"></i>กรอกรหัสการจองเพื่อดูสถานะได้ทันที หากต้องการดูรายละเอียดหรือสลิป ให้เข้าสู่ระบบบัญชีเจ้าของรายการ
                 </small>
             </div>
 
@@ -1075,15 +1085,17 @@
                                         <th>ยอดชำระสุทธิ</th>
                                         <th>สถานะการจอง</th>
                                         <th>สลิปโอนเงิน</th>
-                                        <th class="text-end">รายละเอียด</th>
                                     </tr>
                                 </thead>
                                 <tbody id="myBookingsTableBody">
                                     @foreach (var b in myBookings)
                                     {
-                                        <tr id="row_@b.BookingCode">
+                                        <tr id="row_@b.BookingCode" data-created="@b.CreatedAt.Ticks">
                                             <td>
-                                                <strong class="font-monospace text-success">@b.BookingCode</strong>
+                                                <div class="d-flex align-items-center gap-1">
+                                                    <strong class="font-monospace text-success">@b.BookingCode</strong>
+                                                    <button type="button" class="btn btn-sm btn-outline-success py-0 px-1" data-booking-code="@b.BookingCode" onclick="copyCustomerBookingCode(this)" title="คัดลอกรหัสการจอง" aria-label="คัดลอกรหัสการจอง @b.BookingCode"><i class="bi bi-copy"></i></button>
+                                                </div>
                                                 <small class="text-muted d-block" style="font-size:0.75rem;">@b.CreatedAt.ToString("dd/MM HH:mm")</small>
                                             </td>
                                             <td>
@@ -1144,16 +1156,12 @@
                                                     </button>
                                                 }
                                             </td>
-                                            <td class="text-end">
-                                                <button type="button" class="btn btn-sm btn-light border px-2 py-1" style="border-radius:8px;" onclick="quickTrack('@b.BookingCode')">
-                                                    <i class="bi bi-eye me-1"></i> ติดตาม
-                                                </button>
-                                            </td>
                                         </tr>
                                     }
                                 </tbody>
                             </table>
                         </div>
+                        <div id="myBookingsPagination" class="d-flex justify-content-between align-items-center flex-wrap gap-2 px-3 py-2 border-top bg-light"></div>
                     }
                     else
                     {
@@ -1489,8 +1497,8 @@
             </div>
 
             <div class="d-flex gap-2 justify-content-center">
-                <button type="button" class="btn btn-outline-primary" data-bs-dismiss="modal" style="border-radius:10px;" onclick="scrollToTracking()">
-                    <i class="bi bi-clock-history me-1"></i> ดูสถานะการจองของฉัน
+                <button type="button" class="btn btn-outline-primary" style="border-radius:10px;" onclick="goToBookingStatus(document.getElementById('successBookingCode').innerText)">
+                    <i class="bi bi-clock-history me-1"></i> ดูสถานะรายการนี้
                 </button>
                 <button type="button" class="btn btn-success" data-bs-dismiss="modal" style="border-radius:10px; background:linear-gradient(135deg,#1a472a,#2d6a4f); border:none;" onclick="scrollToBooking()">
                     <i class="bi bi-calendar-plus me-1"></i> จองเวลาอื่นเพิ่ม
@@ -1579,17 +1587,23 @@
                             _ => $"สิทธิพิเศษ {promo.DiscountValue:N0}"
                         };
                         <div class="col-12">
-                            <div class="p-3 rounded-3 border bg-light d-flex justify-content-between align-items-center flex-wrap gap-2">
-                                <div>
-                                    <div class="d-flex align-items-center gap-2 mb-1">
+                            <div class="customer-promo-card">
+                                <div class="customer-promo-main">
+                                    <div class="customer-promo-heading">
                                         <h6 class="fw-bold mb-0 text-success">@promo.PromoName</h6>
-                                        <span class="badge bg-success-subtle text-success">เปิดใช้งาน</span>
+                                        <span class="badge bg-success-subtle text-success rounded-pill px-3 py-2"><i class="bi bi-check-circle me-1"></i>เปิดใช้งาน</span>
                                     </div>
-                                    <p class="small text-muted mb-0">@promo.Description</p>
+                                    @{ var promotionText = promo.PromoType switch
+                                        {
+                                            "TOTAL_BILL" => $"สำหรับบัญชีที่ยังไม่มีการจองที่อนุมัติ/ชำระสำเร็จมาก่อน ไม่อิงวันสมัคร ยอดบิลตั้งแต่ {promo.MinBillAmount?.ToString("N0") ?? "600"} บาท ลด {promo.DiscountValue:N0} บาท",
+                                            "TIME_BASED" => $"จองสนามเวลา {promo.TimeStart?.ToString("HH:mm") ?? "09:00"}–{promo.TimeEnd?.ToString("HH:mm") ?? "15:00"} น. เฉพาะวัน{string.Join(", ", (promo.ActiveDays ?? "1,2,3,4,5").Split(',', StringSplitOptions.RemoveEmptyEntries).Select(value => int.TryParse(value, out var day) ? day : -1).Where(day => day >= 0 && day <= 6).Distinct().OrderBy(day => day).Select(day => new[] { "อาทิตย์", "จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์" }[day]))} ลดค่าเช่าสนาม {promo.DiscountValue:N0}%",
+                                            _ => promo.Description
+                                        }; }
+                                    <p class="small customer-promo-description">@promotionText</p>
                                 </div>
-                                <div class="text-end">
-                                    <span class="badge bg-success-subtle text-success px-3 py-2">@customerPromoReward</span>
-                                    <div class="small text-muted mt-1">ระบบคำนวณส่วนลดจากยอดและเงื่อนไขในบิลอัตโนมัติ</div>
+                                <div class="customer-promo-side">
+                                    <span class="badge bg-success-subtle text-success px-3 py-2 customer-promo-reward">@customerPromoReward</span>
+                                    <div class="small customer-promo-note">ระบบคำนวณส่วนลดจากยอดและเงื่อนไขในบิลอัตโนมัติ</div>
                                 </div>
                             </div>
                         </div>
@@ -1620,16 +1634,19 @@
 @section Scripts {
     <script>
         const customerPromotions = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(promotions.Select(p => new {
+            promotionId = p.PromotionId,
+            updatedAt = p.UpdatedAt.ToString("O"),
             promoType = p.PromoType,
             promoName = p.PromoName,
             discountValue = p.DiscountValue,
             minBillAmount = p.MinBillAmount,
             firstBookingOnly = p.FirstBookingOnly,
             isStackable = p.IsStackable,
-            startDate = p.StartDate?.ToString("yyyy-MM-dd"),
-            endDate = p.EndDate?.ToString("yyyy-MM-dd"),
+            startDate = p.StartDate.HasValue ? DateFormatHelper.ToIsoDate(p.StartDate.Value) : null,
+            endDate = p.EndDate.HasValue ? DateFormatHelper.ToIsoDate(p.EndDate.Value) : null,
             timeStart = p.TimeStart?.ToString("HH:mm"),
             timeEnd = p.TimeEnd?.ToString("HH:mm"),
+            activeDays = (p.ActiveDays ?? "1,2,3,4,5").Split(',', StringSplitOptions.RemoveEmptyEntries).Select(value => int.TryParse(value, out var day) ? day : -1).Where(day => day >= 0 && day <= 6).ToArray(),
             rules = p.PromotionRules.Select(r => new { ruleKind = r.RuleKind, targetType = r.TargetType, categoryId = r.CategoryId, requiredQty = r.RequiredQty, nthItem = r.NthItem })
         })));
         const isFirstCourtBooking = @((bool)(ViewBag.IsFirstCourtBooking ?? false) ? "true" : "false");
@@ -1638,7 +1655,7 @@
         // State Management
         let selectedSlots = new Map(); // key: courtId_slotId, value: { courtId, courtName, slotId, timeRange, price }
         let customerCart = new Map();  // key: productId, value: { productId, productName, type, categoryCode, price, unit, qty, stockQty }
-        let currentActiveDate = '@selectedDate.ToString("yyyy-MM-dd")';
+        let currentActiveDate = '@DateFormatHelper.ToIsoDate(selectedDate)';
         function getLocalTodayIso() {
             const now = new Date();
             return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -1678,6 +1695,11 @@
             const el = document.getElementById('trackingSection');
             if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
+        function goToBookingStatus(code) {
+            const bookingCode = (code || '').trim();
+            if (!bookingCode) return;
+            window.location.href = `/Home/Customer?section=tracking&code=${encodeURIComponent(bookingCode)}#trackingSection`;
+        }
         function scrollToMyBookings(e) {
             if (e) e.preventDefault();
             const el = document.getElementById('myBookingsSection');
@@ -1689,8 +1711,68 @@
             if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
 
+        let myBookingsPage = 1;
+        const myBookingsPageSize = 5;
+        function renderMyBookingsPage() {
+            const body = document.getElementById('myBookingsTableBody');
+            const pager = document.getElementById('myBookingsPagination');
+            if (!body || !pager) return;
+
+            const rows = Array.from(body.querySelectorAll('tr'));
+            rows.sort((a, b) => Number(b.dataset.created || 0) - Number(a.dataset.created || 0));
+            rows.forEach(row => body.appendChild(row));
+
+            const pageCount = Math.max(1, Math.ceil(rows.length / myBookingsPageSize));
+            myBookingsPage = Math.min(Math.max(myBookingsPage, 1), pageCount);
+            const start = (myBookingsPage - 1) * myBookingsPageSize;
+            rows.forEach((row, index) => {
+                row.style.display = index >= start && index < start + myBookingsPageSize ? '' : 'none';
+            });
+
+            const firstItem = rows.length ? start + 1 : 0;
+            const lastItem = Math.min(start + myBookingsPageSize, rows.length);
+            pager.innerHTML = `<small class="text-muted">แสดง ${firstItem}–${lastItem} จาก ${rows.length} รายการ • รายการใหม่สุดอยู่ด้านบน</small>` +
+                (pageCount > 1 ? `<div class="btn-group btn-group-sm" role="group" aria-label="เปลี่ยนหน้าประวัติการจอง">
+                    <button type="button" class="btn btn-outline-success" onclick="changeMyBookingsPage(-1)" ${myBookingsPage <= 1 ? 'disabled' : ''}>ก่อนหน้า</button>
+                    <span class="btn btn-light disabled">หน้า ${myBookingsPage} / ${pageCount}</span>
+                    <button type="button" class="btn btn-outline-success" onclick="changeMyBookingsPage(1)" ${myBookingsPage >= pageCount ? 'disabled' : ''}>ถัดไป</button>
+                </div>` : '');
+        }
+
+        function changeMyBookingsPage(direction) {
+            myBookingsPage += direction;
+            renderMyBookingsPage();
+        }
+
+        async function copyCustomerBookingCode(button) {
+            const code = button?.dataset.bookingCode || '';
+            if (!code) return;
+            try {
+                if (navigator.clipboard && window.isSecureContext) {
+                    await navigator.clipboard.writeText(code);
+                } else {
+                    const temp = document.createElement('textarea');
+                    temp.value = code;
+                    temp.style.position = 'fixed';
+                    temp.style.opacity = '0';
+                    document.body.appendChild(temp);
+                    temp.select();
+                    const copied = document.execCommand('copy');
+                    temp.remove();
+                    if (!copied) throw new Error('copy failed');
+                }
+                const original = button.innerHTML;
+                button.innerHTML = '<i class="bi bi-check2"></i>';
+                button.title = 'คัดลอกรหัสแล้ว';
+                setTimeout(() => { button.innerHTML = original; button.title = 'คัดลอกรหัสการจอง'; }, 1400);
+            } catch {
+                alert('คัดลอกรหัสไม่สำเร็จ กรุณาคัดลอกด้วยตนเอง: ' + code);
+            }
+        }
+
         window.addEventListener('DOMContentLoaded', async () => {
             await restoreUnifiedCart();
+            renderMyBookingsPage();
             if (window.location.hash) {
                 const target = document.querySelector(window.location.hash);
                 if (target) {
@@ -1792,25 +1874,14 @@
 
         // ================= DATE & CALENDAR SELECTION =================
         function selectDatePill(dateIso, pillEl) {
-            document.querySelectorAll('.date-pill').forEach(p => p.classList.remove('active'));
-            pillEl.classList.add('active');
+            setActiveDatePill(dateIso);
             currentActiveDate = dateIso;
-            document.getElementById('datePickerInput').value = dateIso;
             clearCourtSelections();
             updateDateLabels(dateIso);
             loadBookedSlotsForDate(dateIso);
         }
 
-        function onDateInputChange(dateIso) {
-            if (!dateIso) return;
-            const todayIso = getLocalTodayIso();
-            if (dateIso < todayIso) {
-                alert('วันที่เลือกผ่านไปแล้ว กรุณาเลือกวันนี้หรือวันถัดไป');
-                const datePicker = document.getElementById('datePickerInput');
-                datePicker.value = todayIso;
-                dateIso = todayIso;
-            }
-            currentActiveDate = dateIso;
+        function setActiveDatePill(dateIso) {
             document.querySelectorAll('.date-pill').forEach(p => {
                 if (p.getAttribute('data-date') === dateIso) {
                     p.classList.add('active');
@@ -1819,9 +1890,6 @@
                     p.classList.remove('active');
                 }
             });
-            clearCourtSelections();
-            updateDateLabels(dateIso);
-            loadBookedSlotsForDate(dateIso);
         }
 
         async function loadBookedSlotsForDate(dateIso) {
@@ -1947,8 +2015,9 @@
             let promoDiscounts = 0;
             const promoBadges = [];
             const activeApplied = [];
-            const promoFor = type => customerPromotions.find(p => p.promoType === type &&
-                (!p.startDate || currentActiveDate >= p.startDate) && (!p.endDate || currentActiveDate <= p.endDate));
+            const promoFor = type => customerPromotions
+                .filter(p => p.promoType === type && (!p.startDate || currentActiveDate >= p.startDate) && (!p.endDate || currentActiveDate <= p.endDate))
+                .sort((a, b) => (Date.parse(b.updatedAt || '') - Date.parse(a.updatedAt || '')) || (Number(b.promotionId) - Number(a.promotionId)))[0];
             const canApply = promo => promo && !activeApplied.some(p => p.isStackable === false) &&
                 (promo.isStackable !== false || activeApplied.length === 0);
             const recordPromo = (promo, amount, label) => {
@@ -1962,11 +2031,12 @@
             const quantityFor = (rule, type) => Array.from(customerCart.values())
                 .filter(i => i.type === type && (rule.categoryId == null || Number(i.categoryId) === Number(rule.categoryId)))
                 .reduce((sum, i) => sum + i.qty, 0);
-            const promoDate = new Date(`${currentActiveDate}T12:00:00`);
-            const weekday = promoDate.getDay() >= 1 && promoDate.getDay() <= 5;
+            const [promoYear, promoMonth, promoDay] = currentActiveDate.split('-').map(Number);
+            const promoDayOfWeek = new Date(Date.UTC(promoYear, promoMonth - 1, promoDay)).getUTCDay();
 
             const timePromo = promoFor('TIME_BASED');
-            if (canApply(timePromo) && weekday && timePromo.timeStart && timePromo.timeEnd) {
+            const allowedPromoDays = Array.isArray(timePromo?.activeDays) ? timePromo.activeDays.map(Number) : [];
+            if (canApply(timePromo) && allowedPromoDays.includes(promoDayOfWeek) && timePromo.timeStart && timePromo.timeEnd) {
                 let discount = 0;
                 selectedSlots.forEach(slot => {
                     const start = (slot.timeRange || '').split('-')[0].trim();
@@ -2085,8 +2155,7 @@
 
             if (saved.playDate) {
                 currentActiveDate = saved.playDate;
-                const dateInput = document.getElementById('datePickerInput');
-                if (dateInput) dateInput.value = saved.playDate;
+                setActiveDatePill(saved.playDate);
                 updateDateLabels(saved.playDate);
             }
             customerCart = new Map((saved.items || []).map(item => [Number(item.productId), item]));
@@ -2270,8 +2339,7 @@
             if (currentActiveDate < todayIso) {
                 alert('วันที่เลือกผ่านไปแล้ว ไม่สามารถจองย้อนหลังได้ กรุณาเลือกวันนี้หรือวันถัดไป');
                 currentActiveDate = todayIso;
-                const datePicker = document.getElementById('datePickerInput');
-                if (datePicker) datePicker.value = todayIso;
+                setActiveDatePill(todayIso);
                 clearCourtSelections();
                 updateDateLabels(todayIso);
                 await loadBookedSlotsForDate(todayIso);
@@ -2421,6 +2489,7 @@
 
             const tr = document.createElement('tr');
             tr.id = `row_${code}`;
+            tr.dataset.created = String(Date.now());
             const cartText = cart.map(c => `${c.productName} x ${c.qty}`).join(', ') || '-';
             const slipBtn = slipUrl ?
                 `<button type="button" class="btn btn-sm btn-outline-success py-1 px-2" style="border-radius:8px;" onclick="viewSlipFull('${slipUrl}', '${code}')"><i class="bi bi-image me-1"></i> ดูสลิป</button>` :
@@ -2428,7 +2497,10 @@
 
             tr.innerHTML = `
                 <td>
-                    <strong class="font-monospace text-primary">${code}</strong>
+                    <div class="d-flex align-items-center gap-1">
+                        <strong class="font-monospace text-success">${code}</strong>
+                        <button type="button" class="btn btn-sm btn-outline-success py-0 px-1" data-booking-code="${code}" onclick="copyCustomerBookingCode(this)" title="คัดลอกรหัสการจอง" aria-label="คัดลอกรหัสการจอง ${code}"><i class="bi bi-copy"></i></button>
+                    </div>
                     <small class="text-muted d-block" style="font-size:0.75rem;">เมื่อสักครู่</small>
                 </td>
                 <td><span class="badge bg-light text-dark border"><i class="bi bi-calendar3 me-1"></i>${date}</span></td>
@@ -2437,11 +2509,10 @@
                 <td><strong class="text-dark">${netAmount.toLocaleString()} ฿</strong></td>
                 <td><span class="badge bg-warning text-dark px-2 py-1">${statusText}</span></td>
                 <td>${slipBtn}</td>
-                <td class="text-end">
-                    <button type="button" class="btn btn-sm btn-light border px-2 py-1" style="border-radius:8px;" onclick="quickTrack('${code}')"><i class="bi bi-eye me-1"></i> ติดตาม</button>
-                </td>
             `;
             tableBody.prepend(tr);
+            myBookingsPage = 1;
+            renderMyBookingsPage();
         }
 
         // ================= TRACK BOOKING LIVE =================
@@ -2473,13 +2544,42 @@
                     return;
                 }
 
+                // ผู้ที่ไม่ได้เข้าสู่ระบบหรือไม่ใช่เจ้าของ ดูได้เฉพาะสถานะจากรหัสจอง
+                if (!res.isOwner) {
+                    const step = Number(res.step || 1);
+                    const stepLabels = ['จองแล้ว', 'ชำระเงิน', 'ตรวจสอบ', 'สำเร็จ'];
+                    const stepIcons = ['bi-calendar-check', 'bi-credit-card', 'bi-shield-check', 'bi-check-lg'];
+                    const stepsHtml = stepLabels.map((label, index) => {
+                        const number = index + 1;
+                        const completed = step >= number;
+                        const active = step === number && step < 4;
+                        const color = completed ? '#16834f' : (active ? '#f0a000' : '#adb5bd');
+                        const icon = completed ? 'bi-check-lg' : stepIcons[index];
+                        return `<div class="col-6 col-md-3 text-center">
+                            <div class="rounded-circle d-inline-flex align-items-center justify-content-center text-white mb-2" style="width:42px;height:42px;background:${color};"><i class="bi ${icon}"></i></div>
+                            <div class="small fw-bold ${completed || active ? 'text-dark' : 'text-muted'}">ขั้นที่ ${number}</div>
+                            <div class="small ${completed || active ? 'text-dark' : 'text-muted'}">${label}</div>
+                        </div>`;
+                    }).join('');
+                    resultBox.innerHTML = `
+                        <div class="card border-0 shadow-sm rounded-4 overflow-hidden bg-white">
+                            <div class="p-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                <div><span class="badge ${res.badgeClass} me-2 px-3 py-2">${res.statusText}</span><strong class="font-monospace text-success">${res.bookingCode}</strong></div>
+                                <span class="small text-muted">${res.hasCourtBooking ? `วันที่เล่น: ${res.playDate} • ` : ''}ทำรายการ: ${res.createdAt}</span>
+                            </div>
+                            <div class="row g-2 px-3 py-3 mx-0 border-top border-bottom bg-light">${stepsHtml}</div>
+                            <div class="px-3 pb-3 small text-muted"><i class="bi bi-shield-lock me-1"></i>แสดงเฉพาะสถานะ เพื่อดูรายละเอียดและสลิป กรุณาเข้าสู่ระบบบัญชีเจ้าของรายการ</div>
+                        </div>`;
+                    return;
+                }
+
                 // Render Progress Stepper
                 const step = res.step;
                 const hasCourtBooking = res.hasCourtBooking;
                 const step1Class = step >= 1 ? 'step-completed' : 'step-pending';
-                const step2Class = step >= 2 ? 'step-completed' : (step === 1 ? 'step-active' : 'step-pending');
-                const step3Class = step >= 3 ? 'step-completed' : (step === 2 ? 'step-active' : 'step-pending');
-                const step4Class = step >= 4 ? 'step-completed' : (step === 3 ? 'step-active' : 'step-pending');
+                const step2Class = step >= 3 ? 'step-completed' : (step === 2 ? 'step-active' : 'step-pending');
+                const step3Class = step >= 4 ? 'step-completed' : (step === 3 ? 'step-active' : 'step-pending');
+                const step4Class = step >= 4 ? 'step-completed' : 'step-pending';
 
                 const courtListHtml = res.courts && res.courts.length > 0 ?
                     res.courts.map(c => `<li><i class="bi bi-check2 text-success me-1"></i><strong>${c.courtName}</strong> (${c.timeRange}) - ${c.price.toLocaleString()} ฿</li>`).join('') :
@@ -2514,30 +2614,30 @@
                             <div class="d-flex justify-content-between align-items-center position-relative flex-wrap gap-2 text-center" style="max-width:700px; margin:0 auto;">
                                 <div class="flex-fill">
                                     <div class="rounded-circle d-inline-flex align-items-center justify-content-center text-white mb-1" style="width:40px; height:40px; background:${step >= 1 ? '#16a34a' : '#94a3b8'};">
-                                        <i class="bi bi-clipboard-check"></i>
+                                        <i class="bi ${step >= 1 ? 'bi-check-lg' : 'bi-calendar-check'}"></i>
                                     </div>
-                                    <div class="small fw-bold">${hasCourtBooking ? '1. ยื่นคำขอจองสนาม' : '1. สั่งซื้อ/เช่าอุปกรณ์'}</div>
-                                </div>
-                                <div class="text-muted"><i class="bi bi-arrow-right"></i></div>
-                                <div class="flex-fill">
-                                    <div class="rounded-circle d-inline-flex align-items-center justify-content-center text-white mb-1" style="width:40px; height:40px; background:${step >= 2 ? '#16a34a' : (step === 1 ? '#f59e0b' : '#94a3b8')};">
-                                        <i class="bi bi-upload"></i>
-                                    </div>
-                                    <div class="small fw-bold">2. แนบสลิปโอนเงิน</div>
+                                    <div class="small fw-bold">1. จองแล้ว</div>
                                 </div>
                                 <div class="text-muted"><i class="bi bi-arrow-right"></i></div>
                                 <div class="flex-fill">
                                     <div class="rounded-circle d-inline-flex align-items-center justify-content-center text-white mb-1" style="width:40px; height:40px; background:${step >= 3 ? '#16a34a' : (step === 2 ? '#f59e0b' : '#94a3b8')};">
-                                        <i class="bi bi-shield-check"></i>
+                                        <i class="bi ${step >= 3 ? 'bi-check-lg' : 'bi-credit-card'}"></i>
                                     </div>
-                                    <div class="small fw-bold">3. บัญชีอนุมัติชำระเงิน</div>
+                                    <div class="small fw-bold">2. ชำระเงิน</div>
                                 </div>
                                 <div class="text-muted"><i class="bi bi-arrow-right"></i></div>
                                 <div class="flex-fill">
-                                    <div class="rounded-circle d-inline-flex align-items-center justify-content-center text-white mb-1" style="width:40px; height:40px; background:${step >= 4 ? '#2563eb' : '#94a3b8'};">
-                                        <i class="bi bi-door-open"></i>
+                                    <div class="rounded-circle d-inline-flex align-items-center justify-content-center text-white mb-1" style="width:40px; height:40px; background:${step >= 4 ? '#16a34a' : (step === 3 ? '#f59e0b' : '#94a3b8')};">
+                                        <i class="bi bi-shield-check"></i>
                                     </div>
-                                    <div class="small fw-bold">${hasCourtBooking ? '4. เช็คอินเข้าเล่น' : '4. รับสินค้า/อุปกรณ์'}</div>
+                                    <div class="small fw-bold">3. ตรวจสอบ</div>
+                                </div>
+                                <div class="text-muted"><i class="bi bi-arrow-right"></i></div>
+                                <div class="flex-fill">
+                                    <div class="rounded-circle d-inline-flex align-items-center justify-content-center text-white mb-1" style="width:40px; height:40px; background:${step >= 4 ? '#16834f' : '#94a3b8'};">
+                                        <i class="bi ${step >= 4 ? 'bi-check-lg' : 'bi-flag'}"></i>
+                                    </div>
+                                    <div class="small fw-bold">4. สำเร็จ</div>
                                 </div>
                             </div>
                         </div>
@@ -2675,6 +2775,15 @@
                 setTimeout(scrollToTracking, 250);
             } else if (window.location.hash === '#myBookingsSection') {
                 setTimeout(scrollToMyBookings, 250);
+            } else if (window.location.hash === '#productSection') {
+                setTimeout(scrollToShop, 250);
+            }
+            const trackingCodeInput = document.getElementById('trackSearchInput');
+            if (trackingCodeInput?.value.trim()) {
+                setTimeout(() => {
+                    scrollToTracking();
+                    trackBookingLive();
+                }, 300);
             }
         });
     </script>

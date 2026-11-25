@@ -3,7 +3,7 @@
     Layout = "_CourtStaffLayout";
     ViewData["Title"] = "จัดการคิว Walk-in ประจำวัน";
 
-    string selectedDateStr = ViewBag.SelectedDate as string ?? DateTime.Today.ToString("yyyy-MM-dd");
+    string selectedDateStr = ViewBag.SelectedDate as string ?? DateFormatHelper.ToIsoDate(DateTime.Today);
     var courts = ViewBag.Courts as List<Chinnaphat_8272_L005.Models.Court> ?? new();
     var timeSlots = ViewBag.TimeSlots as List<Chinnaphat_8272_L005.Models.TimeSlot> ?? new();
     decimal paidWalkInTotal = ViewBag.PaidWalkInTotal ?? 0m;
@@ -108,7 +108,7 @@
 
                 <div class="d-flex align-items-center gap-2">
                     <form method="get" asp-action="WalkIn" class="d-flex gap-2">
-                        <input type="date" name="date" class="form-control form-control-sm" value="@selectedDateStr" onchange="this.form.submit()" />
+                        <input type="date" name="date" class="form-control form-control-sm" value="@selectedDateStr" lang="th-TH" onchange="this.form.submit()" />
                     </form>
                     <a asp-action="Index" class="btn btn-sm btn-outline-secondary">
                         <i class="bi bi-arrow-left me-1"></i> ผังตารางคอร์ท

@@ -88,4 +88,12 @@ public class ProfileRentalItem
     public DateTime? HandedOverAt { get; set; }
     public DateTime? ReturnedAt { get; set; }
     public DateTime RentalDate { get; set; }
+    public uint? DepositRefundRequestId { get; set; }
+    public string? DepositRefundStatus { get; set; }
+    public string? DepositRefundAssessmentStatus { get; set; }
+    public decimal? DepositRefundFineAmount { get; set; }
+    public decimal? DepositRefundedAmount { get; set; }
+    public string? DepositRefundMethod { get; set; }
+    public string? DepositRefundReference { get; set; }
+    public DateTime? DepositRefundProcessedAt { get; set; }
 }

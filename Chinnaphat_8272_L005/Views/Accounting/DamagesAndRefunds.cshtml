@@ -7,6 +7,7 @@
     var refunds = ViewBag.Refunds as List<Chinnaphat_8272_L005.Models.Refund> ?? new();
     var bookingRefundRequests = ViewBag.BookingRefundRequests as List<Chinnaphat_8272_L005.Models.BookingRefundRequest> ?? new();
     var accountingRefundQueue = bookingRefundRequests.Where(r => r.Status == "PENDING_ACCOUNTING").ToList();
+    var completedProductRefunds = bookingRefundRequests.Where(r => r.Status == "COMPLETED").ToList();
     var posDepositRefunds = ViewBag.PosDepositRefunds as List<Chinnaphat_8272_L005.Controllers.PosDepositRefundViewModel> ?? new();
     var pendingPosDepositRefunds = posDepositRefunds.Where(r => r.Request.Status == "PENDING").ToList();
     var rentalDepositRequests = ViewBag.RentalDepositRefundRequests as List<Chinnaphat_8272_L005.Models.RentalDepositRefundRequest> ?? new();
@@ -220,7 +221,7 @@
                                 <td><div class="font-monospace text-primary fw-bold">@request.ReceiptCode</div><small class="text-muted">@request.CustomerName · @(request.CustomerPhone ?? "ไม่มีเบอร์")</small></td>
                                 <td><div class="text-danger small fw-semibold">@request.DamageDescription</div><small class="text-muted">แจ้งเมื่อ: @request.CreatedAt.ToString("dd/MM/yyyy HH:mm")</small></td>
                                 <td><small class="text-dark">ฝ่ายขาย</small></td>
-                                <td><strong class="fs-6 font-monospace @(request.FineAmount > 0 ? "text-danger" : "text-muted")">@request.FineAmount.ToString("N2") ฿</strong><small class="d-block text-muted">มัดจำ @request.DepositAmount.ToString("N2") ฿</small></td>
+                                <td><strong class="fs-6 font-monospace @(request.FineAmount > 0 ? "text-danger" : "text-muted")">@request.FineAmount.ToString("N2") ฿</strong><small class="d-block text-muted">มัดจำ @request.DepositAmount.ToString("N2") ฿</small><small class="d-block text-muted">หักจากมัดจำ (ไม่เรียกเก็บซ้ำ)</small></td>
                                 <td>
                                     @if (request.DamageAssessmentStatus == "ASSESSED") { <span class="badge bg-warning text-dark">ประเมินแล้ว · หักมัดจำ</span> }
                                     else if (request.DamageAssessmentStatus == "WAIVED") { <span class="badge bg-secondary">ยกเว้นค่าปรับ</span> }
@@ -236,7 +237,11 @@
                                             <button class="btn btn-sm btn-outline-success text-nowrap">บันทึกประเมิน</button>
                                         </form>
                                     }
-                                    else { <span class="text-muted small"><i class="bi bi-lock-fill me-1"></i>บันทึกแล้ว</span> }
+                                    else if (request.Status == "PENDING")
+                                    {
+                                        <a asp-action="DamagesAndRefunds" asp-route-tab="depositRefunds" class="btn btn-sm btn-outline-success text-nowrap"><i class="bi bi-arrow-right-circle me-1"></i>ไปคืนมัดจำ</a>
+                                    }
+                                    else { <span class="text-muted small"><i class="bi bi-lock-fill me-1"></i>ปิดรายการแล้ว</span> }
                                 </td>
                             </tr>
                         }
@@ -260,113 +265,44 @@
      ============================================================ -->
 @if (activeTab == "refunds")
 {
-    <div class="alert alert-info d-flex align-items-start gap-2 mb-4" role="status">
-        <i class="bi bi-info-circle-fill mt-1"></i>
-        <div><strong>ขั้นตอนคืนเงินค่าสินค้า:</strong> ลูกค้าส่งคำขอจากหน้า <strong>โปรไฟล์ &amp; ประวัติ → ประวัติการซื้อสินค้า</strong> → ฝ่ายขายตรวจรับสินค้าจริงในหน้า <strong>ตรวจรับคืน &amp; บันทึกชำรุด → ตรวจรับสินค้าคืน</strong> → บัญชีตรวจยอด บันทึกช่องทางและเลขอ้างอิงการคืนเงินที่หน้านี้<br/><small>คืนเฉพาะสินค้าที่ซื้อ ไม่รวมค่าจองสนาม ค่าเช่า หรือเงินมัดจำ และระบบบันทึกหลักฐานหลังทำรายการคืนเงินจริงแล้ว</small></div>
-    </div>
-    <div class="card border-0 shadow-sm rounded-4 overflow-hidden mb-4">
-        <div class="card-header bg-white d-flex justify-content-between align-items-center"><h5 class="fw-bold mb-0"><i class="bi bi-inboxes text-success me-2"></i>คำขอคืนเงินค่าสินค้าที่ฝ่ายขายส่งมา (@accountingRefundQueue.Count รอตรวจ)</h5><small class="text-muted">คืนเฉพาะยอดสินค้า หลังตรวจรับคืนแล้ว</small></div>
-        @if (accountingRefundQueue.Count == 0) { <div class="p-4 text-center text-muted">ยังไม่มีคำขอจากฝ่ายขาย เมื่อฝ่ายขายตรวจรับสินค้าคืนแล้ว รายการจะแสดงที่นี่</div> }
-        else { <div class="table-responsive"><table class="table table-hover align-middle mb-0"><thead class="table-light"><tr><th>บิล / ลูกค้า</th><th>สินค้าที่ขอคืน</th><th>ยอดคืนสินค้า</th><th>เหตุผลลูกค้า / ผลตรวจฝ่ายขาย</th><th>อนุมัติและบันทึกคืนเงินจริง</th></tr></thead><tbody>
-        @foreach (var req in accountingRefundQueue) { <tr><td><strong>@req.ReferenceCode</strong><br />@req.CustomerName<br /><small>@req.CustomerPhone</small></td><td><strong>@req.ProductName</strong><br/><small>จำนวน @req.ProductQuantity</small></td><td class="fw-bold text-success">@req.Amount.ToString("N2") ฿</td><td>@req.Reason<br /><small class="text-muted">ฝ่ายขาย: @req.SalesNote</small></td><td><form asp-action="ProcessBookingRefundRequest" method="post" class="d-flex flex-column gap-2">@Html.AntiForgeryToken()<input type="hidden" name="requestId" value="@req.RequestId"/><select name="refundMethod" class="form-select form-select-sm" required><option value="">เลือกช่องทางคืนเงิน</option><option value="โอนธนาคาร">โอนธนาคาร</option><option value="พร้อมเพย์">พร้อมเพย์</option><option value="เงินสด">เงินสด</option></select><input name="refundReference" class="form-control form-control-sm" maxlength="100" minlength="2" placeholder="เลขอ้างอิง/หลักฐานการคืนเงินจริง" required/><input name="accountingNote" class="form-control form-control-sm" maxlength="500" placeholder="บันทึกบัญชี (ถ้ามี)"/><button name="approve" value="true" class="btn btn-sm btn-success">บันทึกว่าคืนเงินจริงแล้ว · @req.Amount.ToString("N2") ฿</button><hr class="my-1"/><input name="rejectNote" class="form-control form-control-sm" maxlength="500" placeholder="เหตุผลกรณีปฏิเสธ"/><button name="approve" value="false" class="btn btn-sm btn-outline-danger">ปฏิเสธคำขอ</button></form></td></tr> }
-        </tbody></table></div> }
-    </div>
-    <div class="card border-0 shadow-sm rounded-4 overflow-hidden mb-4"><div class="card-header bg-white fw-bold">ประวัติคำขอคืนเงินค่าสินค้า (@bookingRefundRequests.Count รายการ)</div><div class="table-responsive"><table class="table table-sm align-middle mb-0"><thead class="table-light"><tr><th>บิล / ลูกค้า</th><th>สินค้า</th><th>เหตุผล</th><th>สถานะ</th><th>ช่องทาง / เลขอ้างอิง</th><th>ยอดคืน</th></tr></thead><tbody>
-        @foreach (var req in bookingRefundRequests) { <tr><td>@req.ReferenceCode<br/>@req.CustomerName<br/><small>@req.CreatedAt.ToString("dd/MM/yyyy HH:mm")</small></td><td>@req.ProductName · @req.ProductQuantity</td><td>@req.Reason<br/><small class="text-muted">ฝ่ายขาย: @req.SalesNote</small></td><td><span class="badge @(req.Status == "COMPLETED" ? "bg-success" : req.Status == "REJECTED" ? "bg-danger" : req.Status == "PENDING_ACCOUNTING" ? "bg-info text-dark" : "bg-warning text-dark")">@(req.Status == "PENDING_SALES" ? "รอฝ่ายขายตรวจรับ" : req.Status == "PENDING_ACCOUNTING" ? "รอบัญชีคืนเงินจริง" : req.Status == "COMPLETED" ? "คืนเงินแล้ว" : req.Status == "REJECTED" ? "ปฏิเสธคำขอ" : req.Status)</span>@if (!string.IsNullOrWhiteSpace(req.AccountingNote)){<small class="d-block">@req.AccountingNote</small>}</td><td>@req.RefundMethod<br/>@req.RefundReference</td><td class="text-success fw-bold">@req.Amount.ToString("N2") ฿</td></tr> }
-    </tbody></table></div></div>
-    <!-- Stat Cards -->
+    <style>
+        .account-refund-page .refund-stat { height:100%; border:1px solid #e5ebf1; border-left:4px solid var(--stat-color); border-radius:14px; background:#fff; padding:1rem 1.1rem; box-shadow:0 4px 14px rgba(24,39,60,.045); }
+        .account-refund-page .refund-stat-label { color:#64748b; font-size:.82rem; }
+        .account-refund-page .refund-stat-value { margin-top:.2rem; font-size:1.55rem; font-weight:750; color:var(--stat-color); }
+        .account-refund-page .refund-work-card { height:100%; overflow:hidden; border:1px solid #e3eaf0; border-radius:15px; background:#fff; box-shadow:0 5px 18px rgba(24,39,60,.055); }
+        .account-refund-page .refund-work-head { display:flex; justify-content:space-between; gap:1rem; padding:1rem 1.1rem; border-bottom:1px solid #edf1f5; background:#fbfcfd; }
+        .account-refund-page .refund-work-body { padding:1rem 1.1rem; }
+        .account-refund-page .refund-work-label { color:#718096; font-size:.75rem; margin-bottom:.2rem; }
+        .account-refund-page .refund-work-value { font-weight:650; overflow-wrap:anywhere; }
+        .account-refund-page .refund-work-actions { padding:1rem 1.1rem; background:#f8fafb; border-top:1px solid #edf1f5; }
+        .account-refund-page .refund-history-table th { white-space:nowrap; font-size:.78rem; color:#64748b; }
+        .account-refund-page .refund-history-table td { vertical-align:middle; }
+    </style>
+    <main class="account-refund-page">
     <div class="row g-3 mb-4">
-        <div class="col-md-4">
-            <div class="card border-0 shadow-sm p-3 h-100" style="border-radius:16px; border-left: 5px solid #ffc107 !important;">
-                <div class="text-muted small fw-bold">คำขอคืนสินค้ารอตรวจ</div>
-                <div class="fs-3 fw-bold text-dark mt-1">@accountingRefundQueue.Count <span class="fs-6 fw-normal text-muted">รายการ</span></div>
-                <small class="text-muted">สินค้าที่ฝ่ายขายตรวจรับคืนและส่งต่อแล้ว</small>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card border-0 shadow-sm p-3 h-100" style="border-radius:16px; border-left: 5px solid #0d6efd !important;">
-                <div class="text-muted small fw-bold">รายการที่คืนเงินสำเร็จแล้ว</div>
-                <div class="fs-3 fw-bold text-primary mt-1">@refunds.Count <span class="fs-6 fw-normal text-muted">รายการ</span></div>
-                <small class="text-secondary">ประวัติการบันทึกคืนเงิน</small>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card border-0 shadow-sm p-3 h-100" style="border-radius:16px; border-left: 5px solid #198754 !important;">
-                <div class="text-muted small fw-bold">ยอดเงินที่คืนให้ลูกค้าทั้งหมด</div>
-                <div class="fs-3 fw-bold text-success mt-1">@totalRefunded.ToString("N2") <span class="fs-6 fw-normal text-muted">฿</span></div>
-                <small class="text-success">โอนคืนลูกค้าเรียบร้อยแล้ว</small>
-            </div>
-        </div>
+        <div class="col-sm-6 col-xl-4"><div class="refund-stat" style="--stat-color:#e49a00"><div class="refund-stat-label">รอบัญชีดำเนินการ</div><div class="refund-stat-value">@accountingRefundQueue.Count <small class="fs-6 fw-normal">รายการ</small></div></div></div>
+        <div class="col-sm-6 col-xl-4"><div class="refund-stat" style="--stat-color:#1769d2"><div class="refund-stat-label">คืนเงินสินค้าแล้ว</div><div class="refund-stat-value">@completedProductRefunds.Count <small class="fs-6 fw-normal">รายการ</small></div></div></div>
+        <div class="col-sm-6 col-xl-4"><div class="refund-stat" style="--stat-color:#168653"><div class="refund-stat-label">ยอดคืนเงินจริง</div><div class="refund-stat-value">@completedProductRefunds.Sum(r => r.Amount).ToString("N2") <small class="fs-6 fw-normal">฿</small></div></div></div>
     </div>
-
-    <!-- Section B: Refunds History -->
-    <div class="card border-0 shadow-sm" style="border-radius:18px; overflow:hidden;">
-        <div class="p-3 bg-white border-bottom d-flex justify-content-between align-items-center">
-            <h5 class="fw-bold mb-0 text-dark">
-                <i class="bi bi-clock-history text-success me-2"></i>ประวัติการคืนเงินให้ลูกค้าทั้งหมด (@refunds.Count รายการ)
-            </h5>
-        </div>
-
-        @if (refunds.Any())
-        {
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
-                    <thead class="table-light">
-                        <tr class="small text-secondary">
-                            <th>รหัสคืนเงิน</th>
-                            <th>รหัสการจอง</th>
-                            <th>ชื่อลูกค้า</th>
-                            <th>ยอดเงินคืน</th>
-                            <th>เหตุผลการคืนเงิน</th>
-                            <th>ผู้ดำเนินการ (ฝ่ายบัญชี)</th>
-                            <th>วันที่ดำเนินการ</th>
-                            <th>สถานะ</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var r in refunds)
-                        {
-                            <tr>
-                                <td>
-                                    <span class="badge bg-secondary font-monospace">#REF-@r.RefundId</span>
-                                </td>
-                                <td>
-                                    <span class="font-monospace text-primary fw-bold">@(r.Booking?.BookingCode ?? "-")</span>
-                                </td>
-                                <td>
-                                    <div class="fw-bold text-dark">@(r.Booking?.User?.FullName ?? "ลูกค้า")</div>
-                                </td>
-                                <td>
-                                    <strong class="text-success fs-6 font-monospace">@r.Amount.ToString("N2") ฿</strong>
-                                </td>
-                                <td>
-                                    <small class="text-dark">@r.Reason</small>
-                                </td>
-                                <td>
-                                    <small class="text-muted">@(r.ProcessedByNavigation?.FullName ?? "ฝ่ายบัญชี")</small>
-                                </td>
-                                <td>
-                                    <small class="text-muted">@(r.ProcessedAt?.ToString("dd/MM/yyyy HH:mm") ?? r.CreatedAt.ToString("dd/MM/yyyy HH:mm"))</small>
-                                </td>
-                                <td>
-                                    <span class="badge bg-success">
-                                        <i class="bi bi-check-circle me-1"></i>@r.Status
-                                    </span>
-                                </td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-            </div>
-        }
-        else
-        {
-            <div class="p-5 text-center text-muted">
-                <i class="bi bi-inbox fs-1 d-block mb-2 text-success"></i>
-                <h6>ยังไม่มีประวัติการคืนเงินในระบบ</h6>
-            </div>
-        }
-    </div>
+    <section class="card border-0 shadow-sm rounded-4 overflow-hidden mb-4">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center flex-wrap gap-2 py-3"><div><h5 class="fw-bold mb-0"><i class="bi bi-inboxes text-success me-2"></i>รายการที่ต้องดำเนินการ</h5><small class="text-muted">ตรวจข้อมูลสินค้าและยอดก่อนโอนคืนเต็มจำนวน</small></div><span class="badge rounded-pill bg-warning-subtle text-warning-emphasis px-3 py-2">@accountingRefundQueue.Count รอดำเนินการ</span></div>
+        @if (accountingRefundQueue.Count == 0) { <div class="p-5 text-center text-muted"><i class="bi bi-check2-circle fs-1 d-block mb-2 text-success"></i><strong class="d-block">ไม่มีคำขอรอดำเนินการ</strong><small>รายการจะแสดงหลังฝ่ายขายตรวจรับสินค้าคืนแล้ว</small></div> }
+        else { <div class="p-3 p-lg-4"><div class="row g-3">
+        @foreach (var req in accountingRefundQueue) { <div class="col-12"><article class="refund-work-card">
+            <header class="refund-work-head"><div><div class="fw-bold text-primary">@req.ReferenceCode</div><div class="text-muted small">@req.CustomerName · @(string.IsNullOrWhiteSpace(req.CustomerPhone) ? "ไม่มีเบอร์โทร" : req.CustomerPhone)</div></div><span class="badge rounded-pill bg-info-subtle text-primary-emphasis align-self-start">ผ่านการตรวจรับจากฝ่ายขาย</span></header>
+            <div class="refund-work-body"><div class="row g-3"><div class="col-md-4"><div class="refund-work-label">สินค้าที่คืน</div><div class="refund-work-value">@req.ProductName <span class="text-muted">× @req.ProductQuantity</span></div></div><div class="col-md-3"><div class="refund-work-label">ยอดคืนเต็มจำนวน</div><div class="refund-work-value text-success fs-5">@req.Amount.ToString("N2") ฿</div></div><div class="col-md-5"><div class="refund-work-label">เหตุผล / ผลตรวจ</div><div class="small">@req.Reason</div><div class="small text-muted mt-1">ฝ่ายขาย: @(string.IsNullOrWhiteSpace(req.SalesNote) ? "ไม่ได้ระบุหมายเหตุ" : req.SalesNote)</div></div></div></div>
+            <div class="refund-work-actions"><form asp-action="ProcessBookingRefundRequest" method="post" class="row g-2 align-items-end" novalidate>@Html.AntiForgeryToken()<input type="hidden" name="requestId" value="@req.RequestId"/><div class="col-md-3"><label class="form-label small fw-semibold">ช่องทางคืนเงิน</label><select name="refundMethod" class="form-select" required><option value="">เลือกช่องทาง</option><option value="โอนธนาคาร">โอนธนาคาร</option><option value="พร้อมเพย์">พร้อมเพย์</option></select></div><div class="col-md-4"><label class="form-label small fw-semibold">เลขอ้างอิง / หลักฐาน</label><input name="refundReference" class="form-control" maxlength="100" minlength="2" placeholder="กรอกหลังคืนเงินจริง" required/></div><div class="col-md-5"><label class="form-label small fw-semibold">หมายเหตุบัญชี (ถ้ามี)</label><input name="accountingNote" class="form-control" maxlength="500" placeholder="บันทึกเพิ่มเติม"/></div><div class="col-md-8"><input name="rejectNote" class="form-control" maxlength="500" placeholder="หากปฏิเสธ ให้ระบุเหตุผลในช่องนี้"/></div><div class="col-md-4 d-flex flex-wrap gap-2"><button name="approve" value="true" class="btn btn-success flex-grow-1" onclick="return confirm('ยืนยันว่าคืนเงินจริงจำนวน @req.Amount.ToString("N2") บาทแล้ว?')"><i class="bi bi-check2-circle me-1"></i>ยืนยันคืน @req.Amount.ToString("N2") ฿</button><button name="approve" value="false" class="btn btn-outline-danger" onclick="return confirm('ยืนยันปฏิเสธคำขอนี้?')">ปฏิเสธ</button></div></form></div>
+        </article></div> }
+        </div></div> }
+    </section>
+    <section class="card border-0 shadow-sm rounded-4 overflow-hidden">
+        <div class="card-header bg-white py-3"><h5 class="fw-bold mb-0"><i class="bi bi-clock-history text-success me-2"></i>ประวัติคำขอคืนเงินค่าสินค้า <span class="text-muted fs-6 fw-normal">(@bookingRefundRequests.Count)</span></h5></div>
+        @if (!bookingRefundRequests.Any()) { <div class="p-5 text-center text-muted"><i class="bi bi-inbox fs-1 d-block mb-2"></i>ยังไม่มีประวัติคำขอ</div> }
+        else { <div class="table-responsive"><table class="table table-hover align-middle mb-0 refund-history-table"><thead class="table-light"><tr><th>บิล / ลูกค้า</th><th>สินค้า</th><th>เหตุผล</th><th>สถานะ</th><th>ช่องทาง / เลขอ้างอิง</th><th class="text-end">ยอดคืน</th></tr></thead><tbody>
+        @foreach (var req in bookingRefundRequests) { <tr><td><span class="fw-semibold">@req.ReferenceCode</span><small class="d-block text-muted">@req.CustomerName · @req.CreatedAt.ToString("dd/MM/yyyy HH:mm")</small></td><td>@req.ProductName <span class="text-muted">× @req.ProductQuantity</span></td><td>@req.Reason<small class="d-block text-muted">ฝ่ายขาย: @(string.IsNullOrWhiteSpace(req.SalesNote) ? "—" : req.SalesNote)</small>@if (!string.IsNullOrWhiteSpace(req.AccountingNote)){<small class="d-block text-muted">บัญชี: @req.AccountingNote</small>}</td><td><span class="badge rounded-pill @(req.Status == "COMPLETED" ? "bg-success" : req.Status == "REJECTED" ? "bg-danger" : req.Status == "PENDING_ACCOUNTING" ? "bg-info text-dark" : "bg-warning text-dark")">@(req.Status == "PENDING_SALES" ? "รอฝ่ายขายตรวจรับ" : req.Status == "PENDING_ACCOUNTING" ? "รอบัญชีดำเนินการ" : req.Status == "COMPLETED" ? "คืนเงินแล้ว" : req.Status == "REJECTED" ? "ปฏิเสธคำขอ" : req.Status)</span></td><td>@(req.RefundMethod ?? "—")<small class="d-block text-muted">@(req.RefundReference ?? "ยังไม่มีเลขอ้างอิง")</small></td><td class="text-end fw-bold text-success">@req.Amount.ToString("N2") ฿</td></tr> }
+        </tbody></table></div> }
+    </section>
+    </main>
 }
 
 @if (activeTab == "depositRefunds")

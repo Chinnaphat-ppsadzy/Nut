@@ -312,12 +312,13 @@
         <div class="history-card">
             <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
                 <h6 class="fw-bold mb-0 text-dark">
-                    <i class="bi bi-bag-check text-warning me-2"></i>รายการสั่งซื้อสินค้า (ลูกแบดมินตัน, เครื่องดื่ม, กริป)
+                    <i class="bi bi-bag-check text-warning me-2"></i>รายการสั่งซื้อสินค้าและอุปกรณ์กีฬา
                 </h6>
                 <a href="/Home/Customer?section=product#productSection" class="btn btn-sm btn-outline-warning text-dark" style="border-radius:8px;">
                     <i class="bi bi-cart-plus me-1"></i> สั่งซื้อเพิ่ม
                 </a>
             </div>
+            <div class="px-3 pt-3 small text-muted"><i class="bi bi-info-circle me-1 text-primary"></i>ยื่นขอคืนได้เฉพาะอุปกรณ์กีฬาที่ซื้อและได้รับมอบแล้ว เช่น ลูกแบดหรือกริป ไม่รวมเครื่องดื่ม ค่าจองคอร์ท และอุปกรณ์เช่า</div>
 
             @if (Model.PurchaseHistory.Any())
             {
@@ -411,7 +412,7 @@
                                 <th>ค่าเช่า</th>
                                 <th>ค่ามัดจำ</th>
                                 <th>ยอดรวม</th>
-                                <th class="text-end">สถานะการเช่า</th>
+                                <th class="text-end">สถานะอุปกรณ์ / มัดจำ</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -441,6 +442,37 @@
                                     <td><strong class="text-dark">@r.LineTotal.ToString("N0") ฿</strong></td>
                                     <td class="text-end">
                                         <span class="badge @r.ItemStatusBadgeClass px-2 py-1">@r.ItemStatusText</span>
+                                        <div class="small mt-1">
+                                            @if (r.DepositRefundStatus == "PENDING" && r.DepositRefundAssessmentStatus == "REPORTED")
+                                            {
+                                                <span class="text-warning-emphasis">รอบัญชีประเมินค่าปรับ</span>
+                                            }
+                                            else if (r.DepositRefundStatus == "PENDING")
+                                            {
+                                                <span class="text-primary">รอบัญชีดำเนินการคืนมัดจำ</span>
+                                            }
+                                            else if (r.DepositRefundStatus == "COMPLETED")
+                                            {
+                                                <span class="text-success fw-semibold">บัญชีดำเนินการคืนมัดจำแล้ว</span>
+                                                <div>คืน @((r.DepositRefundedAmount ?? 0m).ToString("N2")) ฿</div>
+                                                @if ((r.DepositRefundFineAmount ?? 0m) > 0)
+                                                {
+                                                    <div class="text-danger">หักค่าปรับ @r.DepositRefundFineAmount.GetValueOrDefault().ToString("N2") ฿</div>
+                                                }
+                                                @if (!string.IsNullOrWhiteSpace(r.DepositRefundReference))
+                                                {
+                                                    <div class="text-muted text-break">อ้างอิง: @r.DepositRefundReference</div>
+                                                }
+                                            }
+                                            else if (r.ItemStatus is "RETURNED" or "DAMAGED")
+                                            {
+                                                <span class="text-muted">ไม่มีข้อมูลคืนมัดจำที่เชื่อมกับรายการนี้</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted">สถานะมัดจำจะแสดงหลังรับคืนอุปกรณ์</span>
+                                            }
+                                        </div>
                                     </td>
                                 </tr>
                             }
@@ -463,7 +495,7 @@
 <div class="modal fade" id="cancelRefundModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog"><div class="modal-content">
     <form asp-action="RequestBookingRefund" method="post">@Html.AntiForgeryToken()
         <div class="modal-header"><h5 class="modal-title">ขอคืนเงินค่าสินค้า</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-        <div class="modal-body"><p>สินค้า <strong id="refundProductName"></strong><br/>บิล <strong id="refundBookingCode"></strong><br/>ยอดคืนสินค้า <strong id="refundProductAmount"></strong> ฿</p><input type="hidden" name="bookingItemId" id="refundBookingItemId"/><label class="form-label">เหตุผลที่ขอคืนสินค้า</label><textarea name="reason" class="form-control" minlength="3" maxlength="500" required rows="3"></textarea><small class="text-muted">ฝ่ายขายจะตรวจรับสินค้าก่อนส่งให้บัญชีดำเนินการคืนยอดค่าสินค้านี้</small></div>
+        <div class="modal-body"><p>สินค้า <strong id="refundProductName"></strong><br/>บิล <strong id="refundBookingCode"></strong><br/>ยอดคืนสินค้า <strong id="refundProductAmount"></strong> ฿</p><input type="hidden" name="bookingItemId" id="refundBookingItemId"/><label class="form-label">เหตุผลที่ขอคืนอุปกรณ์</label><textarea name="reason" class="form-control" minlength="3" maxlength="500" required rows="3"></textarea><small class="text-muted">ฝ่ายขายตรวจรับอุปกรณ์ก่อนส่งให้บัญชีคืนยอดค่าสินค้า ไม่รวมค่าจองคอร์ทหรือเงินมัดจำเช่า</small></div>
         <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">ปิด</button><button class="btn btn-danger">ส่งคำขอคืนสินค้า</button></div>
     </form>
 </div></div></div>

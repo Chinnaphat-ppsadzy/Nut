@@ -5,6 +5,12 @@
 
     string activeDocType = ViewBag.ActiveDocType as string ?? "ALL";
     string searchTerm = ViewBag.SearchTerm as string ?? "";
+    int totalDocuments = ViewBag.TotalDocuments ?? 0;
+    int currentPage = ViewBag.CurrentPage ?? 1;
+    int totalPages = ViewBag.TotalPages ?? 1;
+    int pageSize = ViewBag.PageSize ?? 10;
+    int firstItem = totalDocuments == 0 ? 0 : ((currentPage - 1) * pageSize) + 1;
+    int lastItem = Math.Min(currentPage * pageSize, totalDocuments);
 }
 
 <div class="card border-0 shadow-sm mb-4" style="border-radius:18px; background: linear-gradient(135deg, #1a472a 0%, #2d6a4f 60%, #52b788 100%); color:white;">
@@ -30,7 +36,7 @@
             <!-- Tabs -->
             <div class="d-flex gap-2">
                 <a asp-action="Receipts" asp-route-docType="ALL" class="btn btn-sm @(activeDocType == "ALL" ? "btn-success" : "btn-light") fw-semibold px-3 py-2" style="border-radius:10px;">
-                    ทั้งหมด (@Model.Count)
+                    ทั้งหมด (@totalDocuments)
                 </a>
                 <a asp-action="Receipts" asp-route-docType="RECEIPT" class="btn btn-sm @(activeDocType == "RECEIPT" ? "btn-success" : "btn-light") fw-semibold px-3 py-2" style="border-radius:10px;">
                     <i class="bi bi-receipt me-1"></i> ใบเสร็จรับเงิน (Receipt)
@@ -59,7 +65,7 @@
 <div class="card border-0 shadow-sm" style="border-radius:18px; overflow:hidden;">
     <div class="p-3 bg-white border-bottom d-flex justify-content-between align-items-center">
         <h5 class="fw-bold mb-0 text-dark">
-            <i class="bi bi-journal-text text-success me-2"></i>รายการเอกสารการเงินทั้งหมด (@Model.Count ฉบับ)
+            <i class="bi bi-journal-text text-success me-2"></i>รายการเอกสารการเงินทั้งหมด (@totalDocuments ฉบับ)
         </h5>
     </div>
 
@@ -137,6 +143,21 @@
             <i class="bi bi-file-earmark-x fs-1 d-block mb-2 text-success"></i>
             <h6>ยังไม่มีเอกสารในหมวดนี้</h6>
             <small>เมื่อฝ่ายบัญชีกดอนุมัติสลิปในหน้า "ตรวจสลิป" ระบบจะออกใบเสร็จรับเงินให้อัตโนมัติทันที</small>
+        </div>
+    }
+
+    @if (totalDocuments > 0)
+    {
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 p-3 bg-light border-top">
+            <small class="text-muted">แสดง @firstItem–@lastItem จาก @totalDocuments ฉบับ · หน้า @currentPage/@totalPages</small>
+            <div class="btn-group" role="group" aria-label="เปลี่ยนหน้าเอกสาร">
+                <a asp-action="Receipts" asp-route-search="@searchTerm" asp-route-docType="@activeDocType" asp-route-page="@(currentPage - 1)"
+                   class="btn btn-sm btn-outline-success @(currentPage <= 1 ? "disabled" : "")"
+                   aria-disabled="@(currentPage <= 1)">ก่อนหน้า</a>
+                <a asp-action="Receipts" asp-route-search="@searchTerm" asp-route-docType="@activeDocType" asp-route-page="@(currentPage + 1)"
+                   class="btn btn-sm btn-outline-success @(currentPage >= totalPages ? "disabled" : "")"
+                   aria-disabled="@(currentPage >= totalPages)">ถัดไป</a>
+            </div>
         </div>
     }
 </div>

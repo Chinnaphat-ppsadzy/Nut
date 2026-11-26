@@ -2743,7 +2743,6 @@ C:\Users\ppsadzy\AppData\Local\Temp\CourtBookRefundBuild\Chinnaphat_8272_L005.st
 C:\Users\ppsadzy\AppData\Local\Temp\CourtBookRefundBuild\Chinnaphat_8272_L005.deps.json
 C:\Users\ppsadzy\AppData\Local\Temp\CourtBookRefundBuild\Chinnaphat_8272_L005.runtimeconfig.json
 C:\Users\ppsadzy\AppData\Local\Temp\CourtBookRefundBuild\Chinnaphat_8272_L005.dll
-C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\CourtBook\Debug\net10.0\Chinnaphat_8272_L005.pdb
 C:\Users\ppsadzy\AppData\Local\Temp\CourtBookAuthBuild\appsettings.Development.json
 C:\Users\ppsadzy\AppData\Local\Temp\CourtBookAuthBuild\appsettings.json
 C:\Users\ppsadzy\AppData\Local\Temp\CourtBookAuthBuild\Chinnaphat_8272_L005.staticwebassets.runtime.json
@@ -2758,3 +2757,112 @@ C:\Users\ppsadzy\AppData\Local\Temp\CourtBookRemoveAmenities\Chinnaphat_8272_L00
 C:\Users\ppsadzy\AppData\Local\Temp\CourtBookRemoveAmenities\Chinnaphat_8272_L005.deps.json
 C:\Users\ppsadzy\AppData\Local\Temp\CourtBookRemoveAmenities\Chinnaphat_8272_L005.runtimeconfig.json
 C:\Users\ppsadzy\AppData\Local\Temp\CourtBookRemoveAmenities\Chinnaphat_8272_L005.dll
+C:\Users\ppsadzy\AppData\Local\Temp\CourtBookRememberBuild\appsettings.Development.json
+C:\Users\ppsadzy\AppData\Local\Temp\CourtBookRememberBuild\appsettings.json
+C:\Users\ppsadzy\AppData\Local\Temp\CourtBookRememberBuild\Chinnaphat_8272_L005.staticwebassets.runtime.json
+C:\Users\ppsadzy\AppData\Local\Temp\CourtBookRememberBuild\Chinnaphat_8272_L005.staticwebassets.endpoints.json
+C:\Users\ppsadzy\AppData\Local\Temp\CourtBookRememberBuild\Chinnaphat_8272_L005.deps.json
+C:\Users\ppsadzy\AppData\Local\Temp\CourtBookRememberBuild\Chinnaphat_8272_L005.runtimeconfig.json
+C:\Users\ppsadzy\AppData\Local\Temp\CourtBookRememberBuild\Chinnaphat_8272_L005.dll
+C:\Users\ppsadzy\AppData\Local\Temp\CourtBookLoginAutocompleteBuild\appsettings.Development.json
+C:\Users\ppsadzy\AppData\Local\Temp\CourtBookLoginAutocompleteBuild\appsettings.json
+C:\Users\ppsadzy\AppData\Local\Temp\CourtBookLoginAutocompleteBuild\Chinnaphat_8272_L005.staticwebassets.runtime.json
+C:\Users\ppsadzy\AppData\Local\Temp\CourtBookLoginAutocompleteBuild\Chinnaphat_8272_L005.staticwebassets.endpoints.json
+C:\Users\ppsadzy\AppData\Local\Temp\CourtBookLoginAutocompleteBuild\Chinnaphat_8272_L005.deps.json
+C:\Users\ppsadzy\AppData\Local\Temp\CourtBookLoginAutocompleteBuild\Chinnaphat_8272_L005.runtimeconfig.json
+C:\Users\ppsadzy\AppData\Local\Temp\CourtBookLoginAutocompleteBuild\Chinnaphat_8272_L005.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\appsettings.Development.json
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\appsettings.json
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\Chinnaphat_8272_L005.staticwebassets.runtime.json
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\Chinnaphat_8272_L005.staticwebassets.endpoints.json
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\Chinnaphat_8272_L005.deps.json
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\Chinnaphat_8272_L005.runtimeconfig.json
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\Chinnaphat_8272_L005.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\Humanizer.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\Microsoft.Bcl.AsyncInterfaces.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\Microsoft.Build.Locator.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\Microsoft.CodeAnalysis.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\Microsoft.CodeAnalysis.CSharp.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\Microsoft.CodeAnalysis.CSharp.Workspaces.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\Microsoft.CodeAnalysis.Workspaces.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\Microsoft.CodeAnalysis.Workspaces.MSBuild.BuildHost.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\Microsoft.CodeAnalysis.Workspaces.MSBuild.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\Microsoft.EntityFrameworkCore.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\Microsoft.EntityFrameworkCore.Abstractions.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\Microsoft.EntityFrameworkCore.Design.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\Microsoft.EntityFrameworkCore.Relational.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\Microsoft.Extensions.DependencyModel.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\Mono.TextTemplating.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\MySqlConnector.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\Pomelo.EntityFrameworkCore.MySql.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\System.CodeDom.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\System.Composition.AttributedModel.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\System.Composition.Convention.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\System.Composition.Hosting.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\System.Composition.Runtime.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\System.Composition.TypedParts.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\cs\Microsoft.CodeAnalysis.resources.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\de\Microsoft.CodeAnalysis.resources.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\es\Microsoft.CodeAnalysis.resources.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\fr\Microsoft.CodeAnalysis.resources.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\it\Microsoft.CodeAnalysis.resources.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\ja\Microsoft.CodeAnalysis.resources.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\ko\Microsoft.CodeAnalysis.resources.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\pl\Microsoft.CodeAnalysis.resources.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\pt-BR\Microsoft.CodeAnalysis.resources.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\ru\Microsoft.CodeAnalysis.resources.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\tr\Microsoft.CodeAnalysis.resources.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\zh-Hans\Microsoft.CodeAnalysis.resources.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\zh-Hant\Microsoft.CodeAnalysis.resources.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\cs\Microsoft.CodeAnalysis.CSharp.resources.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\de\Microsoft.CodeAnalysis.CSharp.resources.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\es\Microsoft.CodeAnalysis.CSharp.resources.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\fr\Microsoft.CodeAnalysis.CSharp.resources.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\it\Microsoft.CodeAnalysis.CSharp.resources.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\ja\Microsoft.CodeAnalysis.CSharp.resources.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\ko\Microsoft.CodeAnalysis.CSharp.resources.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\pl\Microsoft.CodeAnalysis.CSharp.resources.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\pt-BR\Microsoft.CodeAnalysis.CSharp.resources.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\ru\Microsoft.CodeAnalysis.CSharp.resources.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\tr\Microsoft.CodeAnalysis.CSharp.resources.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\zh-Hans\Microsoft.CodeAnalysis.CSharp.resources.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\zh-Hant\Microsoft.CodeAnalysis.CSharp.resources.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\cs\Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\de\Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\es\Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\fr\Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\it\Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\ja\Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\ko\Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\pl\Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\pt-BR\Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\ru\Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\tr\Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\zh-Hans\Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\zh-Hant\Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\cs\Microsoft.CodeAnalysis.Workspaces.resources.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\de\Microsoft.CodeAnalysis.Workspaces.resources.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\es\Microsoft.CodeAnalysis.Workspaces.resources.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\fr\Microsoft.CodeAnalysis.Workspaces.resources.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\it\Microsoft.CodeAnalysis.Workspaces.resources.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\ja\Microsoft.CodeAnalysis.Workspaces.resources.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\ko\Microsoft.CodeAnalysis.Workspaces.resources.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\pl\Microsoft.CodeAnalysis.Workspaces.resources.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\pt-BR\Microsoft.CodeAnalysis.Workspaces.resources.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\ru\Microsoft.CodeAnalysis.Workspaces.resources.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\tr\Microsoft.CodeAnalysis.Workspaces.resources.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\zh-Hans\Microsoft.CodeAnalysis.Workspaces.resources.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\zh-Hant\Microsoft.CodeAnalysis.Workspaces.resources.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\cs\Microsoft.CodeAnalysis.Workspaces.MSBuild.BuildHost.resources.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\de\Microsoft.CodeAnalysis.Workspaces.MSBuild.BuildHost.resources.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\es\Microsoft.CodeAnalysis.Workspaces.MSBuild.BuildHost.resources.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\fr\Microsoft.CodeAnalysis.Workspaces.MSBuild.BuildHost.resources.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\it\Microsoft.CodeAnalysis.Workspaces.MSBuild.BuildHost.resources.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\ja\Microsoft.CodeAnalysis.Workspaces.MSBuild.BuildHost.resources.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\ko\Microsoft.CodeAnalysis.Workspaces.MSBuild.BuildHost.resources.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\pl\Microsoft.CodeAnalysis.Workspaces.MSBuild.BuildHost.resources.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\pt-BR\Microsoft.CodeAnalysis.Workspaces.MSBuild.BuildHost.resources.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\ru\Microsoft.CodeAnalysis.Workspaces.MSBuild.BuildHost.resources.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\tr\Microsoft.CodeAnalysis.Workspaces.MSBuild.BuildHost.resources.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\zh-Hans\Microsoft.CodeAnalysis.Workspaces.MSBuild.BuildHost.resources.dll
+C:\Users\ppsadzy\Desktop\8272 chinnaphat supsombat\Nut\Chinnaphat_8272_L005\obj\verification-build\zh-Hant\Microsoft.CodeAnalysis.Workspaces.MSBuild.BuildHost.resources.dll

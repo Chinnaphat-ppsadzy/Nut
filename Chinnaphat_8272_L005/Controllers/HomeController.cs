@@ -198,6 +198,22 @@ public class HomeController : Controller
                                    .ToListAsync();
             ViewBag.Products = products;
 
+            // Show rental stock available for the selected play date, not total inventory.
+            if (DateFormatHelper.TryParseIsoDate(selectedDate, out DateOnly rentalDate))
+            {
+                var rentalProductIds = products.Where(p => p.ProductType == "RENT").Select(p => p.ProductId).ToList();
+                var reservedRentals = await _db.BookingItems
+                    .Where(i => rentalProductIds.Contains(i.ProductId) && i.ItemType == "RENT" && i.Booking.PlayDate == rentalDate &&
+                        (i.Booking.Status == "PENDING_PAYMENT" || i.Booking.Status == "PENDING_VERIFY" || i.Booking.Status == "CONFIRMED"))
+                    .GroupBy(i => i.ProductId)
+                    .Select(g => new { ProductId = g.Key, Quantity = g.Sum(i => (int)i.Quantity) })
+                    .ToDictionaryAsync(g => g.ProductId, g => g.Quantity);
+
+                ViewBag.RentalAvailabilityByProductId = products
+                    .Where(p => p.ProductType == "RENT")
+                    .ToDictionary(p => p.ProductId, p => Math.Max(0, p.StockQty - reservedRentals.GetValueOrDefault(p.ProductId)));
+            }
+
             var bookedSlotKeys = new HashSet<string>();
             if (DateFormatHelper.TryParseIsoDate(selectedDate, out DateOnly targetDate))
             {
@@ -1076,7 +1092,22 @@ public class HomeController : Controller
             }
         }
 
-        return Json(new { success = true, bookedSlots = booked.Distinct().ToList() });
+        var rentalProducts = await _db.Products
+            .Where(p => p.ProductType == "RENT" && (p.IsActive == true || p.IsActive == null))
+            .Select(p => new { p.ProductId, p.StockQty })
+            .ToListAsync();
+        var rentalProductIds = rentalProducts.Select(p => p.ProductId).ToList();
+        var reservedRentalQuantities = await _db.BookingItems
+            .Where(i => rentalProductIds.Contains(i.ProductId) && i.ItemType == "RENT" && i.Booking.PlayDate == targetDate &&
+                (i.Booking.Status == "PENDING_PAYMENT" || i.Booking.Status == "PENDING_VERIFY" || i.Booking.Status == "CONFIRMED"))
+            .GroupBy(i => i.ProductId)
+            .Select(g => new { ProductId = g.Key, Quantity = g.Sum(i => (int)i.Quantity) })
+            .ToDictionaryAsync(g => g.ProductId, g => g.Quantity);
+        var rentalAvailability = rentalProducts.ToDictionary(
+            p => p.ProductId,
+            p => Math.Max(0, p.StockQty - reservedRentalQuantities.GetValueOrDefault(p.ProductId)));
+
+        return Json(new { success = true, bookedSlots = booked.Distinct().ToList(), rentalAvailability });
     }
 
     // Helper classes for input deserialization

@@ -2,12 +2,14 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
 using Chinnaphat_8272_L005.Models;
 using Chinnaphat_8272_L005.Database;
+using Chinnaphat_8272_L005.Helpers;
 using System.Globalization;
 using Microsoft.AspNetCore.Localization;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
+builder.Services.AddDataProtection();
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession(options =>
 {
@@ -122,6 +124,7 @@ app.UseStaticFiles(new StaticFileOptions
 });
 app.UseRouting();
 app.UseSession();
+app.UseMiddleware<RememberMeSessionMiddleware>();
 
 app.UseAuthorization();
 

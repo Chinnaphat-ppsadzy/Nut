@@ -177,7 +177,7 @@
             <div class="alert alert-danger py-2"><i class="bi bi-exclamation-triangle me-2"></i>@ViewBag.ErrorMessage</div>
         }
 
-        <form asp-action="Login" asp-controller="User" method="post" id="loginForm">
+        <form asp-action="Login" asp-controller="User" method="post" id="loginForm" autocomplete="on">
             @Html.AntiForgeryToken()
 
             <!-- Email -->
@@ -186,7 +186,7 @@
                 <div class="input-wrapper">
                     <i class="bi bi-envelope-fill"></i>
                     <input asp-for="Email" class="form-control" id="loginEmail"
-                           placeholder="กรอกอีเมล" autocomplete="email" type="email" />
+                           placeholder="กรอกอีเมล" autocomplete="username" type="email" />
                 </div>
                 <span asp-validation-for="Email" class="text-danger small"></span>
             </div>

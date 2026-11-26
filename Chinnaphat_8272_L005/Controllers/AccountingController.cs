@@ -345,7 +345,7 @@ namespace Chinnaphat_8272_L005.Controllers
         // 2. RECEIPTS & TAX INVOICES (ออกใบเสร็จรับเงิน / ใบกำกับภาษี)
         // ============================================================
         [HttpGet]
-        public async Task<IActionResult> Receipts(string? search, string? docType)
+        public async Task<IActionResult> Receipts(string? search, string? docType, int page = 1)
         {
             ViewData["Title"] = "ออกใบเสร็จรับเงิน & ใบกำกับภาษี";
             await EnsureAccountingRoleAndUserAsync();
@@ -377,8 +377,21 @@ namespace Chinnaphat_8272_L005.Controllers
                 ViewBag.SearchTerm = search.Trim();
             }
 
+            const int pageSize = 10;
+            var totalDocuments = await query.CountAsync();
+            var totalPages = Math.Max(1, (int)Math.Ceiling(totalDocuments / (double)pageSize));
+            page = Math.Clamp(page, 1, totalPages);
+
+            ViewBag.TotalDocuments = totalDocuments;
+            ViewBag.CurrentPage = page;
+            ViewBag.TotalPages = totalPages;
+            ViewBag.PageSize = pageSize;
+
             var receipts = await query
                 .OrderByDescending(r => r.IssuedAt)
+                .ThenByDescending(r => r.ReceiptId)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
                 .ToListAsync();
 
             return View(receipts);
@@ -515,17 +528,23 @@ namespace Chinnaphat_8272_L005.Controllers
 
                 if (request.BookingItemId.HasValue && request.BookingId.HasValue)
                 {
-                    var item = await _db.BookingItems.Include(i => i.Booking).ThenInclude(b => b.Payments)
-                        .FirstOrDefaultAsync(i => i.BookingItemId == request.BookingItemId.Value && i.BookingId == request.BookingId.Value && i.ItemType == "SALE");
+                    var item = await _db.BookingItems.Include(i => i.Product).ThenInclude(p => p.Category)
+                        .Include(i => i.Booking).ThenInclude(b => b.Payments)
+                        .FirstOrDefaultAsync(i => i.BookingItemId == request.BookingItemId.Value && i.BookingId == request.BookingId.Value);
                     var booking = item?.Booking;
-                    if (item == null || booking == null || item.LineTotal != request.Amount)
-                    { TempData["ErrorMessage"] = "ไม่พบสินค้าที่ขอคืน หรือยอดสินค้าไม่ตรง"; return RedirectToAction(nameof(DamagesAndRefunds), new { tab = "refunds" }); }
+                    if (!RefundEligibility.IsRefundableEquipment(item) || booking == null || item!.LineTotal != request.Amount)
+                    { TempData["ErrorMessage"] = "คืนได้เฉพาะอุปกรณ์กีฬาที่ซื้อ ไม่รวมเครื่องดื่ม ค่าคอร์ท หรืออุปกรณ์เช่า"; return RedirectToAction(nameof(DamagesAndRefunds), new { tab = "refunds" }); }
                     var paid = booking.Payments.Where(p => p.Status is "APPROVED" or "PAID").OrderByDescending(p => p.PaymentId).ToList();
                     var paidTotal = paid.Sum(p => p.Amount);
                     var alreadyRefunded = await _db.Refunds.Where(r => r.BookingId == booking.BookingId).SumAsync(r => (decimal?)r.Amount) ?? 0m;
                     var duplicateProductRefund = await _db.BookingRefundRequests.AnyAsync(r => r.RequestId != requestId && r.BookingItemId == item.BookingItemId && r.Status == "COMPLETED");
-                    if (paidTotal <= 0 || duplicateProductRefund || paidTotal - alreadyRefunded < request.Amount)
-                    { TempData["ErrorMessage"] = "ไม่พบยอดชำระคงเหลือพอคืน หรือสินค้านี้คืนเงินไปแล้ว"; return RedirectToAction(nameof(DamagesAndRefunds), new { tab = "refunds" }); }
+                    if (paidTotal <= 0)
+                    { TempData["ErrorMessage"] = "ไม่พบยอดชำระที่ยืนยันแล้วสำหรับรายการจองนี้ จึงยังคืนเงินไม่ได้"; return RedirectToAction(nameof(DamagesAndRefunds), new { tab = "refunds" }); }
+                    if (duplicateProductRefund)
+                    { TempData["ErrorMessage"] = "สินค้ารายการนี้มีคำขอที่คืนเงินสำเร็จแล้ว ระบบป้องกันการคืนซ้ำ"; return RedirectToAction(nameof(DamagesAndRefunds), new { tab = "refunds" }); }
+                    var remainingPaidAmount = paidTotal - alreadyRefunded;
+                    if (remainingPaidAmount < request.Amount)
+                    { TempData["ErrorMessage"] = $"ยอดชำระ {paidTotal:N2} ฿ หักยอดคืนก่อนหน้า {alreadyRefunded:N2} ฿ แล้ว เหลือ {remainingPaidAmount:N2} ฿ ซึ่งน้อยกว่ายอดขอคืน {request.Amount:N2} ฿"; return RedirectToAction(nameof(DamagesAndRefunds), new { tab = "refunds" }); }
                     var now = DateTime.Now;
                     var accountantId = await GetCurrentAccountantIdAsync();
                     _db.Refunds.Add(new Refund { BookingId = booking.BookingId, PaymentId = paid[0].PaymentId, Amount = request.Amount, Reason = $"คืนสินค้า {request.ProductName}", Status = "REFUNDED", ProcessedBy = accountantId, ProcessedAt = now, CreatedAt = now });

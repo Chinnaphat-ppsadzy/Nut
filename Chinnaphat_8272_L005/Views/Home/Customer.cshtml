@@ -4,6 +4,7 @@
 
     string selectedDateStr = ViewBag.SelectedDate as string ?? DateFormatHelper.ToIsoDate(DateTime.Today);
     DateTime selectedDate = DateFormatHelper.TryParseIsoDate(selectedDateStr, out var pDate) ? pDate.ToDateTime(TimeOnly.MinValue) : DateTime.Today;
+    var rentalAvailability = ViewBag.RentalAvailabilityByProductId as Dictionary<uint, int> ?? new();
 
     var courts = ViewBag.Courts as List<Chinnaphat_8272_L005.Models.Court>;
     if (courts == null || !courts.Any())
@@ -852,22 +853,23 @@
                     {
                         var catCode = item.Category?.CategoryCode ?? "GENERAL";
                         var isRent = item.ProductType == "RENT";
-                        <div class="col-6 col-md-4 col-lg-3 cust-product-card" data-cat="@catCode">
+                        var availableQty = isRent ? rentalAvailability.GetValueOrDefault(item.ProductId, item.StockQty) : item.StockQty;
+                                        <div class="col-6 col-md-4 col-lg-3 cust-product-card" data-cat="@catCode" data-product-id="@item.ProductId" data-product-type="@item.ProductType" data-unit="@item.Unit">
                             <div class="card h-100 border-0 shadow-sm rounded-4 overflow-hidden" style="background:#fff; transition: transform 0.2s, box-shadow 0.2s;">
                                 <div class="position-relative p-4 text-center" style="background: @(isRent ? "#eff6ff" : "#f0fdf4");">
                                     <span class="badge position-absolute top-0 start-0 m-3 @(isRent ? "bg-primary" : "bg-success")" style="font-size:0.75rem; border-radius:8px;">
                                         @(isRent ? "อุปกรณ์เช่า (Rent)" : "สินค้าขาย (Sale)")
                                     </span>
-                                    @if (item.StockQty <= 0)
+                                    @if (availableQty <= 0)
                                     {
-                                        <span class="badge bg-danger position-absolute top-0 end-0 m-3" style="font-size:0.75rem; border-radius:8px;">
-                                            สินค้าหมด
+                                        <span id="availability_@item.ProductId" class="badge bg-danger position-absolute top-0 end-0 m-3" style="font-size:0.75rem; border-radius:8px;">
+                                            @(isRent ? "เช่าเต็มในวันที่เลือก" : "สินค้าหมด")
                                         </span>
                                     }
                                     else
                                     {
-                                        <span class="badge bg-light text-secondary border position-absolute top-0 end-0 m-3" style="font-size:0.75rem; border-radius:8px;">
-                                            คงเหลือ @item.StockQty @item.Unit
+                                        <span id="availability_@item.ProductId" class="badge bg-light text-secondary border position-absolute top-0 end-0 m-3" style="font-size:0.75rem; border-radius:8px;">
+                                            @(isRent ? "พร้อมให้เช่า" : "คงเหลือ") @availableQty @item.Unit
                                         </span>
                                     }
                                     
@@ -905,18 +907,18 @@
                                             </div>
                                         }
                                         <div class="mt-2 pt-2 border-top">
-                                            @if (item.StockQty <= 0 && !isRent)
+                                            @if (availableQty <= 0)
                                             {
-                                                <button type="button" class="btn btn-sm btn-secondary w-100 disabled" style="border-radius:8px;">
-                                                    สินค้าหมดชั่วคราว
+                                                <button type="button" class="btn btn-sm btn-secondary w-100" style="border-radius:8px;" disabled>
+                                                    @(isRent ? "ไม่มีอุปกรณ์ให้เช่าในวันที่เลือก" : "สินค้าหมดชั่วคราว")
                                                 </button>
                                             }
                                             else
                                             {
                                                 <div class="d-flex align-items-center gap-2">
-                                                    <button type="button" class="btn btn-sm @(isRent ? "btn-outline-primary" : "btn-outline-success") flex-grow-1 fw-bold py-1 px-2"
+                                                    <button type="button" id="addProduct_@item.ProductId" data-available-qty="@availableQty" class="btn btn-sm @(isRent ? "btn-outline-primary" : "btn-outline-success") flex-grow-1 fw-bold py-1 px-2"
                                                             style="border-radius:8px;"
-                                                            onclick="addToCustomerCart(@item.ProductId, '@Html.Raw(item.ProductName.Replace("'", "\\'"))', '@item.ProductType', '@catCode', @item.CategoryId, @item.Price, '@item.Unit', @item.StockQty)">
+                                                            onclick="addToCustomerCart(@item.ProductId, '@Html.Raw(item.ProductName.Replace("'", "\\'"))', '@item.ProductType', '@catCode', @item.CategoryId, @item.Price, '@item.Unit', this.dataset.availableQty)">
                                                         <i class="bi bi-cart-plus me-1"></i> @(isRent ? "+ เลือกเช่า" : "+ ซื้อลงตะกร้า")
                                                     </button>
                                                     <button type="button" class="btn btn-sm btn-outline-danger fw-semibold cust-cart-badge" id="cardQty_@item.ProductId" style="display:none;" onclick="removeFromCustomerCart(@item.ProductId)" title="ลบรายการนี้ออกจากตะกร้า">
@@ -1789,10 +1791,15 @@
                 showGuestAuthPrompt('สั่งซื้อหรือเช่าอุปกรณ์');
                 return;
             }
+            const maxQty = Math.max(0, parseInt(stockQty, 10) || 0);
+            if (maxQty <= 0) {
+                alert(type === 'RENT' ? `อุปกรณ์ '${name}' ไม่มีจำนวนพร้อมให้เช่าในวันที่เลือก` : `สินค้า '${name}' หมดสต็อก`);
+                return;
+            }
             if (customerCart.has(id)) {
                 const item = customerCart.get(id);
-                if (type === 'SALE' && item.qty >= stockQty) {
-                    alert(`สินค้า '${name}' มีในสต็อกเพียง ${stockQty} ${unit}`);
+                if (item.qty >= maxQty) {
+                    alert(type === 'RENT' ? `อุปกรณ์ '${name}' พร้อมให้เช่าในวันที่เลือก ${maxQty} ${unit}` : `สินค้า '${name}' มีในสต็อกเพียง ${maxQty} ${unit}`);
                     return;
                 }
                 item.qty += 1;
@@ -1806,7 +1813,7 @@
                     price: parseFloat(price) || 0,
                     unit: unit,
                     qty: 1,
-                    stockQty: parseInt(stockQty) || 999
+                    stockQty: maxQty
                 });
             }
             updateCartBadges();
@@ -1827,8 +1834,8 @@
             if (newQty <= 0) {
                 removeFromCustomerCart(id);
             } else {
-                if (item.type === 'SALE' && newQty > item.stockQty) {
-                    alert(`สินค้า '${item.productName}' มีในสต็อกเพียง ${item.stockQty} ${item.unit}`);
+                if (newQty > item.stockQty) {
+                    alert(item.type === 'RENT' ? `อุปกรณ์ '${item.productName}' พร้อมให้เช่าในวันที่เลือก ${item.stockQty} ${item.unit}` : `สินค้า '${item.productName}' มีในสต็อกเพียง ${item.stockQty} ${item.unit}`);
                     return;
                 }
                 item.qty = newQty;
@@ -1897,6 +1904,43 @@
                 const response = await fetch(`/Home/GetBookedSlots?date=${dateIso}`);
                 const data = await response.json();
                 const bookedSet = new Set(data.bookedSlots || []);
+
+                let rentalCartAdjusted = false;
+                document.querySelectorAll('.cust-product-card[data-product-type="RENT"]').forEach(card => {
+                    const productId = Number(card.dataset.productId);
+                    const availableQty = Math.max(0, Number(data.rentalAvailability?.[productId] ?? 0));
+                    const unit = card.dataset.unit || 'ชิ้น';
+                    const badge = document.getElementById(`availability_${productId}`);
+                    const addButton = document.getElementById(`addProduct_${productId}`);
+
+                    if (badge) {
+                        badge.className = `badge position-absolute top-0 end-0 m-3 ${availableQty > 0 ? 'bg-light text-secondary border' : 'bg-danger'}`;
+                        badge.textContent = availableQty > 0 ? `พร้อมให้เช่า ${availableQty} ${unit}` : 'เช่าเต็มในวันที่เลือก';
+                    }
+                    if (addButton) {
+                        addButton.dataset.availableQty = String(availableQty);
+                        addButton.disabled = availableQty <= 0;
+                        addButton.innerHTML = availableQty > 0
+                            ? '<i class="bi bi-cart-plus me-1"></i> + เลือกเช่า'
+                            : 'ไม่มีอุปกรณ์ให้เช่าในวันที่เลือก';
+                    }
+
+                    const cartItem = customerCart.get(productId);
+                    if (cartItem) {
+                        cartItem.stockQty = availableQty;
+                        if (cartItem.qty > availableQty) {
+                            rentalCartAdjusted = true;
+                            if (availableQty === 0) customerCart.delete(productId);
+                            else cartItem.qty = availableQty;
+                        }
+                    }
+                });
+                updateCartBadges();
+                updateSummaryBar();
+                if (rentalCartAdjusted) {
+                    renderModalCartItems();
+                    alert('จำนวนอุปกรณ์เช่าในตะกร้าถูกปรับตามจำนวนที่พร้อมให้เช่าในวันที่เลือก');
+                }
 
                 document.querySelectorAll('.slot-cell').forEach(cell => {
                     if (cell.classList.contains('court-closed')) return;

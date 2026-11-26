@@ -1,9 +1,10 @@
 @model List<Chinnaphat_8272_L005.Models.Product>
 
 @{
-    ViewData["Title"] = "ตรวจรับคืนและจัดการอุปกรณ์เช่า";
+    ViewData["Title"] = "ส่งมอบสินค้าและจัดการอุปกรณ์เช่า";
     Layout = "_SalesStaffLayout";
     var damages = ViewBag.Damages as List<Chinnaphat_8272_L005.Models.EquipmentDamage> ?? new();
+    var pendingSaleItems = ViewBag.PendingSaleItems as List<Chinnaphat_8272_L005.Models.BookingItem> ?? new();
     var rentalItems = ViewBag.ActiveRentalItems as List<Chinnaphat_8272_L005.Models.BookingItem> ?? new();
     var posRentalItems = ViewBag.PosRentalItems as List<Chinnaphat_8272_L005.Controllers.PosRentalLineViewModel> ?? new();
 }
@@ -41,13 +42,70 @@
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
         <div>
             <h3 class="fw-bold mb-1">
-                <i class="bi bi-arrow-repeat me-2"></i>ส่งมอบและตรวจรับคืนอุปกรณ์เช่า
+                <i class="bi bi-box-seam me-2"></i>ส่งมอบสินค้าและจัดการอุปกรณ์เช่า
             </h3>
             <p class="mb-0 opacity-75 small">
-                ฝ่ายขาย/เช่ารับอุปกรณ์และตรวจสภาพ จากนั้นส่งคำขอคืนมัดจำให้ฝ่ายบัญชีตรวจยอดและบันทึกการโอนคืน
+                ส่งมอบสินค้าที่ชำระและบัญชียืนยันแล้ว ส่วนอุปกรณ์เช่าใช้สำหรับส่งมอบ รับคืน แจ้งชำรุด และส่งคำขอคืนมัดจำให้ฝ่ายบัญชี
             </p>
         </div>
     </div>
+</div>
+
+<div class="card border-0 shadow-sm rounded-4 p-3 bg-white mb-4">
+    <h5 class="fw-bold text-dark mb-3">
+        <i class="bi bi-bag-check text-success me-2"></i>สินค้าที่ชำระแล้ว รอส่งมอบ (@pendingSaleItems.Count รายการ)
+    </h5>
+    @if (pendingSaleItems.Any())
+    {
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>รหัสจอง / ลูกค้า</th>
+                        <th>สินค้า</th>
+                        <th>จำนวน</th>
+                        <th>ยอดสินค้า</th>
+                        <th>วันที่สั่ง</th>
+                        <th class="text-end">ดำเนินการ</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var saleItem in pendingSaleItems)
+                    {
+                        <tr>
+                            <td>
+                                <div class="fw-bold text-primary">@(saleItem.Booking?.BookingCode ?? "-")</div>
+                                <small class="text-muted">@(saleItem.Booking?.User?.FullName ?? "ลูกค้า") · @(saleItem.Booking?.User?.Phone ?? "ไม่มีเบอร์")</small>
+                            </td>
+                            <td>
+                                <div class="fw-semibold">@(saleItem.Product?.ProductName ?? $"สินค้า #{saleItem.ProductId}")</div>
+                                <small class="text-muted">SKU: @(saleItem.Product?.Sku ?? "-")</small>
+                            </td>
+                            <td>@saleItem.Quantity @(saleItem.Product?.Unit ?? "ชิ้น")</td>
+                            <td class="fw-semibold">@saleItem.LineTotal.ToString("N2") ฿</td>
+                            <td><small>@saleItem.Booking?.CreatedAt.ToString("dd/MM/yyyy HH:mm")</small></td>
+                            <td class="text-end">
+                                <form asp-action="MarkSaleItemDelivered" method="post" class="d-inline" onsubmit="return confirm('ยืนยันว่าตรวจสินค้าและส่งมอบให้ลูกค้าแล้ว?')">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="bookingItemId" value="@saleItem.BookingItemId" />
+                                    <button type="submit" class="btn btn-sm btn-success text-nowrap">
+                                        <i class="bi bi-box-arrow-up-right me-1"></i>ส่งมอบสินค้า
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+    else
+    {
+        <div class="text-center py-4 text-muted">
+            <i class="bi bi-check2-circle fs-2 text-success d-block mb-2"></i>
+            ไม่มีสินค้าที่รอส่งมอบ
+        </div>
+    }
 </div>
 
 <div class="row g-4">

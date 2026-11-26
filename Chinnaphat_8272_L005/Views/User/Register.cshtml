@@ -124,18 +124,6 @@
 
         .required-star { color: #e53e3e; }
 
-        .password-strength {
-            height: 5px;
-            border-radius: 3px;
-            background: #e2e8f0;
-            margin-top: 6px;
-        }
-
-        .password-strength .bar {
-            height: 100%;
-            border-radius: 3px;
-            transition: all 0.4s;
-        }
     </style>
 </head>
 <body>
@@ -228,8 +216,6 @@
                     <input asp-for="Password" class="form-control" id="regPassword" placeholder="รหัสผ่าน (อย่างน้อย 6 ตัว)" />
                     <i class="bi bi-eye toggle-password" id="toggleRegPwd" onclick="togglePwd('regPassword','toggleRegPwd')"></i>
                 </div>
-                <div class="password-strength"><div class="bar" id="strengthBar"></div></div>
-                <small id="strengthText" class="text-muted"></small>
                 <span asp-validation-for="Password" class="text-danger small d-block"></span>
             </div>
 
@@ -281,30 +267,6 @@
         }
     }
 
-    // Password strength indicator
-    document.getElementById('regPassword').addEventListener('input', function () {
-        const val  = this.value;
-        const bar  = document.getElementById('strengthBar');
-        const text = document.getElementById('strengthText');
-        let score  = 0;
-        if (val.length >= 6)  score++;
-        if (val.length >= 10) score++;
-        if (/[A-Z]/.test(val)) score++;
-        if (/[0-9]/.test(val)) score++;
-        if (/[^A-Za-z0-9]/.test(val)) score++;
-
-        const levels = [
-            { label: '',          color: '#e2e8f0', width: '0%'   },
-            { label: 'อ่อนมาก',   color: '#fc8181', width: '20%'  },
-            { label: 'อ่อน',      color: '#fbd38d', width: '40%'  },
-            { label: 'พอใช้',     color: '#f6e05e', width: '60%'  },
-            { label: 'แข็งแกร่ง', color: '#68d391', width: '80%'  },
-            { label: 'ดีมาก',     color: '#48bb78', width: '100%' },
-        ];
-        bar.style.width      = levels[score].width;
-        bar.style.background = levels[score].color;
-        text.textContent     = val.length > 0 ? `ความแข็งแกร่ง: ${levels[score].label}` : '';
-    });
 </script>
 
 </body>

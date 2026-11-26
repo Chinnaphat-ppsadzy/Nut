@@ -6,16 +6,19 @@ using Microsoft.AspNetCore.Http;
 using System.Net;
 using Chinnaphat_8272_L005.Helpers;
 using Chinnaphat_8272_L005.Database;
+using Microsoft.AspNetCore.DataProtection;
 
 namespace Chinnaphat_8272_L005.Controllers
 {
     public class UserController : Controller
     {
         private readonly Csi402dbContext _db;
+        private readonly IDataProtector _rememberMeProtector;
 
-        public UserController(Csi402dbContext db)
+        public UserController(Csi402dbContext db, IDataProtectionProvider dataProtectionProvider)
         {
             _db = db;
+            _rememberMeProtector = dataProtectionProvider.CreateProtector("CourtBook.RememberMe.v1");
         }
 
         // ============================================================
@@ -76,6 +79,31 @@ namespace Chinnaphat_8272_L005.Controllers
                 if (!string.IsNullOrEmpty(user.Phone))
                 {
                     HttpContext.Session.SetString("Phone", user.Phone);
+                }
+
+                if (model.RememberMe)
+                {
+                    var expiresAt = DateTimeOffset.UtcNow.AddDays(30);
+                    var rememberToken = _rememberMeProtector.Protect($"{user.UserId}|{expiresAt.ToUnixTimeSeconds()}|{user.PasswordHash}");
+                    Response.Cookies.Append(RememberMeSessionMiddleware.CookieName, rememberToken, new CookieOptions
+                    {
+                        HttpOnly = true,
+                        Secure = true,
+                        SameSite = SameSiteMode.Lax,
+                        IsEssential = true,
+                        Path = "/",
+                        Expires = expiresAt
+                    });
+                }
+                else
+                {
+                    Response.Cookies.Delete(RememberMeSessionMiddleware.CookieName, new CookieOptions
+                    {
+                        HttpOnly = true,
+                        Secure = true,
+                        SameSite = SameSiteMode.Lax,
+                        Path = "/"
+                    });
                 }
 
                 ClearLegacyIdentityCookies();
@@ -655,8 +683,13 @@ namespace Chinnaphat_8272_L005.Controllers
             TempData.Clear();
 
             ClearLegacyIdentityCookies();
-
-            TempData["SuccessMessage"] = "ออกจากระบบเรียบร้อยแล้ว เข้าสู่โหมดผู้เยี่ยมชม (Guest)";
+            Response.Cookies.Delete(RememberMeSessionMiddleware.CookieName, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = true,
+                SameSite = SameSiteMode.Lax,
+                Path = "/"
+            });
             return RedirectToAction("Customer", "Home");
         }
 
@@ -723,6 +756,19 @@ namespace Chinnaphat_8272_L005.Controllers
             var refundRequests = await _db.BookingRefundRequests
                 .Where(r => r.CustomerUserId == user.UserId)
                 .OrderByDescending(r => r.CreatedAt).ToListAsync();
+            var rentalBookingItemIds = bookings.SelectMany(b => b.BookingItems)
+                .Where(i => i.ItemType == "RENT")
+                .Select(i => i.BookingItemId)
+                .ToList();
+            var rentalDepositRequests = rentalBookingItemIds.Count == 0
+                ? new List<RentalDepositRefundRequest>()
+                : await _db.RentalDepositRefundRequests
+                    .Where(r => r.BookingItemId.HasValue && rentalBookingItemIds.Contains(r.BookingItemId.Value))
+                    .OrderByDescending(r => r.CreatedAt)
+                    .ToListAsync();
+            var rentalDepositRequestByItem = rentalDepositRequests
+                .GroupBy(r => r.BookingItemId!.Value)
+                .ToDictionary(g => g.Key, g => g.First());
 
             model.TotalBookingsCount = bookings.Count;
             model.TotalSpending = bookings.Sum(b => b.NetAmount);
@@ -817,7 +863,16 @@ namespace Chinnaphat_8272_L005.Controllers
                             ItemStatusBadgeClass = rBadge,
                             HandedOverAt = itm.HandedOverAt,
                             ReturnedAt = itm.ReturnedAt,
-                            RentalDate = b.CreatedAt
+                            RentalDate = b.CreatedAt,
+                            DepositRefundRequestId = rentalDepositRequestByItem.TryGetValue(itm.BookingItemId, out var depositRequest)
+                                ? depositRequest.RequestId : null,
+                            DepositRefundStatus = depositRequest?.Status,
+                            DepositRefundAssessmentStatus = depositRequest?.DamageAssessmentStatus,
+                            DepositRefundFineAmount = depositRequest?.FineAmount,
+                            DepositRefundedAmount = depositRequest?.RefundedAmount,
+                            DepositRefundMethod = depositRequest?.RefundMethod,
+                            DepositRefundReference = depositRequest?.RefundReference,
+                            DepositRefundProcessedAt = depositRequest?.ProcessedAt
                         });
                     }
                     else
@@ -836,7 +891,7 @@ namespace Chinnaphat_8272_L005.Controllers
                             ItemStatusText = GetPurchaseStatusText(b.Status ?? string.Empty, itm.ItemStatus),
                             ItemStatusBadgeClass = GetPurchaseStatusBadge(b.Status ?? string.Empty, itm.ItemStatus),
                             OrderDate = b.CreatedAt,
-                            CanRequestRefund = itm.ItemType == "SALE" && itm.LineTotal > 0
+                            CanRequestRefund = RefundEligibility.IsRefundableEquipment(itm)
                                 && (itm.ItemStatus is "HANDED_OVER" or "DELIVERED")
                                 && b.Payments.Any(p => p.Status is "APPROVED" or "PAID")
                                 && b.Payments.Where(p => p.Status is "APPROVED" or "PAID").Sum(p => p.Amount) >= itm.LineTotal
@@ -889,13 +944,14 @@ namespace Chinnaphat_8272_L005.Controllers
                 return RedirectToAction(nameof(Profile));
             }
 
-            var item = await _db.BookingItems.Include(i => i.Booking).ThenInclude(b => b.Payments)
+            var item = await _db.BookingItems.Include(i => i.Product).ThenInclude(p => p.Category)
+                .Include(i => i.Booking).ThenInclude(b => b.Payments)
                 .FirstOrDefaultAsync(i => i.BookingItemId == bookingItemId && i.Booking.UserId == userId);
             var booking = item?.Booking;
-            if (item == null || booking == null || item.ItemType != "SALE" || booking.Status is "CANCELLED" or "REJECTED" or "EXPIRED"
+            if (item == null || !RefundEligibility.IsRefundableEquipment(item) || booking == null || booking.Status is "CANCELLED" or "REJECTED" or "EXPIRED"
                 || item.ItemStatus is not ("HANDED_OVER" or "DELIVERED"))
             {
-                TempData["ErrorMessage"] = "ขอคืนได้เฉพาะสินค้าที่ซื้อ ชำระแล้ว และฝ่ายขายส่งมอบให้แล้ว";
+                TempData["ErrorMessage"] = "ขอคืนได้เฉพาะอุปกรณ์กีฬาที่ซื้อและฝ่ายขายส่งมอบแล้ว ไม่รวมเครื่องดื่ม ค่าคอร์ท หรืออุปกรณ์เช่า";
                 return RedirectToAction(nameof(Profile));
             }
             var paidTotal = booking.Payments.Where(p => p.Status is "APPROVED" or "PAID").Sum(p => p.Amount);
